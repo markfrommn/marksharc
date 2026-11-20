@@ -1,0 +1,29 @@
+# Ignore Agentic files for now to keep them out of git
+
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+KILO.md
+WARP.md
+.agents/**
+.claude/**
+.codex/**
+.cursor/**
+.omp/**
+.cwf**
+.cwf/**
+
+# Editor Droppings
+
+**/*~
+**/#*#
+
+# OS Crap
+ OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
