@@ -27,6 +27,9 @@
 
 - **`When run`, not `When run command`, for repository scripts.** ShellSpec's `run command` looks the name up on PATH only (`shellspec_which`), so an absolute script path reports "not found". `run command` stays correct for PATH names such as `env` and `curl`.
 
+- **`Parameters` sit in their own `Describe`.** ShellSpec applies a `Parameters` block to every example in the enclosing group, so the hygiene spec scopes it to an inner `Describe`.
+- **`.cwf-settings.yaml` needs `repo_version: 1`,** as `cwf ai init` writes it.
+
 ## File Map
 
 - Create `core/zsh/lib/.gitkeep`, `core/fish/lib/.gitkeep`, `core/bash/.gitkeep`, `core/cli/.gitkeep`, `modules/.gitkeep`, `templates/overlay/.gitkeep`: the spec 6.2 tree.
@@ -661,27 +664,29 @@ git commit -m "test: add shell lint and a single check entry point" -m "Refs DEV
 Describe 'repository hygiene'
   ignored() { "$REAL_GIT" -C "$MARKSHARC_ROOT" check-ignore -q --no-index -- "$1"; }
 
-  Parameters
-    AGENTS.md
-    CLAUDE.md
-    GEMINI.md
-    modules/example/CLAUDE.md
-    .agents/skills/example/SKILL.md
-    .claude/settings.json
-    .claude/hooks/example.sh
-    .codex/config.toml
-    .cursor/rules/example.mdc
-    .omp/example
-    .cwf-settings.yaml
-    .cwf-ai-manifest.json
-    .cwf/ai/ext/example.md
-    .vscode/settings.json
-    docs/COMMON-WORKFLOW.md
-    memory/local/example.md
-  End
-  It "ignores agent configuration: $1"
-    When call ignored "$1"
-    The status should be success
+  Describe 'ignore rules'
+    Parameters
+      AGENTS.md
+      CLAUDE.md
+      GEMINI.md
+      modules/example/CLAUDE.md
+      .agents/skills/example/SKILL.md
+      .claude/settings.json
+      .claude/hooks/example.sh
+      .codex/config.toml
+      .cursor/rules/example.mdc
+      .omp/example
+      .cwf-settings.yaml
+      .cwf-ai-manifest.json
+      .cwf/ai/ext/example.md
+      .vscode/settings.json
+      docs/COMMON-WORKFLOW.md
+      memory/local/example.md
+    End
+    It "ignores agent configuration: $1"
+      When call ignored "$1"
+      The status should be success
+    End
   End
 
   It 'keeps the shared memory index tracked'
@@ -691,7 +696,303 @@ Describe 'repository hygiene'
 
   tracked_agent_config() {
     "$REAL_GIT" -C "$MARKSHARC_ROOT" ls-files |
-      grep -E '(^|/)(AGENTS|CLAUDE|GEMINI)\.md$|^\.(agents|claude|codex|cursor|omp|vscode)/|^\.cwf|^docs/COMMON-WORKFLOW\.md$' || :
+      grep -E '(^|/)(AGENTS|CLAUDE|GEMINI)\.md$|^\.(agents|claude|codex|cursor|omp|vscode)/|^\.cwf|^docs/COMMON-WORKFLOW\.md
+Run: `tests/run-tests --shell sh spec/repo/hygiene_spec.sh`
+Expected: FAIL for `.vscode/settings.json`, `docs/COMMON-WORKFLOW.md` and `memory/local/example.md`.
+
+- [ ] **Step 2: Rewrite `.gitignore`**
+
+```text
+# Editor droppings
+**/*~
+**/#*#
+
+# OS droppings
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+#BEGIN cwf
+.cwf-settings-local.yaml
+.common-state.json
+.devcontainer/
+.sandcat/
+#END cwf
+
+#BEGIN cwf-ai
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.cwf/phase-runs/
+!.claude/hooks/
+memory/local/
+#END cwf-ai
+
+# Agent configuration and cwf renders stay out of the repository (spec 6.2).
+# Keep this block last: git applies the last matching rule, and cwf's
+# generated blocks above may re-include agent paths.
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+KILO.md
+WARP.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.omp/
+.vscode/
+.cwf*
+docs/COMMON-WORKFLOW.md
+memory/local/
+```
+
+(This is the final file. The `cwf-ai` block is written by `cwf ai install` in Step 3; before Step 3 the file is the same without it.)
+
+Run: `tests/run-tests --shell sh spec/repo/hygiene_spec.sh`
+Expected: PASS.
+
+- [ ] **Step 3: Write `.cwf-settings.yaml` (local) and render**
+
+Write the settings file from `docs/DEVELOPING.md` step 1 with the author's values: `github_org: markfrommn`, `linear_workspace: https://linear.app/psols`, `linear_mcp: linear-server-psols`, `linear_team: DEV`, project link `https://linear.app/psols/project/marksharc-3ff9057f0630`. If `cwf ai init --dry-run --force --profile preset/generic,cap/gha` shows extra required keys (such as `git.mode`), add them.
+
+Run: `cwf ai install && git status --short --ignored`
+Expected: new tracked candidates are only `memory/MEMORY.md` and `.gitignore`; every rendered agent path shows as ignored (`!!`).
+
+- [ ] **Step 4: Keep the agent block last**
+
+Open `.gitignore`. If cwf placed its cwf-ai block below the agent block, move the agent block back to the end. Leave cwf's own lines as written.
+
+Run: `tests/run-tests --shell sh spec/repo/hygiene_spec.sh && cwf status && cwf ai status`
+Expected: hygiene passes; `cwf status` shows no gitignore warning; `cwf ai status` reports no drift. Record any remaining cwf warning in the PR.
+
+- [ ] **Step 5: Write `docs/DEVELOPING.md`**
+
+```markdown
+# Developing marksharc
+
+## Tools
+
+| Tool | Version | Used for |
+| --- | --- | --- |
+| zsh | 5.9+ | Core and CLI; the zsh suite |
+| fish | 4.x | Fish lint now; the fish phase later |
+| bash | 5.x | Environment parity later |
+| ShellSpec | 0.28.1, pinned in `tests/shellspec.pin` | All specs |
+| shellcheck | current | Lint for `sh` and `bash` files |
+| git, python3 | any recent | Fixtures |
+
+On macOS: `brew install fish shellcheck shellspec`, then check that
+`shellspec --version` prints the pinned version. Elsewhere, or for an exact
+pin, check out the commit in `tests/shellspec.pin` and point
+`SHELLSPEC_BIN` at its `shellspec` script, as CI does.
+
+## Checks
+
+```sh
+tests/check
+```
+
+This runs `tests/lint` and both suites, in the same order as CI. See
+[tests/README.md](../tests/README.md) for single suites and the test rules.
+CI runs on `macos-latest` and `ubuntu-latest` for every pull request and every
+push to `main`; both must be green before a merge.
+
+## Rules
+
+- Every behaviour change ships with a spec. Specs use a temporary HOME and
+  command stubs, never real services.
+- Portable code (`core/`, `modules/`, `templates/`) holds no personal values:
+  no user, host, org or site names, and no home paths.
+- Shell startup is quiet, offline and makes no installs.
+- The framework checkout is never written at run time.
+- Agent configuration is never committed. `.gitignore` keeps `AGENTS.md`,
+  `CLAUDE.md`, `.claude/`, `.agents/`, `.omp/`, `.codex/`, `.cursor/`,
+  `.vscode/`, `.cwf*` and `docs/COMMON-WORKFLOW.md` out, and
+  `tests/spec/repo/hygiene_spec.sh` checks it. Keep the agent block last in
+  `.gitignore`.
+
+The design rules are in section 10 of [the specification](../specs/MARKSHARC-SPEC.md).
+
+## Branches, commits and pull requests
+
+- One pull request per Linear issue. Name the branch after the issue, such as
+  `<user>/dev-41-<slug>`.
+- Use Conventional Commit subjects (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `ci:`).
+- Add a line to `CHANGELOG.md` under `Unreleased` for user-visible changes.
+
+## Workflow tooling (cwf), set up by hand
+
+The `cwf` workflow tool renders agent definitions into a working copy. Its
+settings file and everything it renders stay local; none of it is committed.
+
+1. Write `.cwf-settings.yaml` at the repository root:
+
+   ```yaml
+   ai:
+     profile:
+       - preset/generic
+       - cap/gha
+     values:
+       repo_display: marksharc
+       plan_docs: specs/*-PLAN*.md
+       authority_docs: specs/MARKSHARC-SPEC.md
+       verify: "tests/check (lint, zsh suite, repository suite); CI runs the same on macOS and Ubuntu"
+       test_stack: "ShellSpec 0.28.1 via tests/run-tests; tests/lint for zsh -n, shellcheck and fish --no-execute"
+       ports: "n/a (shell framework, no server)"
+       github_org: <github-org>
+       linear_workspace: <linear-workspace-url>
+       linear_mcp: <linear-mcp-server-name>
+       linear_team: <linear-team-key>
+       linear_projects:
+         - "[MarkSharc](<linear-project-url>)"
+   ```
+
+2. Render the agent definitions:
+
+   ```sh
+   cwf ai install
+   ```
+
+   This writes `AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/` and the other
+   agent trees, `docs/COMMON-WORKFLOW.md`, and a cwf block in `.gitignore`. It
+   seeds `memory/MEMORY.md` if it is missing.
+
+3. Check the result:
+
+   ```sh
+   git status --short     # expect no new files; at most a moved .gitignore block
+   cwf ai status          # render integrity
+   cwf status             # repository checks
+   ```
+
+   If `cwf ai install` added or moved its block below the agent block in
+   `.gitignore`, move the agent block back to the end, then run
+   `tests/run-tests --shell sh spec/repo/hygiene_spec.sh`.
+
+4. After a template or settings change, run `cwf ai refresh` and repeat step 3.
+
+Memory notes live in `memory/`; `cwf ai memory new` writes one and
+`cwf ai memory index` rebuilds `memory/MEMORY.md`. `memory/local/` is ignored.
+```
+
+- [ ] **Step 6: Run everything and commit**
+
+Run: `tests/check`
+Expected: PASS.
+
+```sh
+git add .gitignore docs/DEVELOPING.md memory/MEMORY.md tests/spec/repo/hygiene_spec.sh
+git commit -m "chore: ignore agent configuration and document cwf setup" -m "Refs DEV-41"
+```
+
+### Task 5: CI on macOS and Ubuntu
+
+**Files:**
+- Create: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- Consumes: `tests/shellspec.pin` (`commit`, `source`), `tests/lint`, `tests/run-tests`.
+
+- [ ] **Step 1: Write the workflow**
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install shells and linters (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:fish-shell/release-4
+          sudo apt-get update -q
+          sudo apt-get install -y -q zsh fish shellcheck
+
+      - name: Install shells and linters (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish shellcheck
+
+      - name: Install pinned ShellSpec
+        run: |
+          commit=$(awk '$1 == "commit" { print $2 }' tests/shellspec.pin)
+          source=$(awk '$1 == "source" { print $2 }' tests/shellspec.pin)
+          dir="$RUNNER_TEMP/shellspec"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 "$source" "$commit"
+          git -C "$dir" checkout -q FETCH_HEAD
+          echo "SHELLSPEC_BIN=$dir/shellspec" >> "$GITHUB_ENV"
+
+      - name: Tool versions
+        run: |
+          zsh --version
+          fish --version
+          bash --version | head -n 1
+          shellcheck --version | sed -n 2p
+          "$SHELLSPEC_BIN" --version
+
+      - name: Lint
+        run: tests/lint
+
+      - name: zsh suite
+        run: tests/run-tests --shell zsh spec/zsh
+
+      - name: Repository suite
+        run: tests/run-tests --shell sh spec/repo
+```
+
+- [ ] **Step 2: Check the pin is fetchable the way CI fetches it**
+
+Run (in a scratch dir): `git init -q s && git -C s fetch -q --depth 1 https://github.com/shellspec/shellspec.git 90e48c950239f3b8a9fdfa3e869592872c77b981 && git -C s checkout -q FETCH_HEAD && s/shellspec --version`
+Expected: `0.28.1`.
+
+- [ ] **Step 3: Lint, commit, push, open the PR**
+
+Run: `tests/check`
+
+```sh
+git add .github/workflows/ci.yml
+git commit -m "ci: run lint and suites on macOS and Ubuntu" -m "Refs DEV-41"
+git push -u origin HEAD
+gh pr create --title "DEV-41: repo scaffold, conventions, and CI" --body-file <body>
+```
+
+- [ ] **Step 4: Watch CI and fix what Linux exposes**
+
+Run: `gh pr checks --watch`
+Expected: `check (macos-latest)` and `check (ubuntu-latest)` both pass. For each failure, reproduce locally if possible (for dash, run `tests/run-tests --shell dash spec/repo` when dash is installed), fix, add a spec when the fix is a behaviour change, and push.
+
+## Done when
+
+- [ ] CI is green on macOS and Ubuntu for the PR.
+- [ ] `cwf status` and `cwf ai status` are clean and `git status` shows no rendered agent files.
+- [ ] DEV-41 is In Review with the PR linked. Merging is the user's call.
+ || :
   }
   It 'tracks no agent configuration'
     When call tracked_agent_config

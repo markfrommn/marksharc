@@ -1,29 +1,47 @@
-# Ignore Agentic files for now to keep them out of git
-
-AGENTS.md
-CLAUDE.md
-GEMINI.md
-KILO.md
-WARP.md
-.agents/**
-.claude/**
-.codex/**
-.cursor/**
-.omp/**
-.cwf**
-.cwf/**
-
-# Editor Droppings
-
+# Editor droppings
 **/*~
 **/#*#
 
-# OS Crap
- OS
+# OS droppings
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+#BEGIN cwf
+.cwf-settings-local.yaml
+.common-state.json
+.devcontainer/
+.sandcat/
+#END cwf
+
+#BEGIN cwf-ai
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.cwf/phase-runs/
+!.claude/hooks/
+memory/local/
+#END cwf-ai
+
+# Agent configuration and cwf renders stay out of the repository (spec 6.2).
+# Keep this block last: git applies the last matching rule, and cwf's
+# generated blocks above may re-include agent paths.
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+KILO.md
+WARP.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.omp/
+.vscode/
+.cwf*
+docs/COMMON-WORKFLOW.md
+memory/local/
