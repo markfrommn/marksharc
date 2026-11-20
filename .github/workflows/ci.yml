@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install shells and linters (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:fish-shell/release-4
+          sudo apt-get update -q
+          sudo apt-get install -y -q zsh fish shellcheck
+
+      - name: Install shells and linters (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish shellcheck
+
+      - name: Install pinned ShellSpec
+        run: |
+          commit=$(awk '$1 == "commit" { print $2 }' tests/shellspec.pin)
+          source=$(awk '$1 == "source" { print $2 }' tests/shellspec.pin)
+          dir="$RUNNER_TEMP/shellspec"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 "$source" "$commit"
+          git -C "$dir" checkout -q FETCH_HEAD
+          echo "SHELLSPEC_BIN=$dir/shellspec" >> "$GITHUB_ENV"
+
+      - name: Tool versions
+        run: |
+          zsh --version
+          fish --version
+          bash --version | head -n 1
+          shellcheck --version | sed -n 2p
+          "$SHELLSPEC_BIN" --version
+
+      - name: Lint
+        run: tests/lint
+
+      - name: zsh suite
+        run: tests/run-tests --shell zsh spec/zsh
+
+      - name: Repository suite
+        run: tests/run-tests --shell sh spec/repo
