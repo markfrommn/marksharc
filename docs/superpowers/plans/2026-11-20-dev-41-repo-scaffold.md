@@ -25,6 +25,8 @@
 - **Suites by shell.** `tests/spec/zsh/` runs with `--shell zsh`; `tests/spec/repo/` runs with `--shell sh` (dash on Ubuntu, bash-as-sh on macOS) and covers the harness and repository rules. The cross-shell contract suite arrives with P2.2.
 - **Ubuntu fish comes from `ppa:fish-shell/release-4`**, because the Ubuntu archive ships fish 3.x and the tech stack is fish 4.x.
 
+- **`When run`, not `When run command`, for repository scripts.** ShellSpec's `run command` looks the name up on PATH only (`shellspec_which`), so an absolute script path reports "not found". `run command` stays correct for PATH names such as `env` and `curl`.
+
 ## File Map
 
 - Create `core/zsh/lib/.gitkeep`, `core/fish/lib/.gitkeep`, `core/bash/.gitkeep`, `core/cli/.gitkeep`, `modules/.gitkeep`, `templates/overlay/.gitkeep`: the spec 6.2 tree.
@@ -519,7 +521,7 @@ Describe 'tests/lint'
   BeforeEach 'lint_tree' 'stub_checkers'
 
   It 'routes each shell file to its checker by extension or shebang'
-    When run command "$MARKSHARC_ROOT/tests/lint" "$tree"
+    When run "$MARKSHARC_ROOT/tests/lint" "$tree"
     The status should be success
     The output should equal 'lint: ok (6 files)'
     The contents of file "$OPLOG" should equal "shellcheck -x -s sh b.sh
@@ -532,7 +534,7 @@ zsh -n tool"
   It 'checks every file and fails when any checker fails'
     printf 'x\n' > "$tree/bad.zsh"
     printf 'x\n' > "$tree/bad.sh"
-    When run command "$MARKSHARC_ROOT/tests/lint" "$tree"
+    When run "$MARKSHARC_ROOT/tests/lint" "$tree"
     The status should equal 1
     The output should equal ''
     The stderr should include 'lint: bad.sh: shellcheck failed'

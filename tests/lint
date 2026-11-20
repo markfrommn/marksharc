@@ -1,0 +1,52 @@
+#!/bin/sh
+# Static checks for every shell file in the repository:
+#   zsh -n for zsh, shellcheck for sh and bash, fish --no-execute for fish.
+# Files are classified by extension, then by shebang. ShellSpec files
+# (*_spec.sh) use the ShellSpec DSL; running the suite checks them.
+# Usage: tests/lint [repo-root]   (default: this checkout)
+set -eu
+set -f
+root=${1:-$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)}
+cd "$root"
+
+# kind_of FILE: print zsh, bash, fish or sh, or nothing for a file lint skips.
+kind_of() {
+  case $1 in
+    *_spec.sh) return 0 ;;
+    *.zsh) echo zsh; return 0 ;;
+    *.bash) echo bash; return 0 ;;
+    *.fish) echo fish; return 0 ;;
+    *.sh) echo sh; return 0 ;;
+  esac
+  first=
+  IFS= read -r first < "$1" || :
+  case $first in '#!'*) ;; *) return 0 ;; esac
+  # shellcheck disable=SC2086 # split the shebang line into words; globbing is off
+  set -- ${first#??}
+  interp=${1:-}
+  interp=${interp##*/}
+  if [ "$interp" = env ]; then interp=${2:-}; fi
+  case $interp in zsh|bash|fish|sh) echo "$interp" ;; esac
+}
+
+status=0
+count=0
+failed() { echo "lint: $1: $2" >&2; status=1; }
+need() { command -v "$1" >/dev/null 2>&1 || { failed "$2" "$1 is required but not found"; return 1; }; }
+
+files=$(mktemp "${TMPDIR:-/tmp}/marksharc-lint.XXXXXX")
+trap 'rm -f -- "$files"' EXIT
+git ls-files --cached --others --exclude-standard > "$files"
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  kind=$(kind_of "$f")
+  [ -n "$kind" ] || continue
+  count=$((count + 1))
+  case $kind in
+    zsh) need zsh "$f" && { zsh -n "$f" < /dev/null || failed "$f" "zsh -n failed"; } ;;
+    sh|bash) need shellcheck "$f" && { shellcheck -x -s "$kind" "$f" < /dev/null || failed "$f" "shellcheck failed"; } ;;
+    fish) need fish "$f" && { fish --no-execute "$f" < /dev/null || failed "$f" "fish --no-execute failed"; } ;;
+  esac
+done < "$files"
+if [ "$status" -eq 0 ]; then echo "lint: ok ($count files)"; fi
+exit "$status"
