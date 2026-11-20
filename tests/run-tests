@@ -1,0 +1,28 @@
+#!/bin/sh
+# Run ShellSpec in a scrubbed environment with a throwaway HOME.
+# Usage: tests/run-tests [shellspec options] [spec paths]
+# Tests never install their runner: put the pinned ShellSpec (tests/shellspec.pin)
+# on PATH or set SHELLSPEC_BIN to its executable.
+set -eu
+suite=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+pinned=$(awk '$1 == "version" { print $2 }' "$suite/shellspec.pin")
+runner=${SHELLSPEC_BIN:-$(command -v shellspec || :)}
+if [ -z "$runner" ] || [ ! -x "$runner" ]; then
+  echo "ShellSpec $pinned required; install it or set SHELLSPEC_BIN to its executable." >&2
+  exit 127
+fi
+runner=$(CDPATH='' cd -- "$(dirname -- "$runner")" && pwd)/$(basename -- "$runner")
+actual=$("$runner" --version 2>/dev/null || :)
+if [ "$actual" != "$pinned" ]; then
+  echo "ShellSpec $pinned required; $runner reports '${actual:-no version}'." >&2
+  exit 127
+fi
+workspace=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-tests.XXXXXX")
+trap 'rm -rf -- "$workspace"' EXIT
+trap 'exit 130' HUP INT TERM
+cd "$suite"
+env -i PATH="$PATH" HOME="$workspace" \
+  XDG_CONFIG_HOME="$workspace/config" XDG_CACHE_HOME="$workspace/cache" \
+  XDG_DATA_HOME="$workspace/data" XDG_STATE_HOME="$workspace/state" \
+  MARKSHARC_ROOT="$(CDPATH='' cd .. && pwd)" REAL_GIT="$(command -v git)" \
+  PYTHON="$(command -v python3 || :)" TERM=dumb "$runner" "$@"

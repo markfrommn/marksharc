@@ -1,0 +1,4 @@
+# ShellSpec pin for tests/run-tests and CI. One directive per line.
+version 0.28.1
+commit 90e48c950239f3b8a9fdfa3e869592872c77b981
+source https://github.com/shellspec/shellspec.git
