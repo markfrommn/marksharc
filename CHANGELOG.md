@@ -13,3 +13,14 @@ All notable changes to this project are recorded here. The format follows
 - `tests/lint`: `zsh -n`, shellcheck and `fish --no-execute` over every shell file.
 - GitHub Actions CI on macOS and Ubuntu.
 - Developer guide in `docs/DEVELOPING.md`.
+- Zsh core loader (`core/zsh/`): session classes, env/init phases, module
+  loader, tiered PATH builder hooks, cached tool init, generated ZDOTDIR,
+  verbose reload (`cs`/`li`).
+- The 26 environment and tool modules (`modules/`): path, brew, zsh-options,
+  editor, pager, ls, ps, nav, zoxide, completion, completion-fzf-tab,
+  command-not-found, history-atuin, history-native, prompt-starship,
+  node-nvm, go-gvm, python, bun, pnpm, rust, go, lmstudio, cuda, direnv,
+  greeting.
+- Cross-shell contract suite (`tests/spec/contract/`), run in CI on macOS and
+  Ubuntu.
+- Personal-value lint over the portable tree.
