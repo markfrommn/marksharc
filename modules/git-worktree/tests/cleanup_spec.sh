@@ -4,9 +4,11 @@ Describe 'safe worktree cleanup'
     git_fixture "${2:-main}" || return
     load_mfn git-worktree gwt-clean
     cwf() {
-      case "$1 $2" in
-        "env status") [[ $mode != no-env ]] || print "no cwf environment";;
-        "env destroy") print destroy >> "$OPLOG"; [[ $mode != destroy-fail ]];;
+      # env status keeps its no-env behavior; the destroy invocation must be
+      # exactly the flags gwt-clean passes, so dropped flags fail the specs.
+      case "$*" in
+        'env status') [[ $mode != no-env ]] || print "no cwf environment";;
+        'env destroy --data delete --yes') print destroy >> "$OPLOG"; [[ $mode != destroy-fail ]];;
         *) return 1;;
       esac
     }

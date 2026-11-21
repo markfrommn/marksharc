@@ -72,7 +72,7 @@ this table to cover every module.
 | ssh-agent | Cache in the state dir, one-time migration from the legacy path, insecure source/state parents refused, probing, parsing, cleanup | `spec/zsh/modules/ssh-agent/agents_spec.sh` |
 | x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
-| mux | fix-tmux window rename guards | `spec/zsh/modules/mux/mux_spec.sh` |
+| mux | fix-tmux re-imports the tmux client environment (ssh-agent fix) | `spec/zsh/modules/mux/mux_spec.sh` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
 | herdr | Session wrappers from herdr session list, collie detection, cached completion | `spec/zsh/modules/herdr/herdr_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
