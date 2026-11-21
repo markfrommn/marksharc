@@ -10,7 +10,7 @@
 
 **Spec:** [specs/MARKSHARC-SPEC.md](../../specs/MARKSHARC-SPEC.md) sections 6.4, 6.5, 6.6, 6.13, 7.1, 10; [specs/MARKSHARC-PLAN.md](../../specs/MARKSHARC-PLAN.md) P2.3 with the P1.6 outcome and the P1.6/P1.7 implementer notes.
 
-**Source:** `/home/mark/etc/mark-desktop-files` @ `6f4b52c33131143b07234aecf0035a1f94d8055a`, clean, tree-identical to `origin/main` `4f8469cf1544347e342289cf7d9f5bf1c29fa7e0` (read-only for this unit). Recorded in move commits as `Source: mark-desktop-files 4f8469cf1544347e342289cf7d9f5bf1c29fa7e0`.
+**Source:** `mark-desktop-files` `origin/main` @ `4f8469cf1544347e342289cf7d9f5bf1c29fa7e0`, read from the local checkout at `/home/mark/etc/mark-desktop-files` (read-only for this unit). Recorded in move commits as `Source: mark-desktop-files 4f8469cf1544347e342289cf7d9f5bf1c29fa7e0`.
 
 ## Global Constraints
 
@@ -167,7 +167,6 @@ demo-cwf-new-hook() { :; }
 typeset -gaU cwf_new_post_create_hooks cwf_new_copy_exclude
 cwf_new_post_create_hooks=( demo-cwf-new-hook ${cwf_new_post_create_hooks:#demo-cwf-new-hook} )
 cwf_new_copy_exclude+=( 'demo:.env' )
-demo-cwf-new-hook() { :; }
 DATA
 ```
 
