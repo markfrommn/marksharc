@@ -1,0 +1,70 @@
+# zsh-plugin-update - explicit clone/checkout of every registry pin (spec 6.8).
+#
+# Usage: zsh-plugin-update
+#
+# This is the only place plugin Git work happens. Startup never calls it and
+# never pulls; pins live under ${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins
+# as <name>@<sha>. An existing path that is not a Git clone is never deleted
+# or overwritten. Registries are the zsh.plugins files of the modules.
+emulate -L zsh
+local registry
+local -a registries=( "${MARKSHARC_HOME:-${zdir:-}}"/modules/*/zsh.plugins(N) )
+local cache_parent="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins"
+local line name url sha kind key root
+local -a words
+integer i
+for registry in $registries; do
+  while IFS= read -r line || [[ -n $line ]]; do
+    # Trim leading whitespace so indented comments and blanks are skipped.
+    line=${line#"${line%%[![:space:]]*}"}
+    [[ -z ${line//[[:space:]]/} || ${line[1]} == \# ]] && continue
+    words=( "${(Z:C:)line}" ) 2>/dev/null
+    if ! _zsh-plugin-valid-quoting "${(j: :)words}"; then
+      print -ru2 "zsh-plugin-update: malformed directive: $line"
+      return 1
+    fi
+    words=( "${(Q)words[@]}" )
+    # The registry holds only plugin directives; anything else is malformed.
+    if [[ ${words[1]:-} != plugin ]]; then
+      print -ru2 "zsh-plugin-update: malformed directive: $line"
+      return 1
+    fi
+    name=${words[2]:-} url=${words[3]:-} sha=${words[4]:-}
+    if [[ -z $name || -z $url || -z $sha ]]; then
+      print -ru2 "zsh-plugin-update: malformed directive: $line"
+      return 1
+    fi
+    kind=source
+    for (( i=5; i+1 <= $#words; i+=2 )); do
+      key=${words[i]}
+      case $key in
+        shell) ;;
+        kind)
+          kind=${words[i+1]}
+          if [[ $kind != source && $kind != fpath ]]; then
+            print -ru2 "zsh-plugin-update: malformed directive: $line"
+            return 1
+          fi
+          ;;
+        *)
+          print -ru2 "zsh-plugin-update: malformed directive: $line"
+          return 1
+          ;;
+      esac
+    done
+    if (( i <= $#words )); then
+      print -ru2 "zsh-plugin-update: malformed directive: $line"
+      return 1
+    fi
+    root="$cache_parent/${name}@${sha}"
+    if [[ ! -d $root ]]; then
+      mkdir -p -- "$cache_parent" || return 1
+      command git clone --no-checkout "$url" "$root" || return 1
+    elif [[ ! -e $root/.git ]]; then
+      print -ru2 "zsh-plugin-update: $root is not a git clone; refusing to overwrite"
+      return 1
+    fi
+    command git -C "$root" checkout --detach "$sha" || return 1
+  done < "$registry"
+done
+return 0

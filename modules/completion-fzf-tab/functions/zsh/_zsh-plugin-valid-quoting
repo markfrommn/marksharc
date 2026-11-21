@@ -1,0 +1,30 @@
+# Return success only when all shell quotes and backslash escapes in the
+# comment-stripped directive are closed. This inspects characters; it never
+# evaluates directive contents.
+emulate -L zsh
+local text=$1 state=plain char
+integer i
+for (( i=1; i <= $#text; i++ )); do
+  char=${text[i]}
+  case $state in
+    plain)
+      case $char in
+        \\) state=plain_escape ;;
+        \') state=single ;;
+        \") state=double ;;
+      esac
+      ;;
+    plain_escape) state=plain ;;
+    single)
+      [[ $char == \' ]] && state=plain
+      ;;
+    double)
+      case $char in
+        \\) state=double_escape ;;
+        \") state=plain ;;
+      esac
+      ;;
+    double_escape) state=double ;;
+  esac
+done
+[[ $state == plain ]]

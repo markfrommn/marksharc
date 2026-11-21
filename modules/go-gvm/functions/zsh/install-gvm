@@ -1,0 +1,14 @@
+# Explicit bootstrap, never invoked by shell startup.
+(
+    emulate -L zsh
+    local tempfile result
+    tempfile=$(mktemp) || return 1
+    {
+        curl --fail --silent --show-error --location https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer -o "$tempfile" || return $?
+        bash "$tempfile"
+    } always {
+        result=$?
+        rm -f -- "$tempfile"
+    }
+    return $result
+)

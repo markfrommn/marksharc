@@ -1,0 +1,2 @@
+# pssu: your processes, optionally filtered by pattern.
+_ms_ps own plain "$@"
