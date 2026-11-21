@@ -153,18 +153,17 @@ Verify: `tests/run-tests --shell zsh spec/zsh/module_specs_spec.sh` passes (link
 
 Mechanical pass as Task 3. Hand edits:
 
-- `wiring_case`: drop `mdf-sync` and `link-cleanup` from the function list (private `mdf`/`mark-tools` content). Synthesize a neutral overlay before the PTY run:
+- `wiring_case`: drop `mdf-sync` and `link-cleanup` from the function list (private `mdf`/`mark-tools` content). Synthesize a neutral overlay before the PTY run. **Execution correction:** the option assignments live in the demo module's `init.zsh`, not `env.zsh` — the loader resets declared option variables to their defaults at the init plan, so an overlay sets another module's options from its init (the source's `convoy` pattern; verified by probe during execution):
 
 ```zsh
     # A neutral stand-in for the author's private overlay: roots/orgs arrive as
     # options and a private module registers a cwf-new hook (design rule 10).
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo-work"
     print 'describe "demo work roots"' > "$XDG_CONFIG_HOME/marksharc/modules/demo-work/module.conf"
-    cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-work/env.zsh" <<'DATA'
+    cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-work/init.zsh" <<'DATA'
 [[ -n $_ms_opt_git_worktree_roots ]] || _ms_opt_git_worktree_roots="/work/one /work/two"
 [[ -n $_ms_opt_git_worktree_orgs ]] || _ms_opt_git_worktree_orgs="org-one org-two"
-DATA
-    cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-work/init.zsh" <<'DATA'
+demo-cwf-new-hook() { :; }
 typeset -gaU cwf_new_post_create_hooks cwf_new_copy_exclude
 cwf_new_post_create_hooks=( demo-cwf-new-hook ${cwf_new_post_create_hooks:#demo-cwf-new-hook} )
 cwf_new_copy_exclude+=( 'demo:.env' )

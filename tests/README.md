@@ -67,6 +67,20 @@ this table to cover every module.
 | history-atuin, history-native | Wrapper over atuin, policy, native fallback, no stray history files | `spec/zsh/history_spec.sh` |
 | Overlay | Private module root, host config, env-id invalidation, reload paths, function ownership, post hook, option restore | `spec/zsh/overlay_spec.sh` |
 | Modules | Bands, double-source idempotency, layout, interactive load | `spec/zsh/modules_spec.sh` |
-| Modules | module.conf contract; module tests linkage (discovery-only contract today: no module ships a tests directory yet, so the linkage example is vacuous until P2.8 adds module-local tests) | `spec/zsh/module_specs_spec.sh` |
+| Modules | module.conf contract; module tests linkage (every module `tests/` directory is linked from `spec/zsh/modules/<name>`) | `spec/zsh/module_specs_spec.sh` |
+| agent | Agent marker option declared by the module, core classification reads it | `spec/zsh/modules/agent/agent_spec.sh` |
+| ssh-agent | Cache in the state dir, one-time migration from the legacy path, insecure source/state parents refused, probing, parsing, cleanup | `spec/zsh/modules/ssh-agent/agents_spec.sh` |
+| x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
+| docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
+| mux | fix-tmux window rename guards | `spec/zsh/modules/mux/mux_spec.sh` |
+| titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
+| herdr | Session wrappers from herdr session list, collie detection, cached completion | `spec/zsh/modules/herdr/herdr_spec.sh` |
+| wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
+| cc-providers | Provider files linked from the option/overlay directory | `spec/zsh/modules/cc-providers/providers_spec.sh` |
+| git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
+| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; init sources cwf shell zsh once per shell | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
+| cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
+| System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |

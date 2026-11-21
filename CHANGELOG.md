@@ -29,6 +29,10 @@ All notable changes to this project are recorded here. The format follows
   command-not-found, history-atuin, history-native, prompt-starship,
   node-nvm, go-gvm, python, bun, pnpm, rust, go, lmstudio, cuda, direnv,
   greeting.
+- The 13 system and workflow modules (`modules/`) with their module-local
+  specs linked from `tests/spec/zsh/modules/`: agent, ssh-agent, x11,
+  docker, mux, titles, herdr, wezterm, cc-providers, git-worktree, cwf,
+  fish-bridge, cloud.
 - Cross-shell contract suite (`tests/spec/contract/`), run in CI on macOS and
   Ubuntu.
 - Personal-value lint over the portable tree.
