@@ -1,0 +1,32 @@
+# -*- mode: shell-script; sh-shell: zsh -*-
+#
+# MarkSharc init phase (spec 6.6): interactive sessions only. Sourced at top level
+# by the generated ZDOTDIR .zshrc and by reload.zsh.
+
+[[ ${MARKSHARC_SESSION-} == interactive ]] || return 0
+typeset -g _ms_starting=1
+_ms_trace "init phase: start"
+
+# cs and li reload the core with a verbose trace (spec 6.10).
+alias cs='_ms_reload_login=0; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
+alias li='_ms_reload_login=1; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
+
+# Each init may register cleanup for its own hooks before the next init plan.
+for _ms_cleanup in "${_ms_init_cleanups[@]}"; do
+    (( $+functions[$_ms_cleanup] )) && "$_ms_cleanup"
+done
+typeset -ga _ms_init_cleanups=()
+unset _ms_cleanup
+if (( $+functions[_ms_modules_plan] )); then
+    _ms_modules_plan init
+    _ms_modules_setup_paths
+    _ms_phase=init
+    source "$MARKSHARC_HOME/core/zsh/phase.zsh"
+fi
+[[ -r ${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}/local/post.zsh ]] && source "${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}/local/post.zsh"
+# Tools run during init (envman, version managers) may have re-added entries: keep
+# the first occurrence of each.
+typeset -gU path
+path=( "${path[@]}" )
+_ms_trace "init phase: done"
+unset _ms_starting
