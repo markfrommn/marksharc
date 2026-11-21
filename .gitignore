@@ -54,8 +54,6 @@ WARP.md
 .cursor/
 .omp/
 .vscode/
-.cwf-ai*
-.cwf-settings*
-.cwf/ai/
+.cwf*
 docs/COMMON-WORKFLOW.md
 memory/local/
