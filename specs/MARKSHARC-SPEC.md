@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | Design approved 2026-11-20; implementation not started |
+| Status | Design approved 2026-11-20; implementation in progress |
 | Source issue | DEV-33 "Mark Sharc - Planning Kickoff" (Linear, project MarkSharc) |
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
-| Interim home | `mark-desktop-files/specs/` until the MVP docs issue moves it |
+| Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.

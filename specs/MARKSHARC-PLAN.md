@@ -443,6 +443,8 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 
 - A shell started with `MARKSHARC_HOME=/data/work/mark/marksharc` loads the environment and tool modules on the Mac.
 
+**Outcome:** Implemented on branch `mark/dev-42-marksharc-p22-move-the-core-and-the-environment`; the PR link is added when the PR is published. Source revision `dcdb605a36bdf821b39eddd5f0bd2095bc7ec81d`. The zsh core loader lives at `core/zsh` and the 26 P1.5 environment and tool modules at `modules/`, with the moved zsh suites, the cross-shell contract suite wired into CI, the repo hygiene suite and the personal-value lint over the portable tree. Independent gate counts: lint 50 files; zsh 194/194 and repo 25/25 before the review-fix examples (196/196 and 26/26 after); contract 4/4. Pending checks: a shell started with the literal installed path `MARKSHARC_HOME=/data/work/mark/marksharc`, and the first real Ubuntu CI run. Follow-up DEV-65 records the legacy history import executable and its specs, deliberately not moved with this unit.
+
 #### P2.3 — Move the system and workflow modules (DEV-43)
 
 - **Repo:** marksharc
@@ -556,7 +558,7 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 
 - README: what it is, requirements, Day 0 install, Day 1 use (modules, overlay, reload), Day 2 (sync, update, doctor).
 - `docs/`: filesystem layout, module reference (generated from `describe` lines), writing a module, overlay guide, directive reference, design rules, testing guide.
-- Move the spec and plan here as the source of truth and update the layout and structure sections to match what was built.
+- The spec and plan are already authoritative in `marksharc/specs/` (migrated early, with DEV-42); P2.7 updates their layout and structure sections to match what was built, rather than moving them again.
 - Close out `docs/zsh-bugs-and-bogons.md` and the fish gap documents: each item resolved, or carried into an issue.
 
 **Tests**
