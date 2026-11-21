@@ -1,4 +1,15 @@
+# ZSH Droppings
+**/.zcompdump*
+**/.zsh_sessions*/**
+**/.zsh_history
+**/.zshhistory
+
+# Temp Files
+tmp/**/*
+
 # Editor droppings
+*~
+#*#
 **/*~
 **/#*#
 
@@ -32,6 +43,7 @@ memory/local/
 # Keep this block last: git applies the last matching rule, and cwf's
 # generated blocks above may re-include agent paths.
 AGENTS.md
+AGENTS.override.md
 CLAUDE.md
 GEMINI.md
 KILO.md
@@ -42,6 +54,7 @@ WARP.md
 .cursor/
 .omp/
 .vscode/
-.cwf*
+.cwf-ai*
+.cwf-settings*
 docs/COMMON-WORKFLOW.md
 memory/local/
