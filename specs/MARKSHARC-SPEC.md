@@ -331,6 +331,8 @@ Wiring per shell:
 | fish | `~/.config/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. The user's `config.fish` is untouched. |
 | bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash`, silently, in every mode. No interactive phase until full bash is in scope. `BASH_ENV` is set only when the `agent.bash_env` option is on. |
 
+The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
+
 The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a matching value skips the export and PATH work and only recomputes shell-local facts. Login shells and explicit reloads always rebuild.
 
 `ZDOTDIR` takeover is deliberate: it keeps installer edits to `~/.zshrc` from changing the shell silently. `marksharc doctor` lists foreign lines found in `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, and `~/.config/fish/config.fish` so each can become a module or an overlay line.
@@ -366,7 +368,7 @@ Planned plugins: fzf-tab (MVP); zsh-autosuggestions and zsh-syntax-highlighting 
 
 ### 6.9 Completion
 
-- zsh runs a full `compinit` with its dump in the cache, rebuilt when `fpath` changes. `compinit -C` is not used.
+- zsh runs a full `compinit -i -d` with its dump in the cache, rebuilt when `fpath` changes. The security audit remains enabled, but insecure directories are excluded silently rather than prompting; `compinit -C` skips the audit and `compinit -u` trusts insecure directories, so neither is used.
 - The existing zstyles move into the `completion` module, minus the dead ones.
 - Generated completions (`herdr completion zsh`, `cwf shell zsh`, `kubectl completion zsh`) are written to cache files by `render` and `update`, not evaluated at startup.
 - `completion-fzf-tab` and `completion-carapace` are alternative UI modules. Enabling Carapace disables fzf-tab unless the overlay forces both.
