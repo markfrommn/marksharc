@@ -29,8 +29,7 @@ Describe 'removed cloud startup integration'
     ms_fixture_full
     local tool cloud_root sname
     # Tools that other startup code may run are benign here; only cloud tools may fail.
-    # (herdr/cwf stubs return with their P2.3 modules.)
-    for tool in zoxide starship atuin; do
+    for tool in zoxide starship atuin herdr cwf; do
       printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/$tool"
       chmod +x "$TEST_ROOT/bin/$tool"
     done
