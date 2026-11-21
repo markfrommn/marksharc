@@ -1,0 +1,24 @@
+# One repository per subshell preserves caller cwd and isolates temporary state.
+(
+    emulate -L zsh
+    setopt pipefail
+    cd -- "$1" || return 1
+    local origin org branch base=''
+    local -a orgs=( ${=_ms_opt_git_worktree_orgs-} )
+    origin=$(git remote get-url origin 2>/dev/null) || return 0
+    [[ $origin != https* && $origin == *:* ]] || return 0
+    org=${${origin#*:}%%/*}
+    (( ${orgs[(Ie)$org]} )) || return 0
+    git fetch --prune --prune-tags || return $?
+    branch=$(git symbolic-ref --quiet --short HEAD) || { print -ru2 "Detached HEAD at $PWD; skipping base update"; return 1; }
+    if [[ $branch == (main|master) ]]; then
+        git pull --ff-only || return $?
+    else
+        if git show-ref --verify --quiet refs/remotes/origin/main; then base=main
+        elif git show-ref --verify --quiet refs/remotes/origin/master; then base=master
+        else print -ru2 "No origin main/master at $PWD"; return 1
+        fi
+        # Git refuses non-fast-forward or checked-out destination refs.
+        git fetch origin "refs/heads/${base}:refs/heads/${base}" || return $?
+    fi
+)

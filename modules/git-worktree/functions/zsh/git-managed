@@ -1,0 +1,8 @@
+typeset -ga git_managed_ret=()
+git_managed_arr_core managed git_managed_ret $@
+iecho -n "Git Managed: "
+for f in "${git_managed_ret[@]}"; do
+    iecho -n " $f"
+done
+iecho ""
+unset git_managed_ret

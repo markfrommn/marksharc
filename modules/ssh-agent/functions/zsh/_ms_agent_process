@@ -1,0 +1,6 @@
+local pid=$1 owner executable args
+[[ $pid == <1-> ]] || return 1
+owner=$(ps -p "$pid" -o uid=) || return 1
+executable=$(ps -p "$pid" -o comm=) || return 1
+args=$(ps -p "$pid" -o args=) || return 1
+[[ ${owner//[[:space:]]/} == $EUID && ${executable:t} == ssh-agent && $args != *' -l'* ]]

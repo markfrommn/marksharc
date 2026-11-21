@@ -1,0 +1,9 @@
+# Remember the DISPLAY the session arrived with as DISPLAY_ORIG; an empty DISPLAY is bogus
+# and dropped. Nothing here probes the network or sleeps.
+if [[ -z ${DISPLAY-} ]]; then
+    if [[ -n ${DISPLAY+set} ]]; then iecho "Clearing empty DISPLAY..."; fi
+    unset DISPLAY DISPLAY_ORIG
+else
+    export DISPLAY_ORIG=$DISPLAY
+    iecho "DISPLAY already set to ${DISPLAY}"
+fi

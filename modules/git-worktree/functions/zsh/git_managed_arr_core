@@ -1,0 +1,15 @@
+emulate -L zsh
+[[ $# -ge 2 && $2 =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || return 1
+local mode=$1 destination=$2 file result
+[[ $mode == managed || $mode == unmanaged ]] || return 1
+shift 2
+local -a selected=()
+for file in "$@"; do
+    git --literal-pathspecs ls-files --error-unmatch -- "$file" >/dev/null 2>&1
+    result=$?
+    if [[ ( $mode == managed && $result == 0 ) || ( $mode == unmanaged && $result == 1 ) ]]; then
+        selected+=( "$file" )
+    elif (( result > 1 )); then return $result
+    fi
+done
+set -A "$destination" "${selected[@]}"

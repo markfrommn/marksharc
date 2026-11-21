@@ -1,0 +1,6 @@
+local pid=$1 socket=$2 entry
+_ms_agent_process "$pid" && command -v lsof >/dev/null 2>&1 || return 1
+for entry in "${(@f)$(lsof -a -p "$pid" -U -Fn 2>/dev/null)}"; do
+    [[ $entry == "n$socket" ]] && return 0
+done
+return 1

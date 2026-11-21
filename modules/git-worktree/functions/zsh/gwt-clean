@@ -1,0 +1,114 @@
+emulate -L zsh
+setopt pipefail
+# Hooks: functions named in gwt_clean_pre_remove_hooks run as `hook <worktree> <base> <branch>` after
+# every preflight, the confirmation and the merge check, before the CWF environment is destroyed.
+# A failing or undefined hook aborts with the worktree retained.
+local target base branch basebranch line listed='' answer origin target_head target_status base_status worktrees hook
+target=$(git rev-parse --show-toplevel 2>/dev/null) || { print -ru2 'Not in a Git worktree'; return 1; }
+worktrees=$(git worktree list --porcelain) || return 1
+base=$(print -r -- "$worktrees" | sed -n 's/^worktree //p' | head -1) || return 1
+[[ -n $base && $target != $base ]] || { print -ru2 'Run from a linked worktree'; return 1; }
+branch=$(git symbolic-ref --quiet --short HEAD) || { print -ru2 'Detached HEAD; refusing cleanup'; return 1; }
+target_head=$(git rev-parse HEAD) || return 1
+target_status=$(git status --porcelain --untracked-files=all) || {
+    print -ru2 'Worktree has uncommitted or untracked changes'
+    if [ -z "${FORCE}" ]; then
+        return 1
+    else
+        print -ru2 'FORCED - Continuing'
+    fi
+}
+[[ -z $target_status ]] || {
+    print -ru2 'Worktree has missing status'
+    if [ -z "${FORCE}" ]; then
+        return 1
+    else
+        print -ru2 'FORCED - Continuing'
+    fi
+}
+base_status=$(git -C "$base" status --porcelain --untracked-files=all) || return 1
+[[ -z $base_status ]] || {
+    print -ru2 'Base repository has uncommitted or untracked changes'
+    if [ -z "${FORCE}" ]; then
+        return 1
+    else
+        print -ru2 'FORCED - Continuing'
+    fi
+}
+if git -C "$base" show-ref --verify --quiet refs/heads/main; then
+    basebranch=main
+elif git -C "$base" show-ref --verify --quiet refs/heads/master; then
+    basebranch=master
+else
+    print -ru2 'No main/master branch'; return 1
+fi
+[[ $branch != $basebranch ]] || { print -ru2 'Cannot remove the base branch'; return 1; }
+for line in "${(@f)worktrees}"; do
+    case $line in
+        'worktree '*) listed=${line#worktree };;
+        locked*) [[ $listed != $target ]] || { print -ru2 'Worktree is locked; refusing cleanup'; return 1; };;
+        "branch refs/heads/$basebranch")
+            [[ $listed == $base ]] || { print -ru2 "Base branch is checked out at $listed"; return 1; };;
+    esac
+done
+print -n -- "Remove merged worktree $target and branch $branch? [y/N] "
+read -r answer || return 1
+[[ $answer == [yY] ]] || { print -ru2 'Cleanup cancelled'; return 1; }
+git -C "$base" switch "$basebranch" || return 1
+origin=$(git -C "$base" remote get-url origin 2>/dev/null)
+if [[ -n $origin ]]; then
+    git -C "$base" fetch --prune --prune-tags || return 1
+    git -C "$base" pull --ff-only || return 1
+fi
+local base_ref="refs/heads/$basebranch" delete_flag=-d
+if ! git merge-base --is-ancestor "$target_head" "$base_ref"; then
+    local target_tree base_tree pr_merges pr_head merge_commit
+    target_tree=$(git rev-parse --verify "$target_head^{tree}") || return 1
+    base_tree=$(git rev-parse --verify "$base_ref^{tree}") || return 1
+    # A squash can preserve the tree without preserving the branch's commits.
+    if [[ $target_tree == $base_tree ]]; then
+        delete_flag=-D
+    elif [[ -n $origin ]] && command -v gh >/dev/null 2>&1 &&
+         pr_merges=$(gh pr list --repo "$origin" --head "$branch" --state merged \
+             --json headRefOid,mergeCommit \
+             --jq '.[] | select(.mergeCommit != null) | [.headRefOid, .mergeCommit.oid] | @tsv' 2>/dev/null); then
+        # A merge into an intermediate branch counts once its merge commit reaches the base.
+        while IFS=$'\t' read -r pr_head merge_commit; do
+            if [[ $pr_head == "$target_head" && -n $merge_commit ]] &&
+               git merge-base --is-ancestor "$merge_commit" "$base_ref" 2>/dev/null; then
+                delete_flag=-D
+                break
+            fi
+        done <<< "$pr_merges"
+    fi
+    if [[ $delete_flag != -D ]]; then
+        print -ru2 "Could not verify that branch is merged into $basebranch"
+        if [[ -z $FORCE ]]; then
+            return 1
+        fi
+        print -ru2 'FORCED - Continuing'
+    fi
+fi
+# Recheck after the update and merge lookup, before removing anything.
+target_status=$(git status --porcelain --untracked-files=all) || return 1
+[[ $(git rev-parse HEAD) == $target_head && $(git symbolic-ref --quiet --short HEAD) == $branch && -z $target_status ]] || {
+    print -ru2 'Worktree changed during preflight'; return 1
+}
+for hook in $gwt_clean_pre_remove_hooks; do
+    (( $+functions[$hook] )) || { print -ru2 "Pre-remove hook not defined: $hook; worktree retained"; return 1; }
+    "$hook" "$target" "$base" "$branch" || { print -ru2 "Pre-remove hook failed: $hook; worktree retained"; return 1; }
+done
+if command -v cwf >/dev/null 2>&1; then
+    cwf_msg=$(cd -- "$target" && cwf env status)
+    if [[ "$cwf_msg" != *"no cwf environment"* ]]; then
+        (cd -- "$target" && cwf env destroy --data delete --yes) || { print -ru2 'Environment destruction failed; worktree retained'; return 1; }
+    fi
+elif [[ -e $target/.cwf || -e $target/.cwf-run ]]; then
+    print -ru2 'CWF metadata exists but cwf is unavailable; worktree retained'; return 1
+fi
+cd -- "$base" || return 1
+git worktree remove -- "$target" || { print -ru2 'Environment cleanup completed but worktree removal failed'; return 1; }
+if [[ $delete_flag == -D && $(git rev-parse --verify "refs/heads/$branch") != $target_head ]]; then
+    print -ru2 'Worktree removed but branch tip changed; branch retained'; return 1
+fi
+git branch "$delete_flag" -- "$branch" || { print -ru2 'Worktree removed but branch deletion failed'; return 1; }

@@ -1,0 +1,15 @@
+# One-time move of the pre-state-dir cache (~/tmp/private/agent.<host>.sh) to $1 (the new path).
+# Never clobbers; refuses a symlinked, foreign or group/world writable old parent or file
+# and then leaves the old file alone.
+emulate -L zsh
+local new=$1 dir
+local old=$HOME/tmp/private/${new:t}
+[[ ! -e $new && ! -L $new ]] || return 0
+[[ -f $old && -O $old && ! -L $old ]] || return 0
+for dir in "$HOME/tmp" "$HOME/tmp/private"; do
+    [[ -d $dir && ! -L $dir && -O $dir ]] || return 0
+    local -a writable=( "$dir"(N-f:g+w:) "$dir"(N-f:o+w:) )
+    (( $#writable == 0 )) || return 0
+done
+command mv -n -- "$old" "$new" 2>/dev/null
+return 0

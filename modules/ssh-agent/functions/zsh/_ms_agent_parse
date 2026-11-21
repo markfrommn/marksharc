@@ -1,0 +1,10 @@
+local line token value
+while IFS= read -r line; do
+    for token in ${(z)line}; do
+        case $token in
+            SSH_AUTH_SOCK=*) value=${token#*=}; SSH_AUTH_SOCK=${(Q)value};;
+            SSH_AGENT_PID=*) value=${token#*=}; value=${(Q)value}; [[ $value == <1-> ]] && SSH_AGENT_PID=$value;;
+        esac
+    done
+done
+return 0
