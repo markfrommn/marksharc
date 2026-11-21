@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | Design approved 2026-11-20; implementation not started |
+| Status | Design approved 2026-11-20; implementation in progress |
 | Source issue | DEV-33 "Mark Sharc - Planning Kickoff" (Linear, project MarkSharc) |
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
-| Interim home | `mark-desktop-files/specs/` until the MVP docs issue moves it |
+| Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
@@ -258,7 +258,7 @@ Rules:
 - Sourcing a module twice must be safe.
 - Public modules contain no user names, host names, organisation names, or absolute home paths. Such values arrive as options.
 - A module declares its options with defaults; the overlay sets them.
-- Modules load in `order` (0–99, default 50), then by name. Reserved bands: 0–9 core, 10–19 package managers (brew), 20–69 general, 70–79 completion, 80–89 prompt, history, and navigation tools, 90–99 line-editor plugins that must load last.
+- Modules load in `order` (0–99, default 50), then by name. Reserved bands: 0–9 core, 10–19 package managers (brew), 20–69 general, 70–79 completion, 80–89 prompt, history, and navigation tools, 90–99 last-running init: modules that must see every earlier module's hooks (`titles` 90, `x11` 91, `ssh-agent` 93, `greeting` 94), with line-editor plugins that must load last at 95 and above.
 
 ### 6.5 Directive vocabulary
 
@@ -331,6 +331,8 @@ Wiring per shell:
 | fish | `~/.config/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. The user's `config.fish` is untouched. |
 | bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash`, silently, in every mode. No interactive phase until full bash is in scope. `BASH_ENV` is set only when the `agent.bash_env` option is on. |
 
+The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
+
 The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a matching value skips the export and PATH work and only recomputes shell-local facts. Login shells and explicit reloads always rebuild.
 
 `ZDOTDIR` takeover is deliberate: it keeps installer edits to `~/.zshrc` from changing the shell silently. `marksharc doctor` lists foreign lines found in `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, and `~/.config/fish/config.fish` so each can become a module or an overlay line.
@@ -339,17 +341,18 @@ The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a
 
 Modules and the overlay add directories to named tiers. The builder concatenates tiers in order, keeps inherited entries it does not manage, and removes duplicates.
 
-Default order, chosen to reproduce today's result:
+Default order, chosen to reproduce today's result except that version managers come first (operator decision, DEV-38: correct gvm and nvm behaviour wins over historical order, so Homebrew's `go` or `node` never shadows the manager-selected one) and, on Linux, `local` follows `app`. A `tiers` override lists the order; any tier it omits follows in the default order:
 
 | Tier | Typical contents |
 |---|---|
 | `first` | Explicit user overrides |
-| *(inherited, unmanaged, before any managed entry)* | Virtualenv and tool activations |
+| *(inherited, unmanaged, before any managed entry)* | Virtualenv and tool activations, including an explicit `nvm use` or `gvm use` |
+| `manager` | Version-manager directories (gvm Go and pkgset bin, nvm default node bin, pyenv shims), contributed without sourcing the manager; always ahead of `brew` in every session class, including after the `.zprofile` re-assert |
 | `brew` | Homebrew `bin` and `sbin` |
-| `local` | `/usr/local`, `/opt` trees (before `system` on macOS, after it on Linux) |
+| `local` | `/usr/local`, `/opt`, Linuxbrew (unless `brew.linuxbrew_tier` is `brew`), `/opt/dell`, `~/.opencode/bin`, and on macOS LM Studio. Before `system` on macOS; on Linux after `app`, the last tier before `last` |
 | `system` | `/bin`, `/usr/bin`, `/sbin`, `/usr/sbin` |
 | `user` | `~/bin`, `~/bin/bin.<OS>.<arch>`, `~/.local/bin`, Go, Cargo, bun, pnpm, krew |
-| `app` | Application dirs: LM Studio, CUDA, opencode |
+| `app` | Application dirs that follow `user`: CUDA (Linux, when the NVIDIA driver is loaded) and, on Linux, LM Studio |
 | *(inherited, unmanaged, after a managed entry)* | |
 | `last` | `.` when `core.dot_in_path` is on and the user is not root |
 
@@ -365,7 +368,7 @@ Planned plugins: fzf-tab (MVP); zsh-autosuggestions and zsh-syntax-highlighting 
 
 ### 6.9 Completion
 
-- zsh runs a full `compinit` with its dump in the cache, rebuilt when `fpath` changes. `compinit -C` is not used.
+- zsh runs a full `compinit -i -d` with its dump in the cache, rebuilt when `fpath` changes. The security audit remains enabled, but insecure directories are excluded silently rather than prompting; `compinit -C` skips the audit and `compinit -u` trusts insecure directories, so neither is used.
 - The existing zstyles move into the `completion` module, minus the dead ones.
 - Generated completions (`herdr completion zsh`, `cwf shell zsh`, `kubectl completion zsh`) are written to cache files by `render` and `update`, not evaluated at startup.
 - `completion-fzf-tab` and `completion-carapace` are alternative UI modules. Enabling Carapace disables fzf-tab unless the overlay forces both.
@@ -561,7 +564,7 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 |---|---|
 | Removing OMZ changes keybindings and completion feel in ways history cannot show. | Its own pre-migration PR, lived in on the Mac before sol; rollback is one revert. |
 | How agent harnesses find rc files when `ZDOTDIR` is redirected is not fully verified (Claude Code is documented to source `~/.zshrc` or `~/.bashrc`; Codex is undocumented). | Contract tests for `zsh -c`, `zsh -ic`, and `bash -c` under agent markers; a manual check per harness in the core-loader issue. |
-| Per-directory history may not import into atuin with its directory. | A short spike inside the history issue; fall back to importing without directory. |
+| Per-directory history may not import into atuin with its directory. | A short spike inside the history issue; fall back to importing without directory. Resolved in DEV-36: a temporary zsh-histdb database imported with `atuin import zsh-hist-db` preserves the directory. |
 | ShellSpec has had no release since 2021. | Pin the version; the contract suite is plain enough to port to bats if needed. |
 | The directive format could grow into a language. | The vocabulary in 6.5 is closed; anything else is native code in `env.<shell>` or `init.<shell>`. |
 | fish users need zsh for the CLI and write-once commands. | Stated as a requirement; revisit with the Go helper under "maybe later". |
@@ -594,3 +597,4 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Plugin manager | None; built-in pinned loader | Research |
 | Deployment tool | None imposed; own installer and stubs | Research |
 | Test runner | ShellSpec plus a cross-shell contract suite | Research, existing suite |
+| Version-manager PATH order | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order | Operator, DEV-38 |

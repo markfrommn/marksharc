@@ -16,6 +16,7 @@ Describe 'repository hygiene'
       .cwf-settings.yaml
       .cwf-ai-manifest.json
       .cwf/ai/ext/example.md
+      .cwf/phase-runs/phase-1.json
       .vscode/settings.json
       docs/COMMON-WORKFLOW.md
       memory/local/example.md

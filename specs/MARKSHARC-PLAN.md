@@ -236,6 +236,8 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 - `atuin stats` reflects the imported entries.
 - No history file grows in the repo or in HOME after a session.
 
+**Outcome:** Delivered in [PR #11](https://github.com/markfrommn/mark-desktop-files/pull/11), pending human merge. The spike chose the histdb route: a temporary zsh-histdb database imported with `atuin import zsh-hist-db` keeps each entry's directory, timestamp, duration and host label, with plain `atuin import zsh` (no directories) when `sqlite3` is missing. The Mac and sol imports are an operator step after the dry run; pick one route and stay on it, because switching routes can duplicate rows.
+
 #### P1.4 — Zsh core loader and session classes (DEV-37)
 
 - **Repo:** mark-desktop-files
@@ -299,6 +301,22 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 
 **Notes:** Can proceed in parallel with P1.6.
 
+**Notes for the implementer (from DEV-37):**
+
+- The loader checks `requires command` once, before any module's `env.zsh` changes PATH. A module that needs a Homebrew-installed tool can be skipped in a minimal-PATH shell unless `brew` loads first or the check moves after the env phase.
+- In the `legacy` module, `build_path` activates gvm and detects Go only when `MARKSHARC_SESSION` is `interactive`, and never passes `--default`. Agent and batch shells get gvm's Go by PATH only: the default environment's `gvm_go_name`, read with builtins, or the newest `~/.gvm/gos/go*`, with no sourcing and no forks. Keep that split in `go-gvm`.
+- Fortune is opt-in through `set legacy.greeting on`; carry that option to the `greeting` module.
+
+**Outcome:** Delivered in [PR #13](https://github.com/markfrommn/mark-desktop-files/pull/13), pending human merge; task plan [2026-11-20-dev-38-zsh-env-tool-modules.md](../docs/superpowers/plans/2026-11-20-dev-38-zsh-env-tool-modules.md). Operator decision: version-manager paths (gvm, nvm, pyenv shims) go in a new `manager` tier ahead of `brew` in every session class, a deviation from the old 6.7 order now written into the spec. One builtin Go selector serves every session class (gvm's default environment, else the newest Go), and `GOROOT` follows the first `go` on PATH. Intended PATH changes on the Mac: nvm's default node first in batch, agent and login shells; `~/.bun/bin` and `~/Library/pnpm` in the `user` tier; interactive shells on the default Go instead of the next-newest. `requires command` is checked at each module's turn against the live PATH plus pending tier directories.
+
+**Notes for the implementer (from DEV-38):**
+
+- The `legacy` module (order 99) and the trimmed `zsh.zshrc.interactive` hold only system, workflow and personal code. P1.6 deletes both.
+- The `dot_in_path` option is `path.dot_in_path`, default on, to reproduce today's PATH. P1.7 renames it to `core.dot_in_path` with the default off and the overlay setting it on.
+- Fortune is now `set greeting.fortune on`; the old `legacy.greeting` key is gone.
+- Personal PATH entries still added from the transitional `mark-tools` module (`~/etc/<user>-desktop-files` bin and scripts, sandcat, gam, envman) and `/opt/dell` in the `local` list move or go in P1.7.
+- Check by hand on sol: the Linux tier order and Linuxbrew placement (option `brew.linuxbrew_tier`), the CUDA `/dev/nvidiactl` probe, the ps flags under procps, and nvm alias resolution.
+
 #### P1.6 — Restructure zsh into modules: system and workflow (DEV-39)
 
 - **Repo:** mark-desktop-files
@@ -327,6 +345,8 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 - All specs pass.
 - `cwf-new`, `gwt-clean`, `claudek`, and `collie-default` are checked by hand on the Mac.
 
+**Outcome:** Delivered in [PR #14](https://github.com/markfrommn/mark-desktop-files/pull/14), pending human merge; task plan [2026-11-20-dev-39-system-workflow-modules.md](../docs/superpowers/plans/2026-11-20-dev-39-system-workflow-modules.md). The twelve modules plus `cloud` (`install-krew`) hold the system and workflow code. Three transitional modules, `convoy`, `mdf` and `mark-tools`, hold the personal code that P1.7 moves. The `legacy` module and every old `zsh.*` file are gone, so `config/zsh` holds `core/`, `modules/`, and the `.zshenv.linux` and `.zshenv.mac` stubs. The ssh-agent cache is `$XDG_STATE_HOME/marksharc/ssh-agent/agent.<host>.sh`; the old `~/tmp/private` file moves there once, and a symlinked, foreign or group/world-writable source is refused. `cwf-new` runs `cwf_new_post_create_hooks` and `gwt-clean` runs `gwt_clean_pre_remove_hooks`; a failing or undefined hook stops the command and keeps the session or worktree. Operator decision: the 6.4 band 90–99 is last-running init (`titles` 90, `x11` 91, `ssh-agent` 93), with 95 and above kept for line-editor plugins, so `greeting` moved from 98 to 94. The hand checks on the Mac are an operator step after merge.
+
 #### P1.7 — Carve out the private overlay (DEV-40)
 
 - **Repo:** mark-desktop-files
@@ -354,6 +374,21 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 - The portable tree passes the personal-value lint.
 - The overlay link exists on the Mac and sol.
 - Behaviour is unchanged.
+
+**Repository outcome (DEV-40):** Prepared in [PR #16](https://github.com/markfrommn/mark-desktop-files/pull/16), pending human review and merge. The private overlay and portable-tree lint are implemented. Hermetic zsh tests exercise the loader, private modules and startup; they do not certify behavior on an installed host. The Mac and sol links and their installed checks remain pending after human merge. Linux runtime and real CWF/provider integrations remain unverified by this change. See [the overlay guide](../docs/marksharc-overlay.md).
+
+**Notes for the implementer (from DEV-37):**
+
+- Module selection today: with no `config.conf`, every module present loads. If `config.conf` has any `module <name>` line, only the listed modules load. If it has only `set` or `module <name> off` lines, everything loads except the `off` modules. Confirm or change this when the overlay arrives.
+- The loader reads one module root, `config/zsh/modules`. `_ms_module_roots` must gain the overlay's `modules/` directory.
+- The Plesk `dname=plesk-phorn` mapping lives in `modules/mark-tools/env.zsh`; it moves to the overlay's `site-bac` module.
+
+**Notes for the implementer (from DEV-39):**
+
+- The personal code waits in three transitional modules. `convoy` (41) sets `git-worktree.roots` and `git-worktree.orgs`, finds `COMMON_DEV_TOOLS`, and registers the `core-platform` `cwf-new` hook first. `mdf` (40) exports `MDF_BASE`/`MDF_REL`, points `cc-providers.dir` at `$MDF_BASE/ai/providers`, and creates the `~/tmp/private/sockets` ssh ControlPath directories once per shell. `mark-tools` (60) holds sandcat, gam, envman, the Plesk mapping, the desktop-files bin directories, and the `etc/zsh.zshrc.user` source.
+- `mark-tools` sits at 60 so its bin directories land after every other `user`-tier contributor (`go`, `rust`, `bun`, `pnpm`); `system_modules_spec` asserts that env order. Keep the overlay module after them.
+- `etc/zsh.zshrc.user` now runs before the `titles` `cd .` kick, `x11` and `ssh-agent`; it used to run after the kick and x11.
+- `modules_spec`'s personal-value check exempts the three transitional modules; the P1.7 lint replaces it.
 
 ### Phase 2: MVP
 
@@ -407,6 +442,8 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 **Done when**
 
 - A shell started with `MARKSHARC_HOME=/data/work/mark/marksharc` loads the environment and tool modules on the Mac.
+
+**Outcome:** Delivered in [PR #2](https://github.com/markfrommn/marksharc/pull/2), pending human review and merge. Source revision `dcdb605a36bdf821b39eddd5f0bd2095bc7ec81d`. The zsh core loader lives at `core/zsh` and the 26 P1.5 environment and tool modules at `modules/`, with the moved zsh suites, the cross-shell contract suite wired into CI, the repo hygiene suite and the personal-value lint over the portable tree. Final independent local gate counts: lint 50 files; zsh 198/198; contract 4/4; repo 26/26. The first Ubuntu run exposed competing global and insecure-directory `compinit` prompts plus a non-hermetic no-Go fixture; the fix makes the completion module the sole audited, non-interactive owner and the fixture independent of `/usr/bin`. Hosted run [44899859687](https://github.com/markfrommn/marksharc/actions/runs/44899859687) passed every check on macOS and Ubuntu at `5aaf370`; CI continues to verify each exact PR head. A shell started with the literal installed path `MARKSHARC_HOME=/data/work/mark/marksharc` remains an operator check after merge; the pre-merge runtime checks used this worktree with an isolated HOME. Follow-up DEV-65 records the legacy history import executable and its specs, deliberately not moved with this unit.
 
 #### P2.3 — Move the system and workflow modules (DEV-43)
 
@@ -521,7 +558,7 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 
 - README: what it is, requirements, Day 0 install, Day 1 use (modules, overlay, reload), Day 2 (sync, update, doctor).
 - `docs/`: filesystem layout, module reference (generated from `describe` lines), writing a module, overlay guide, directive reference, design rules, testing guide.
-- Move the spec and plan here as the source of truth and update the layout and structure sections to match what was built.
+- The spec and plan are already authoritative in `marksharc/specs/` (migrated early, with DEV-42); P2.7 updates their layout and structure sections to match what was built, rather than moving them again.
 - Close out `docs/zsh-bugs-and-bogons.md` and the fish gap documents: each item resolved, or carried into an issue.
 
 **Tests**

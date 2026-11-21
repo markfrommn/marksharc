@@ -1,0 +1,2 @@
+# pss: all processes, optionally filtered by pattern.
+_ms_ps all plain "$@"

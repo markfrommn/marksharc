@@ -1,0 +1,20 @@
+# Optional native activation; callers may supply an explicit installed location.
+# "brew shellenv" prints nothing when PATH already starts with the brew directories,
+# so it is generated under a fixed minimal PATH (the cached text is then always
+# complete). Sourcing it prepends brew's directories to PATH; the user's existing
+# PATH order is kept and only directories that were absent go to the front.
+emulate -L zsh
+local brew result
+local -a saved
+(( $# )) || set -- /usr/local/bin/brew /opt/homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew
+for brew in "$@"; do
+    if [[ -x $brew && ! -d $brew ]]; then
+        (( ${_ms_reloading:-0} )) && return 0
+        saved=( "${path[@]}" )
+        _ms_init_cached -P /usr/bin:/bin:/usr/sbin:/sbin brew "$brew" shellenv zsh
+        result=$?
+        path=( "${path[@]:|saved}" "${saved[@]}" )
+        return $result
+    fi
+done
+return 0

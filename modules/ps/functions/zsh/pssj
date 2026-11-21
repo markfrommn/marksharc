@@ -1,0 +1,2 @@
+# pssj: all processes in job format, optionally filtered by pattern.
+_ms_ps all jobs "$@"

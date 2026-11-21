@@ -1,0 +1,21 @@
+# zsh-plugin-load - load an already-cloned pinned plugin (spec 6.8).
+#
+# Usage: zsh-plugin-load <name> <sha> <source|fpath>
+#
+# Reads only from the XDG cache; never runs Git. A missing clone is skipped
+# silently (doctor reports it); the explicit zsh-plugin-update refreshes pins.
+emulate -L zsh
+local name=$1 sha=$2 kind=$3
+local root="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${name}@${sha}"
+[[ -d $root ]] || return 0
+case $kind in
+  source)
+    local entry
+    for entry in "$root/$name.plugin.zsh" "$root/$name.zsh" "$root/init.zsh"; do
+      if [[ -r $entry ]]; then source "$entry"; return $?; fi
+    done
+    ;;
+  fpath) fpath=( "$root" $fpath ) ;;
+  *) return 2 ;;
+esac
+return 0

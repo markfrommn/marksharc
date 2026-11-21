@@ -1,0 +1,8 @@
+# Pinned third-party plugins for the built-in offline loader (spec 6.8).
+#
+# Startup only loads already-cloned pins from the XDG cache and never touches
+# the network; refresh clones explicitly with zsh-plugin-update.
+#
+# One directive per line:
+#   plugin <name> <git-url> <commit-sha> [shell <shell>] [kind source|fpath]
+plugin fzf-tab https://github.com/Aloxaf/fzf-tab 24105b15714bfec37989ed5c5b6e60f572253019 shell zsh kind source
