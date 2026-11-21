@@ -11,6 +11,7 @@ HOME, or call real services.
 tests/check                                   # everything CI runs
 tests/lint                                    # zsh -n, shellcheck, fish --no-execute
 tests/run-tests --shell zsh spec/zsh          # zsh units
+tests/run-tests --shell sh spec/contract      # cross-shell startup contract
 tests/run-tests --shell sh spec/repo          # runner, lint and repository checks
 SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 ```
@@ -33,6 +34,7 @@ checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
 | `spec/spec_helper.sh`, `spec/support/fixtures.sh` | Per-example sandbox and shared helpers (`stub_command`, `git_fixture`, `run_bounded`, `file_mode`) |
 | `support/pty_socket.py` | OS fixture support only: a PTY child supervisor and a Unix socket binder |
 | `spec/zsh/` | Specs run with `--shell zsh` |
+| `spec/contract/` | Contract suite run with `--shell sh`: launches the real zsh core (bash and fish join in their phases) and proves quiet startup, environment availability, idempotent re-source and writes confined to cache/state |
 | `spec/repo/` | Specs run with `--shell sh`: the harness itself and repository rules |
 
 ## Contract inventory

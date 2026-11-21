@@ -58,5 +58,8 @@ jobs:
       - name: zsh suite
         run: tests/run-tests --shell zsh spec/zsh
 
+      - name: Contract suite
+        run: tests/run-tests --shell sh spec/contract
+
       - name: Repository suite
         run: tests/run-tests --shell sh spec/repo
