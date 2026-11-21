@@ -75,7 +75,7 @@ DATA
     ms_fixture_full
     print 'return 0' > "$MS_HOME/modules/brew/functions/zsh/setup-homebrew"
     local tool
-    for tool in zoxide starship atuin herdr cwf; do printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/$tool"; chmod +x "$TEST_ROOT/bin/$tool"; done
+    for tool in zoxide starship atuin; do printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/$tool"; chmod +x "$TEST_ROOT/bin/$tool"; done
     # The loader runs every new module in an interactive session with its trace on.
     ms_pty MARKSHARC_VERBOSE=1 -dic 'print READY' || return 1
     local out=$(<"$TEST_ROOT/out") name
@@ -83,6 +83,9 @@ DATA
       [[ $out == *"marksharc: module $name:"* ]] || { print "module $name not loaded"; return 2; }
     done
     [[ $out != *'returned'* && $out != *'failed validation'* ]] || { print -r -- "$out"; return 3; }
+    # The global FORBIDDEN stubs for cwf and herdr (P1.6 tools) stay active: a
+    # P1.5 module must never call them, so the operation log must be empty.
+    [[ ! -s $OPLOG ]] || { grep FORBIDDEN "$OPLOG"; return 4; }
   }
   It 'loads the modules through the loader in an interactive session'
     When run full_start_case
