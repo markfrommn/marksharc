@@ -67,6 +67,6 @@ this table to cover every module.
 | history-atuin, history-native | Wrapper over atuin, policy, native fallback, no stray history files | `spec/zsh/history_spec.sh` |
 | Overlay | Private module root, host config, env-id invalidation, reload paths, function ownership, post hook, option restore | `spec/zsh/overlay_spec.sh` |
 | Modules | Bands, double-source idempotency, layout, interactive load | `spec/zsh/modules_spec.sh` |
-| Modules | module.conf contract; module tests linkage | `spec/zsh/module_specs_spec.sh` |
+| Modules | module.conf contract; module tests linkage (discovery-only contract today: no module ships a tests directory yet, so the linkage example is vacuous until P2.8 adds module-local tests) | `spec/zsh/module_specs_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |
