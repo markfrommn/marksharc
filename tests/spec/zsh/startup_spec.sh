@@ -32,8 +32,26 @@ DATA
     printf '#!/bin/sh\necho fortune >> "$OPLOG"\n' > "$TEST_ROOT/bin/fortune"
     printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/go"
     chmod +x "$TEST_ROOT/bin/git" "$TEST_ROOT/bin/fortune" "$TEST_ROOT/bin/go"
-    # P1.6 system/workflow stubs (herdr, cwf, envman) return when their modules land in P2.3.
-    mkdir -p "$TEST_ROOT/fpath"
+    cat > "$TEST_ROOT/bin/herdr" <<'DATA'
+#!/bin/sh
+case "$*" in
+  'session list') echo 'NAME STATE PID SOCKET';;
+  'completion zsh') echo HERDR_COMPLETION >> "$OPLOG";;
+  *) echo FORBIDDEN >> "$OPLOG"; exit 99;;
+esac
+DATA
+    cat > "$TEST_ROOT/bin/cwf" <<'DATA'
+#!/bin/sh
+case "$*" in
+  'shell zsh') echo CWF_INIT >> "$OPLOG";;
+  'session name') exit 1;;
+  *) echo FORBIDDEN >> "$OPLOG"; exit 99;;
+esac
+DATA
+    chmod +x "$TEST_ROOT/bin/herdr" "$TEST_ROOT/bin/cwf"
+    # envman stays with the private overlay (mark-tools); no portable module loads it.
+    # The cdt directory is the synthesized tooling checkout the cwf module reads.
+    mkdir -p "$TEST_ROOT/fpath" "$TEST_ROOT/cdt"
   }
   startup_case() {
     emulate -L zsh
@@ -80,7 +98,10 @@ DATA
       script+='; (( ${+functions[starship_precmd]} == 1 )) || exit 27'
       script+='; [[ $MARKSHARC_SESSION == interactive ]] || exit 28'
     fi
-    local -a extra=( FPATH="$TEST_ROOT/fpath:$FPATH" )
+    # The cwf module runs cwf shell zsh once per shell when the tooling checkout
+    # is known; the fixture synthesizes one (COMMON_DEV_TOOLS is the documented,
+    # portable contract — the private overlay's discovery of it stays behind).
+    local -a extra=( FPATH="$TEST_ROOT/fpath:$FPATH" COMMON_DEV_TOOLS="$TEST_ROOT/cdt" )
     case $fixture_mode in
       command-tty) ms_pty "${extra[@]}" -dlc "$script" ;;
       tty-login) ms_pty "${extra[@]}" -dlic "$script" ;;
@@ -104,8 +125,9 @@ DATA
     [[ $(<"$OPLOG") != *FORBIDDEN* ]] || { cat "$OPLOG"; return 2; }
     if [[ $fixture_mode == (tty|tty-login|node|pyenv) ]]; then
       local event
-      # ENVMAN/HERDR_COMPLETION/CWF_INIT re-join this list with P2.3.
-      for event in COMPINIT; do
+      # ENVMAN stays with the private overlay; the herdr and cwf events come from
+      # the portable modules against the synthesized stubs and tooling checkout.
+      for event in COMPINIT HERDR_COMPLETION CWF_INIT; do
         [[ $(grep -c "^$event\$" "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 7; }
       done
       [[ $fixture_mode != pyenv || $(grep -c '^PYENV_INIT$' "$OPLOG") == 2 ]] || return 8
@@ -266,14 +288,19 @@ DATA
     emulate -L zsh
     export TMPDIR="$TEST_ROOT/tmp"
     mkdir "$TMPDIR"
-    mktemp() { command mktemp "$TEST_ROOT/install.XXXXXX"; }
-    local before=$PWD
+    mktemp() { [[ $1 == -d ]] && command mktemp -d "$TEST_ROOT/krew.XXXXXX" || command mktemp "$TEST_ROOT/install.XXXXXX"; }
+    local before=$PWD helper
     curl() { return 42; }
-    # install-wezterm-terminfo and install-krew re-join with their P2.3 modules.
     load_mfn go-gvm
-    install-gvm > "$TEST_ROOT/out" 2>&1
-    [[ $? == 42 && $PWD == $before ]] || return 1
-    local -a leftovers=( "$TEST_ROOT"/install.*(ND) )
+    for helper in install-gvm install-wezterm-terminfo install-krew; do
+      case $helper in
+        install-wezterm-terminfo) load_mfn wezterm "$helper";;
+        install-krew) load_mfn cloud "$helper";;
+      esac
+      "$helper" > "$TEST_ROOT/out" 2>&1
+      [[ $? == 42 && $PWD == $before ]] || return 1
+    done
+    local -a leftovers=( "$TEST_ROOT"/krew.*(ND) "$TEST_ROOT"/install.*(ND) )
     [[ $#leftovers == 0 ]]
   }
   It 'propagates explicit installer failures and removes temporary artifacts'

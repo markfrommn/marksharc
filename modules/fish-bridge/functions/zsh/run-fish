@@ -1,0 +1,35 @@
+local envs_to_pass=(
+    "LOGNAME"
+    "DISPLAY"
+    "DISPLAY_ORIG"
+    "TERM"
+    "TMUX"
+    "TMUX_PANE"
+    "COLORTERM"
+    "REMOTEHOST"
+    "SSH_AUTH_SOCK"
+    "SSH_CLIENT"
+    "SSH_CONNECTION"
+    "SSH_TTY"
+    "XDG_SESSION_ID"
+    "XDG_RUNTIME_DIR"
+    "XDG_SESSION_TYPE"
+    "XDG_SESSION_CLASS"
+    "DBUS_SESSION_BUS_ADDRESS"
+    "LANG"
+    "LC_ALL"
+    "LaunchInstanceID"
+    "SECURITYSESSIONID"
+    "WARP_TERMINAL_SESSION_UUID"
+)
+envs=()
+for ename in "$envs_to_pass[@]"
+do
+    if printenv $ename >/dev/null 2>&1 ; then
+        etok=$ename=${(P)ename}
+        envs+=($etok)
+    fi
+done
+fishpath=$(/usr/bin/which fish)
+echo env -i $envs SHELL=$fishpath $fishpath -l
+env -i $envs SHELL=$fishpath $fishpath -l

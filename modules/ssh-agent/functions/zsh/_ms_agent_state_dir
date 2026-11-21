@@ -1,0 +1,20 @@
+# Private state directory for the cached agent; the path is returned in REPLY. The
+# marksharc and ssh-agent directories must be owned, non-symlink directories (created 0700,
+# ssh-agent tightened to 0700); the XDG state base must be an owned directory.
+emulate -L zsh
+local base=${XDG_STATE_HOME:-$HOME/.local/state} dir
+if [[ -e $base ]]; then
+    [[ -d $base && -O $base ]] || { print -ru2 "Agent state path is not an owned directory: $base"; return 1; }
+else
+    (umask 077; command mkdir -p -- "$base") || return 1
+fi
+for dir in "$base/marksharc" "$base/marksharc/ssh-agent"; do
+    [[ ! -L $dir ]] || { print -ru2 "Private state path is a symlink: $dir"; return 1; }
+    if [[ -e $dir ]]; then
+        [[ -d $dir && -O $dir ]] || { print -ru2 "Private state path is not an owned directory: $dir"; return 1; }
+    else
+        (umask 077; command mkdir -- "$dir") || return 1
+    fi
+done
+command chmod 0700 "$base/marksharc/ssh-agent" || return 1
+REPLY=$base/marksharc/ssh-agent

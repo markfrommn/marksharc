@@ -1,0 +1,27 @@
+local running_containers
+running_containers=$( docker ps | grep -E -v CONTAINER | awk '{print $1}' )
+
+if [ -n "$running_containers" ]; then
+    iecho -n "Killing running containers..."
+    for c in $running_containers ; do
+        docker kill "$c"
+        iecho " $c "
+    done
+    iecho ""
+else
+    iecho "No running containers."
+fi
+
+local dead_containers
+dead_containers=$( docker ps -a | grep -E -v CONTAINER | awk '{print $1}' )
+
+if [ -n "$dead_containers" ]; then
+    iecho -n "Removing stopped containers..."
+    for c in $dead_containers ; do
+        docker rm "$c"
+        iecho " $c "
+    done
+    iecho ""
+else
+    iecho "No stopped containers."
+fi

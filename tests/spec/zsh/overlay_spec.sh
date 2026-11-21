@@ -125,8 +125,36 @@ Describe 'private overlay loader'
     When run post_case
     The status should be success
   End
-  # private_layout_case and disabled_hook_case return with the private overlay and
-  # the P1.6 cwf module in P2.3; they referenced trees that never live in this repo.
+  # private_layout_case stays out: it asserted the author's private tree, which
+  # never lives in this repo. disabled_hook_case is back with a synthesized
+  # overlay module (the convoy hook/cleanup pattern with neutral names).
+  disabled_hook_case() {
+    emulate -L zsh
+    ms_fixture_full
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks"
+    print 'describe "demo hooks"' > "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks/module.conf"
+    cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks/init.zsh" <<'DATA'
+demo-cwf-new-hook() { :; }
+typeset -gaU cwf_new_post_create_hooks
+cwf_new_post_create_hooks=( demo-cwf-new-hook ${cwf_new_post_create_hooks:#demo-cwf-new-hook} )
+_ms_demo_hooks_cleanup() {
+  cwf_new_post_create_hooks=( "${(@)cwf_new_post_create_hooks:#demo-cwf-new-hook}" )
+}
+typeset -gaU _ms_init_cleanups
+_ms_init_cleanups+=( _ms_demo_hooks_cleanup )
+DATA
+    ms_pty -dic '
+      print -r -- "before=${cwf_new_post_create_hooks[(Ie)demo-cwf-new-hook]}"
+      print "module demo-hooks off" >> "$XDG_CONFIG_HOME/marksharc/config.conf"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" >/dev/null 2>&1
+      print -r -- "after=${cwf_new_post_create_hooks[(Ie)demo-cwf-new-hook]}"
+      exit' || return 1
+    [[ $(<"$TEST_ROOT/out") == *'before=1'* && $(<"$TEST_ROOT/out") == *'after=0'* ]] || { cat "$TEST_ROOT/out"; return 2; }
+  }
+  It 'removes a disabled private module owned hook on reload'
+    When run disabled_hook_case
+    The status should be success
+  End
   removed_option_case() {
     emulate -L zsh
     ms_fixture

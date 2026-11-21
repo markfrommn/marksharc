@@ -181,17 +181,19 @@ Describe 'removed legacy history setup'
     The status should be success
   End
 
-  It 'runs the atuin init before the policy and after starship'
+  It 'runs the atuin init before the policy, after starship, and before the titles cd .'
     ordering_case() {
       local z="$MARKSHARC_ROOT/modules" a p
       a=$(grep -n '_ms_init_cached atuin atuin init zsh' "$z/history-atuin/init.zsh" | head -1 | cut -d: -f1)
       p=$(grep -n '^unset HISTFILE' "$z/history-atuin/init.zsh" | head -1 | cut -d: -f1)
       [[ -n $a && -n $p ]] && (( a < p )) || return 1
-      # titles (order 90) re-asserts its cd . kick here when P2.3 lands it.
-      local o_s o_a
+      # The final cd . belongs to the titles module, which loads after history.
+      [[ $(grep -c '^cd \.$' "$z/titles/init.zsh") == 1 ]] || return 1
+      local o_s o_a o_t
       o_s=$(sed -n 's/^order //p' "$z/prompt-starship/module.conf")
       o_a=$(sed -n 's/^order //p' "$z/history-atuin/module.conf")
-      (( o_s < o_a ))
+      o_t=$(sed -n 's/^order //p' "$z/titles/module.conf")
+      (( o_s < o_a && o_a < o_t ))
     }
     When run ordering_case
     The status should be success
@@ -224,7 +226,9 @@ Describe 'no history file is written by a session'
     printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/go"
     printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/fortune"
     printf '#!/bin/sh\nexit 99\n' > "$TEST_ROOT/bin/git"
-    chmod +x "$TEST_ROOT"/bin/{go,fortune,git}
+    printf '#!/bin/sh\nexit 1\n' > "$TEST_ROOT/bin/cwf"
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_ROOT/bin/herdr"
+    chmod +x "$TEST_ROOT"/bin/{go,cwf,herdr,fortune,git}
     local script='print -s "echo hi"; history >/dev/null; h >/dev/null; print READY'
     ms_pty HISTFILE="$HOME/.zsh_history" HISTSIZE=2000 SAVEHIST=1000 -dic "$script"
     [[ $? == 0 && $(<"$TEST_ROOT/out") == *READY* ]] || { cat "$TEST_ROOT/out"; return 1; }

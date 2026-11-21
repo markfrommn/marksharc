@@ -1,0 +1,4 @@
+[[ -n $SSH_AUTH_SOCK && -S $SSH_AUTH_SOCK && -O $SSH_AUTH_SOCK ]] || return 1
+SSH_AUTH_SOCK="$SSH_AUTH_SOCK" ssh-add -l >/dev/null 2>&1
+local result=$?
+(( result == 0 || result == 1 ))

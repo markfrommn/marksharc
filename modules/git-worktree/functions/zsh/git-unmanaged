@@ -1,0 +1,8 @@
+typeset -ga git_unmanaged_ret=()
+git_managed_arr_core unmanaged git_unmanaged_ret $@
+iecho -n "Git Un-Managed: "
+for f in "${git_unmanaged_ret[@]}"; do
+    iecho -n " $f"
+done
+iecho ""
+unset git_unmanaged_ret

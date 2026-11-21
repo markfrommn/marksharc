@@ -1,0 +1,9 @@
+local cache tmpfile
+_ms_agent_cache_file || return 1
+cache=$REPLY
+tmpfile=$(umask 077; mktemp "${cache:h}/.agent.XXXXXX") || return 1
+{
+    print -r -- "SSH_AUTH_SOCK=${(q)SSH_AUTH_SOCK}; export SSH_AUTH_SOCK"
+    [[ -z $SSH_AGENT_PID ]] || print -r -- "SSH_AGENT_PID=$SSH_AGENT_PID; export SSH_AGENT_PID"
+} > "$tmpfile" || { rm -f -- "$tmpfile"; return 1; }
+chmod 600 "$tmpfile" && mv -f -- "$tmpfile" "$cache"
