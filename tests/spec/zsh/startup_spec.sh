@@ -169,6 +169,24 @@ DATA
     When run quiet_case
     The status should be success
   End
+  insecure_fpath_case() {
+    emulate -L zsh
+    ms_fixture_full
+    print 'return 0' > "$MS_HOME/modules/brew/functions/zsh/setup-homebrew"
+    startup_tools
+    # A world-writable completions directory fails compaudit's audit (a
+    # world-writable site-functions directory ships on some CI images).
+    # compinit -i excludes it silently; a prompting compinit hangs the PTY here.
+    ms_mod zz-insecure module.conf 'describe "insecure completions fixture"'
+    mkdir -p "$MS_HOME/modules/zz-insecure/completions/zsh"
+    chmod 777 "$MS_HOME/modules/zz-insecure/completions/zsh"
+    ms_pty -dic 'print READY' || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") == *READY* && $(<"$TEST_ROOT/out") != *insecure* ]] || { cat "$TEST_ROOT/out"; return 2; }
+  }
+  It 'initialises completion silently when an fpath directory fails the security audit'
+    When run insecure_fpath_case
+    The status should be success
+  End
   greeting_case() {
     emulate -L zsh
     startup_fixture
@@ -191,7 +209,7 @@ DATA
     # removed before initialization ran.
     cat > "$TEST_ROOT/fpath/compinit" <<'DATA'
 print "compinit $*" >> "$OPLOG"
-if [ -e "$2" ]; then
+if [ -e "${@[-1]}" ]; then
   print DUMP_PRESENT >> "$OPLOG"
 else
   print DUMP_ABSENT >> "$OPLOG"
@@ -217,8 +235,8 @@ DATA
     [[ $(<"$OPLOG") != *FORBIDDEN* ]] || { cat "$OPLOG"; return 2; }
     [[ $(grep -c '^FZF_TAB$' "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 3; }
     [[ $(grep -c '^DUMP_ABSENT$' "$OPLOG") == 1 && $(<"$OPLOG") != *DUMP_PRESENT* ]] || { cat "$OPLOG"; return 4; }
-    [[ $(grep -c "^compinit -d $cache/zcompdump\$" "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 5; }
-    [[ $(<"$OPLOG") != *'compinit -C'* && $(<"$OPLOG") != *'compinit -D'* ]] || { cat "$OPLOG"; return 6; }
+    [[ $(grep -c "^compinit -i -d $cache/zcompdump\$" "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 5; }
+    [[ $(<"$OPLOG") != *'compinit -C'* && $(<"$OPLOG") != *'compinit -D'* && $(<"$OPLOG") != *'compinit -u'* ]] || { cat "$OPLOG"; return 6; }
     [[ ! -e $cache/zcompdump && -s $cache/zcompdump.fpath && $(<"$cache/zcompdump.fpath") != /nonexistent/fpath ]] || return 7
     local -a zcompdumps=( "$MS_HOME"/.zcompdump*(N) "$MS_HOME"/core/.zcompdump*(N) )
     [[ ${#zcompdumps} == 0 ]] || return 8

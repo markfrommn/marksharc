@@ -79,8 +79,10 @@ Describe 'version-manager paths: nvm, gvm, pyenv'
     ms_unit "path=( $other /usr/bin ) GOROOT=$TEST_ROOT/othergo/libexec
       $run" || return 5
     [[ $(<"$TEST_ROOT/out") == "GOROOT=$TEST_ROOT/othergo/libexec" ]] || { cat "$TEST_ROOT/out"; return 6; }
-    # No go on PATH: nothing changes.
-    ms_unit "path=( /usr/bin ) GOROOT=/keep
+    # No go on PATH: nothing changes. The PATH is a guaranteed go-free fixture
+    # directory; a host directory like /usr/bin may hold a real go on some CI images.
+    mkdir -p "$TEST_ROOT/nogo"
+    ms_unit "path=( $TEST_ROOT/nogo ) GOROOT=/keep
       $run" || return 7
     [[ $(<"$TEST_ROOT/out") == 'GOROOT=/keep' ]] || return 8
     # Not a rebuild: an inherited environment is left as it is.

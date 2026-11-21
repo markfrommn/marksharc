@@ -11,6 +11,13 @@ if [[ -z ${MARKSHARC_HOME-} ]]; then
     MARKSHARC_HOME=${${(%):-%N}:A:h:h:h}
     export MARKSHARC_HOME
 fi
+
+# The completion module owns compinit (spec 6.9). Debian/Ubuntu's global zshrc
+# runs its own compinit first unless the user zshenv set this; in a non-tty or
+# agent shell that global compinit aborts startup outright, and on a tty it can
+# prompt. Shell-local: the distro check reads it in this same shell, and child
+# shells set it again from their own env phase.
+typeset -g skip_global_compinit=1
 typeset -g _ms_starting=1 _ms_verbose=0
 typeset -gi _ms_reloading=${_ms_reloading:-0}
 [[ -n ${MARKSHARC_VERBOSE-} && $MARKSHARC_VERBOSE != 0 ]] && _ms_verbose=1

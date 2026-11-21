@@ -1,6 +1,10 @@
 # completion module, init phase (spec 6.9): a full compinit whose dump and fpath
 # fingerprint live in the per-host XDG cache (the dump is rebuilt when fpath changes),
 # then the zstyles. Sourced at top level, so typeset is used and a reload skips compinit.
+# -i keeps the compaudit security check (never -C or -u) but excludes an insecure
+# directory silently: startup is non-interactive by contract (spec 6.6/6.10), so a
+# prompt would hang PTY sessions and a world-writable distro site-functions directory
+# (seen on ubuntu-latest CI) must not be trusted.
 autoload -Uz compinit
 if (( ! ${_ms_reloading:-0} )); then
     typeset _ms_cache="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}"
@@ -12,7 +16,7 @@ if (( ! ${_ms_reloading:-0} )); then
         rm -f -- "$_ms_dump"
         print -r -- "$_ms_fpath_value" >"$_ms_fpath"
     fi
-    compinit -d "$_ms_dump"
+    compinit -i -d "$_ms_dump"
     unset _ms_cache _ms_dump _ms_fpath _ms_fpath_value
 fi
 

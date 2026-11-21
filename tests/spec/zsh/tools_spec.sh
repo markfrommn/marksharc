@@ -234,7 +234,9 @@ Describe 'interactive tool modules (init phase)'
     fpath=( "$TEST_ROOT/fp" $fpath )
     _ms_reloading=0
     source "$MARKSHARC_ROOT/modules/completion/init.zsh" || return 1
-    [[ $(<"$OPLOG") == "compinit -d $XDG_CACHE_HOME/marksharc/"*"/zcompdump" ]] || { cat "$OPLOG"; return 2; }
+    # -i: the audit still runs (never -C or -u), but an insecure directory is
+    # excluded silently instead of prompting a startup that cannot answer.
+    [[ $(<"$OPLOG") == "compinit -i -d $XDG_CACHE_HOME/marksharc/"*"/zcompdump" ]] || { cat "$OPLOG"; return 2; }
     [[ $(zstyle -L ':completion:*' menu) == *select=1* ]] || return 3
     zstyle -L ':completion:*' hosts > /dev/null || return 4
   }

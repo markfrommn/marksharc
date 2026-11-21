@@ -99,6 +99,25 @@ Describe 'core env phase, host facts, ZDOTDIR and MARKSHARC_ENV'
     When run exports_case
     The status should be success
   End
+  global_compinit_case() {
+    emulate -L zsh
+    ms_fixture
+    # Debian/Ubuntu's global zshrc runs its own compinit unless the user zshenv set
+    # skip_global_compinit; the completion module owns compinit (spec 6.9). The
+    # suppression must hold in every mode, stay shell-local, silent, and leave the
+    # session class alone.
+    local flags
+    for flags in -c -ic -lc; do
+      ms_run $flags 'print -r -- "S=$MARKSHARC_SESSION ${(t)skip_global_compinit}:$skip_global_compinit"' || return 1
+      [[ $(<"$TEST_ROOT/out") == 'S=batch scalar:1' && ! -s $TEST_ROOT/err ]] || { print -r -- "$flags OUT=$(<$TEST_ROOT/out) ERR=$(<$TEST_ROOT/err)"; return 2; }
+    done
+    ms_run CLAUDECODE=1 -ic 'print -r -- "S=$MARKSHARC_SESSION ${(t)skip_global_compinit}:$skip_global_compinit"' || return 3
+    [[ $(<"$TEST_ROOT/out") == 'S=agent scalar:1' && ! -s $TEST_ROOT/err ]] || { print -r -- "OUT=$(<$TEST_ROOT/out) ERR=$(<$TEST_ROOT/err)"; return 4; }
+  }
+  It 'suppresses the distro global compinit from the env phase in every session class'
+    When run global_compinit_case
+    The status should be success
+  End
   zdot_case() {
     emulate -L zsh
     ms_fixture

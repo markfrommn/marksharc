@@ -5,6 +5,14 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- zsh startup on Debian/Ubuntu: the distro-global `compinit` no longer runs
+  (`skip_global_compinit` is set in the env phase), so non-tty and agent shells
+  no longer abort at startup; the completion module now runs `compinit -i`, so
+  the security audit still applies but an insecure system directory (seen on the
+  ubuntu-latest CI image) is excluded instead of prompting or hanging the shell.
+
 ### Added
 
 - Repository layout from the specification (`core/`, `modules/`,
