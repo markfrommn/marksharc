@@ -56,5 +56,6 @@ WARP.md
 .vscode/
 .cwf-ai*
 .cwf-settings*
+.cwf/ai/
 docs/COMMON-WORKFLOW.md
 memory/local/
