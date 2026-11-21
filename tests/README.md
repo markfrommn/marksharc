@@ -61,7 +61,7 @@ this table to cover every module.
 | path | Tier order goldens (macOS/Linux/modules), placement, reload, dot rule, spaces, tiers option, pending commands, env finalizers, requires-after-brew | `spec/zsh/path_spec.sh` |
 | node-nvm, go-gvm, python | Manager tier ahead of brew in every class; nvm alias resolution; gvm selection and GOROOT; hooks; pyenv vs uv | `spec/zsh/manager_paths_spec.sh` |
 | brew, core libs | setup-homebrew variants; host-fact seams | `spec/zsh/environment_spec.sh` |
-| Tool modules | brew/go/rust/bun/pnpm/lmstudio/cuda env placement; ls/pager/zsh-options/nav/zoxide/starship/direnv/greeting/completion init | `spec/zsh/tools_spec.sh` |
+| Tool modules | brew/go/rust/bun/pnpm/lmstudio/cuda env placement; ls/pager/zsh-options/nav/zoxide/starship/direnv/greeting/completion init; editor selection (option, then emacs, then vi, no xemacs fallback); FreeBSD sourcing of the kept modules with no CLICOLOR/startx behavior | `spec/zsh/tools_spec.sh` |
 | ps | Seven helpers, header kept, self-match excluded, portable flags | `spec/zsh/ps_spec.sh` |
 | OMZ keepers | No OMZ references; no cloud startup; plugin loader kinds, pins, update, no-eval; nav widgets; coloured man; command-not-found | `spec/zsh/omz_removal_spec.sh` |
 | history-atuin, history-native | Wrapper over atuin, policy, native fallback, no stray history files | `spec/zsh/history_spec.sh` |

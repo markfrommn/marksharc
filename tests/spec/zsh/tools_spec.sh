@@ -149,6 +149,44 @@ Describe 'interactive tool modules (init phase)'
     When run pager_options_case
     The status should be success
   End
+  editor_case() {
+    emulate -L zsh
+    # Ported from mark-desktop-files' pruning spec: an explicit option wins,
+    # then emacs, then vi; no xemacs alias or fallback survives the move.
+    have_command() { [[ $1 == emacs ]]; }
+    unset EDITOR _ms_opt_editor_command
+    source "$MARKSHARC_ROOT/modules/editor/init.zsh" || return 1
+    [[ $EDITOR == 'emacs -nw' ]] || return 2
+    have_command() { return 1; }
+    unset EDITOR
+    source "$MARKSHARC_ROOT/modules/editor/init.zsh" || return 3
+    [[ $EDITOR == vi ]] || return 4
+    _ms_opt_editor_command='nano -w'
+    source "$MARKSHARC_ROOT/modules/editor/init.zsh" || return 5
+    [[ $EDITOR == 'nano -w' && -z ${aliases[xemacs]-} && ${aliases[emacs]-} != *xemacs* ]]
+  }
+  It 'selects Emacs, vi, or the editor option without retaining xemacs aliases or fallbacks'
+    When run editor_case
+    The status should be success
+  End
+  freebsd_case() {
+    emulate -L zsh
+    # Ported from mark-desktop-files' pruning spec: the kept modules load on
+    # FreeBSD with no FreeBSD-only CLICOLOR export or startx alias.
+    local ostype=FreeBSD
+    have_command() { return 1; }
+    unset CLICOLOR
+    local module
+    for module in zsh-options editor pager ls nav; do
+      source "$MARKSHARC_ROOT/modules/$module/init.zsh" > "$TEST_ROOT/output" 2>&1 || return 3
+    done
+    [[ -z ${CLICOLOR-} ]] || return 1
+    (( ${+aliases[startx]} == 0 )) || return 2
+  }
+  It 'loads the kept modules on FreeBSD with no FreeBSD-only CLICOLOR or startx behavior'
+    When run freebsd_case
+    The status should be success
+  End
   options_case() {
     emulate -L zsh
     unset LANG
