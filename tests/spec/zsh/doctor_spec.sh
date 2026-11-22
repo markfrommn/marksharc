@@ -196,10 +196,13 @@ Describe 'marksharc doctor'
   timing_failure_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    # An empty .zshrc: the child starts without marksharc. With no startup files at all,
-    # Debian's zsh opens the blocking zsh-newuser-install menu and the child times out.
+    # The child starts without marksharc, so this .zshenv does marksharc's two startup
+    # guards itself. Its presence stops Debian's blocking zsh-newuser-install menu (shown
+    # when no startup files exist); skip_global_compinit stops Ubuntu's /etc/zsh/zshrc
+    # compinit, which prompts on the CI image's insecure directory. Either blocks the
+    # child until doctor reports a timeout.
     mkdir -p "$TEST_ROOT/empty-zdot"
-    : > "$TEST_ROOT/empty-zdot/.zshrc"
+    print -r -- 'skip_global_compinit=1' > "$TEST_ROOT/empty-zdot/.zshenv"
     ms_env
     env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
     [[ $(<"$TEST_ROOT/out") == *'startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
