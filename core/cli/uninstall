@@ -144,6 +144,14 @@ state=${mf[state]-}
 (( purge )) || command mv -f -- "$manifest" "$manifest.restored"
 
 if (( purge )); then
+    # Copies of hand-edited stubs that install re-runs kept in the state directory would go with
+    # it: move them next to the restored files first.
+    for saved in "$state"/replaced/*(N.); do
+        dest=$HOME/.zshenv.marksharc-replaced.${${saved:t}#zshenv.}
+        [[ -e $dest || -L $dest ]] && dest=$dest.$$
+        command cp -p -- "$saved" "$dest" || die "could not keep $saved; the purge was not carried out"
+        print -r -- "marksharc: kept an earlier edited stub as $dest (merge any lines you still need)."
+    done
     for dir in $purge_targets; do command rm -rf -- "$dir"; done
 fi
 

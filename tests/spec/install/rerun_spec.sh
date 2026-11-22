@@ -78,6 +78,33 @@ Describe 'install.sh re-runs and environment'
     The status should be success
   End
 
+  purge_replaced_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    printf 'original env\n' > "$HOME/.zshenv"
+    inst --home "$FW" || return 1
+    printf '. "$HOME/.cargo/env"\n' >> "$HOME/.zshenv"
+    inst --home "$FW" || return 2
+    saved=$(ls "$XDG_STATE_HOME"/marksharc/replaced/* | head -n 1)
+    [ -n "$saved" ] || return 3
+    uninstall --purge --yes || { cat "$TEST_ROOT/err"; return 4; }
+    [ -e "$XDG_STATE_HOME/marksharc" ] && return 5
+    # the copy the purge would have deleted is moved next to the restored files
+    kept=$(ls "$HOME"/.zshenv.marksharc-replaced.* 2> /dev/null | head -n 1)
+    [ -n "$kept" ] && grep -q 'cargo/env' "$kept" || { ls -A "$HOME"; return 6; }
+    grep -q -F "$kept" "$TEST_ROOT/out" || { cat "$TEST_ROOT/out"; return 7; }
+    # without edited copies nothing extra appears
+    rm -f "$HOME"/.zshenv.marksharc-replaced.* "$HOME/.zshenv"
+    inst --home "$FW" || return 8
+    uninstall --purge --yes || return 9
+    ls "$HOME"/.zshenv.marksharc-replaced.* > /dev/null 2>&1 && return 10
+    return 0
+  }
+  It 'uninstall --purge moves the edited-stub copies from the state dir next to the restored files'
+    When run purge_replaced_case
+    The status should be success
+  End
+
   edited_uninstall_case() {
     FW=$TEST_ROOT/fw
     fake_fw "$FW"
