@@ -427,7 +427,7 @@ In the MVP the existing `chdir-set-title`, `setup-herdr-sessions`, and `fix-tmux
 A host has two checkouts: the framework and the overlay (plus any private module repos listed in the overlay). Everything is fast-forward only.
 
 - `marksharc sync` fetches and fast-forwards each checkout, reports dirty, ahead, or diverged trees without touching them, re-renders, fetches newly pinned plugins, and prints a `doctor` summary.
-- **Notify**: an interactive shell starts a detached fetch when the last check is older than `sync.check_hours` (default 12). The result is written to a status file; the next shell prints one line when the host is behind.
+- **Notify**: an interactive shell starts a detached fetch when the last check is older than `sync.check_hours` (default 12). The result is written to a status file; the next eligible shell prints one line when the host is behind. This detached fetch is the explicit exception to the offline startup rule in 10.4.
 - **Poll-pull** (Modernization): a launchd agent or systemd user timer runs `marksharc sync --auto`.
 - **Push** (Modernization): `marksharc push [host…]` runs `marksharc sync` over ssh on each host in `hosts.conf` and reports per-host results.
 
@@ -547,7 +547,7 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 1. **Match capabilities, not file trees.** A working command, a discoverable binary, and the right exported variable matter more than identical structure across shells.
 2. **Let each shell be itself.** Share data and executables; write interactive behaviour natively.
 3. **Login, interactive, and agent are separate questions.** Env belongs to every mode. Prompting, history tools, titles, and greetings need an eligible interactive session.
-4. **Startup is quiet, fast, and offline.** No output, no network, no installs, no pulls. Those are explicit commands.
+4. **Startup is quiet, fast, and offline**, except for the detached, throttled interactive notify fetch and its subsequent behind notice in 6.14. Installs and pulls are explicit commands.
 5. **Reload is safe.** Keep inherited paths, deduplicate, replace named hooks, track what you generated.
 6. **Data stays data.** Preserve spaces and metacharacters. Apply directives; never evaluate generated text, except a tool's own documented shell integration.
 7. **Scope mutable state.** Per-host cache, per-shell cache files, connectivity checks on cached sockets.
@@ -589,6 +589,7 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Startup output | Quiet; chatty `cs` and `li` | Interview |
 | Interactive upgrades | Autosuggestions, syntax highlighting, colour defaults; Carapace opt-in without fzf-tab | Interview |
 | Sync | Pull and notify in MVP; timer and ssh push after | Interview |
+| Notify exception | Detached interactive fetch, throttled to 12 hours by default; cached behind notice on a subsequent eligible shell | Operator, DEV-45 |
 | Overlay location | `mark-desktop-files/marksharc/` linked to `~/.config/marksharc` | Interview |
 | Write-once language | zsh executables | Interview |
 | Bash | Env-only, early in Modernization | Interview |
