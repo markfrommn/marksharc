@@ -258,6 +258,7 @@ Rules:
 - Sourcing a module twice must be safe.
 - Public modules contain no user names, host names, organisation names, or absolute home paths. Such values arrive as options.
 - A module declares its options with defaults; the overlay sets them.
+- Module files (`env.<shell>`, `init.<shell>`) and the overlay's `local/` hooks run at top level at startup and inside the `marksharc` function on `marksharc reload`, where a bare `typeset` would be function-local. A declaration at file scope therefore says `-g` (`typeset -g`, `typeset -g +x PS1`, `integer -g`); declarations inside functions, anonymous functions included, are unrestricted. `tests/support/function-safe-check.py` enforces this for the zsh modules, the core and the overlay template.
 - Modules load in `order` (0–99, default 50), then by name. Reserved bands: 0–9 core, 10–19 package managers (brew), 20–69 general, 70–79 completion, 80–89 prompt, history, and navigation tools, 90–99 last-running init: modules that must see every earlier module's hooks (`titles` 90, `x11` 91, `ssh-agent` 93, `greeting` 94), with line-editor plugins that must load last at 95 and above.
 
 ### 6.5 Directive vocabulary

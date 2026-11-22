@@ -3,9 +3,10 @@
 # MarkSharc env phase (spec 6.6): every shell, every mode. Host facts, exports,
 # PATH, umask. No output, no forks beyond cached files.
 #
-# Sourced at top level by the stub, the generated ZDOTDIR .zshenv and reload.zsh,
-# never from inside a function: module env.zsh files may use bare `typeset`,
-# which would otherwise turn function-local.
+# Sourced by the stub, the generated ZDOTDIR .zshenv and reload.zsh: at top level at
+# startup and from the marksharc function on reload. Either way module files must be
+# function-safe: declarations at file scope say -g (typeset -g, integer -g, ...), see
+# spec 6.4 and tests/support/function-safe-check.py.
 
 if [[ -z ${MARKSHARC_HOME-} ]]; then
     MARKSHARC_HOME=${${(%):-%N}:A:h:h:h}
@@ -59,3 +60,5 @@ typeset -ga _ms_path_asserted=( "${path[@]}" )
 if (( _ms_env_rebuild )) && [[ -n $_ms_env_id_value ]]; then export MARKSHARC_ENV=$_ms_env_id_value; fi
 _ms_trace "env phase: done"
 unset _ms_starting
+# The stub tests this file's status (source ... && ok): never end on a conditional.
+true

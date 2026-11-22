@@ -1,8 +1,8 @@
 # -*- mode: shell-script; sh-shell: zsh -*-
 # Module loader (spec 6.4 and 6.5). Modules live in $MARKSHARC_HOME/modules/<name>/.
 # The loader functions only read metadata and set up state; the env.zsh and
-# init.zsh files themselves are sourced by the top-level loops in zshenv.zsh and
-# zshrc.zsh so that `typeset` inside a module stays global.
+# init.zsh files themselves are sourced by the loops in phase.zsh (at top level at startup,
+# from the marksharc function on reload), so module files declare with -g (spec 6.4).
 
 # Tokenise one directive line (spec 6.5) into the global array `reply`. Returns 1
 # for blank lines, comments and malformed quoting. Words are unquoted with (Q);

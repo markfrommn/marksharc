@@ -1,8 +1,8 @@
 # -*- mode: shell-script; sh-shell: zsh -*-
 #
-# Run one phase's module files. Sourced at top level by zshenv.zsh and zshrc.zsh
-# (never from a function: a bare `typeset` in a module would turn function-local)
-# with _ms_phase (env|init) and _ms_plan set. A broken module must not take the
+# Run one phase's module files. Sourced by zshenv.zsh and zshrc.zsh, at top level at
+# startup and from the marksharc function on reload (module files declare with -g, so
+# both give the same result) with _ms_phase (env|init) and _ms_plan set. A broken module must not take the
 # shell down:
 #  - the file is sourced inside an `always` block, so recoverable errors (aborted
 #    expansions, syntax errors) only skip the rest of that file;

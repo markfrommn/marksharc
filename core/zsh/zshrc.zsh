@@ -13,9 +13,9 @@ alias li='_ms_reload_login=1; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
 
 # The marksharc command (spec 6.2, 6.10). `reload` has to act on this shell, which a child
 # process cannot, so it is a function that sources reload.zsh (quiet unless --verbose, where
-# cs and li always trace). Every other subcommand runs the CLI program. Bare `typeset`
-# in a module file is function-local during a reload from here, as it is in any function;
-# the aliases above reload at top level.
+# cs and li always trace). Every other subcommand runs the CLI program. Module files
+# declare at file scope with -g, so a reload from this function leaves the same state as
+# the aliases above.
 marksharc() {
     if [[ ${1-} == reload ]]; then
         shift

@@ -19,4 +19,9 @@ marksharc module disable <name>    # edits config.conf
 marksharc reload                   # apply changes in the current shell
 ```
 
+Native zsh in `local/post.zsh` and in private modules runs both at startup and inside the
+`marksharc` function on `marksharc reload`. Declare file-scope variables with `-g`
+(`typeset -g name=value`); a bare `typeset` would be function-local on reload. Declarations
+inside your own functions are unaffected.
+
 Keep this directory in your own git repository to sync it between hosts.

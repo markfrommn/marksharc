@@ -5,11 +5,11 @@
 # prepends to PATH, so the manager tier's order is restored afterwards.
 autoload -Uz add-zsh-hook
 if [[ -f ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm ]] && (( ! ${+functions[gvm]} )); then
-    typeset -a _ms_gvm_saved=( "${path[@]}" )
+    typeset -ga _ms_gvm_saved=( "${path[@]}" )
     # The first gvm Go on PATH now is a parent shell's explicit gvm use (sourcing gvm below
     # prepends its default environment, so look before it).
     _ms_gvm_first
-    typeset _ms_gvm_want=$REPLY
+    typeset -g _ms_gvm_want=$REPLY
     unset GVM_VERSION
     source "${GVM_ROOT:-$HOME/.gvm}/scripts/gvm" >/dev/null 2>&1
     if (( ${+functions[gvm]} )); then

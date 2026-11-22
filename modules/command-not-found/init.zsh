@@ -19,7 +19,7 @@ command_not_found_handler() {
 }
 
 if (( ${+commands[brew]} )); then
-    typeset _ms_cnf_homebrew="${commands[brew]:A:h:h}/Library/Homebrew/command-not-found/handler.sh"
+    typeset -g _ms_cnf_homebrew="${commands[brew]:A:h:h}/Library/Homebrew/command-not-found/handler.sh"
     if [[ -r $_ms_cnf_homebrew ]]; then
         source "$_ms_cnf_homebrew"
         unset _ms_cnf_homebrew

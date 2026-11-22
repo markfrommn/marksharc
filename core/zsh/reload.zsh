@@ -1,6 +1,7 @@
 # -*- mode: shell-script; sh-shell: zsh -*-
 # cs and li (spec 6.10): a verbose reload of the core in the current shell. Sourced
-# at top level by the cs/li aliases so `typeset` in modules stays global. It
+# by the cs/li aliases (top level) and by the marksharc function; module files declare with
+# -g, so both leave the same state (tests/spec/zsh/function_safe_spec.sh). It
 # re-sources the core (code edits take effect), forces an env rebuild and re-runs
 # the init phase. `li` also re-runs the login-only steps. Once-per-shell steps are
 # skipped while _ms_reloading is set. The marksharc function (zshrc.zsh) runs it for

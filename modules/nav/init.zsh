@@ -190,7 +190,7 @@ insert-cycleddown() {
 zle -N insert-cycleddown
 
 zmodload zsh/terminfo 2>/dev/null || true
-typeset _dirhistory_keymap _dirhistory_sequence
+typeset -g _dirhistory_keymap _dirhistory_sequence
 for _dirhistory_keymap in emacs vicmd viins; do
     for _dirhistory_sequence in '\e[3D' '\e[1;3D' '\e\e[D' '\eO3D'; do
         bindkey -M "$_dirhistory_keymap" "$_dirhistory_sequence" dirhistory_zle_dirhistory_back
