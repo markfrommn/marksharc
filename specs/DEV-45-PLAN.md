@@ -27,3 +27,10 @@ Result: local bare-repository tests and the independent fresh-install fixture ex
 the push, detached fetch, later PTY notice, fast-forward and notice clearing. The
 live Mac-to-sol acceptance remains unverified. The existing on-demand environment ID
 and caches provide the MVP refresh; the P3.1 renderer is deferred.
+
+Delivery: [PR #5](https://github.com/markfrommn/marksharc/pull/5), pending human
+merge. Local gates pass: lint 70 files; zsh 372, contract 4, install 40 and
+repository 26 examples, all with zero failures. Fresh-HOME install e2e, the
+independent local Git flow, quality review and stack-check pass. No local or cloud
+review providers are configured; secondary review is off by default. Some safety
+tests were added after implementation, so TDD-first was not met for every case.
