@@ -61,5 +61,34 @@ jobs:
       - name: Contract suite
         run: tests/run-tests --shell sh spec/contract
 
+      - name: Install suite
+        run: tests/run-tests --shell sh spec/install
+
       - name: Repository suite
         run: tests/run-tests --shell sh spec/repo
+
+  # The Day 0 path on a clean account: install.sh from this checkout into a fresh HOME,
+  # then a login zsh and an interactive zsh must come up working. Needs only sh, zsh, git.
+  install-e2e:
+    name: install e2e (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install zsh (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q zsh
+
+      - name: Tool versions
+        run: |
+          zsh --version
+          git --version
+
+      - name: Install into a fresh HOME and start shells
+        run: tests/e2e/install-e2e.sh "$GITHUB_WORKSPACE"

@@ -1,9 +1,10 @@
 #!/bin/sh
-# Run every check CI runs: lint, the zsh suite, the contract suite and the
-# repository suite.
+# Run every check CI runs: lint, the zsh suite, the contract suite, the install
+# suite and the repository suite.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 "$here/lint"
 "$here/run-tests" --shell zsh spec/zsh
 "$here/run-tests" --shell sh spec/contract
+"$here/run-tests" --shell sh spec/install
 "$here/run-tests" --shell sh spec/repo
