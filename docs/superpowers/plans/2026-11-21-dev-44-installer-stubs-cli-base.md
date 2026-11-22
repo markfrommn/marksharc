@@ -107,3 +107,11 @@
 - Reload: `marksharc reload` stays the in-shell function (spec 6.10); module code is made function-safe. Every file-scope declaration in module `env.zsh`/`init.zsh` now says `-g`; `tests/support/function-safe-check.py` (modules, core, overlay hooks) and `tests/spec/zsh/function_safe_spec.sh` enforce it, plus a PTY spec comparing `marksharc reload` with `cs`. Rule documented in spec 6.4, `templates/overlay/local/post.zsh` and the overlay README. `core/zsh/zshenv.zsh` ends with `true`. The `reload` explainer no longer suggests `cs`/`li`.
 
 Known limitations (left as they are): clone provenance is lost after uninstall plus reinstall (the clone is then treated as pre-existing, the safe direction); an install interrupted between the manifest write and the dotfile removal leaves HOME files that uninstall reports as conflicts; disabling the path module removes `bin/` from PATH; a parse error in a core lib file does not trigger the stub fallback.
+
+## Review fixes (third pass)
+
+- `marksharc reload` spec made discriminating: markers are planted in module scratch variables and PS1 is exported before each reload path (`marksharc reload`, `--verbose`, `cs`); none may survive. Confirmed to fail against the pre-`-g` modules (`marksharc reload: marker left behind`).
+- `function-safe-check.py` now handles here-strings, same-line and multi-line case arms, `builtin`/`command`/`exec` prefixes, and no longer flags `function { ... }` or `function name() { ... }`.
+- `uninstall --purge` moves edited-stub copies from the state dir to `~/.zshenv.marksharc-replaced.<stamp>` before deleting it.
+- Spec 6.4 records that cached third-party tool init output is also sourced inside the function on reload (a known limitation).
+- Further known limitations: a generated ZDOTDIR is left behind when uninstall runs with a different `XDG_STATE_HOME` than new shells used; an "edited stub" copy is saved spuriously when the state directory was deleted (the stub fingerprint is gone).
