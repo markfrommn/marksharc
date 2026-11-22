@@ -15,28 +15,54 @@ _ms_words() {
     raw=( ${(Z:C:)1} ) 2>/dev/null || return 1
     (( $#raw )) || return 1
     for tok in $raw; do
-        if [[ $tok == [\'\"]* ]] && [[ ${#tok} -lt 2 || ${tok[1]} != ${tok[-1]} ]]; then reply=(); return 1; fi
-        _ms_word "$tok"
+        _ms_word "$tok" || { reply=(); return 1; }
         reply+=( "$REPLY" )
     done
     return 0
 }
 
 # Unquote one word into REPLY. A leading ~ or ~/ and $NAME / ${NAME} references
-# expand (single-quoted words stay literal); $(...) and backticks never run.
+# expand outside single quotes; backslash quotes a reference. Command substitutions,
+# backticks and every other metacharacter remain data and are never evaluated.
 _ms_word() {
     emulate -L zsh
-    local raw=$1 value out rest
-    if [[ $raw == \'* ]]; then REPLY=${(Q)raw}; return 0; fi
-    value=${(Q)raw}
-    if [[ $raw == '~' || $raw == '~/'* ]]; then value=$HOME${value#\~}; fi
-    out=
-    rest=$value
-    while [[ $rest =~ '\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?' ]]; do
-        out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
-        rest=${rest[MEND+1,-1]}
+    local raw=$1 state=plain ch rest name
+    integer i len=${#raw}
+    REPLY=
+    for (( i = 1; i <= len; i++ )); do
+        ch=$raw[i]
+        if [[ $state == single ]]; then
+            if [[ $ch == \' ]]; then state=plain; else REPLY+=$ch; fi
+            continue
+        fi
+        if [[ $state == double && $ch == \" ]]; then state=plain; continue; fi
+        if [[ $state == plain && $ch == \' ]]; then state=single; continue; fi
+        if [[ $state == plain && $ch == \" ]]; then state=double; continue; fi
+        if [[ $ch == \\ ]]; then
+            if (( i == len )); then REPLY+='\'; continue; fi
+            if [[ $state == plain || $raw[i+1] == \" || $raw[i+1] == '$' || $raw[i+1] == '`' || $raw[i+1] == \\ ]]; then
+                (( i++ )); REPLY+=$raw[i]
+            else
+                REPLY+='\'
+            fi
+            continue
+        fi
+        if [[ $state == plain && $ch == '~' && $i == 1 && ( $len == 1 || $raw[2] == / ) ]]; then
+            REPLY+=$HOME
+            continue
+        fi
+        if [[ $ch == '$' ]]; then
+            rest=$raw[i,-1]
+            if [[ $rest =~ '^\$\{([A-Za-z_][A-Za-z0-9_]*)\}' || $rest =~ '^\$([A-Za-z_][A-Za-z0-9_]*)' ]]; then
+                name=$match[1]
+                REPLY+=${(P)name-}
+                (( i += MEND - 1 ))
+                continue
+            fi
+        fi
+        REPLY+=$ch
     done
-    REPLY=$out$rest
+    [[ $state == plain ]]
 }
 
 # config.conf: `module <name> [off]` and `set <module>.<key> <value>` lines. The
@@ -176,6 +202,23 @@ _ms_modules_plan() {
 _ms_command_available() {
     whence -p -- "$1" >/dev/null 2>&1 && return 0
     (( $+functions[_ms_command_pending] )) && _ms_command_pending "$1"
+}
+
+# Runtime guards left in rendered env.zsh. Use the path module's filesystem seam
+# when it is loaded; the fallback keeps directive-only fixtures independent of it.
+_ms_render_dir() {
+    if (( $+functions[_ms_isdir] )); then _ms_isdir "$1"; else [[ -d $1 ]]; fi
+}
+_ms_render_file() {
+    local REPLY
+    if (( $+functions[_ms_fs_path] )); then
+        _ms_fs_path "$1"
+    elif [[ -n ${_ms_fs_root-} && $1 != "$HOME" && $1 != "$HOME"/* ]]; then
+        REPLY=${_ms_fs_root}$1
+    else
+        REPLY=$1
+    fi
+    [[ -f $REPLY ]]
 }
 
 # Env phase: the "requires command" check of one module, made when its turn comes,
