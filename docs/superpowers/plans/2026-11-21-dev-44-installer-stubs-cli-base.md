@@ -96,3 +96,14 @@
 
 - [ ] README: replace the status note with the Day 0 commands (`curl | sh` and clone-first). CHANGELOG line. `tests/README.md` inventory rows and layout row. `docs/DEVELOPING.md` mention of the e2e script.
 - [ ] Gates: `tests/check`; the e2e script directly; `stack-check` with `origin/main...HEAD`.
+
+## Review fixes (second pass)
+
+- A re-run on a missing or replaced stub with backups recorded in the manifest stops before any write (the manifest would otherwise lose the backups); the message names the backup and the uninstall command. Specs: `tests/spec/install/rerun_spec.sh`.
+- The manifest records a stub fingerprint (`stub_sum`, `cksum`). A stub that differs from it was edited: install keeps a copy in `$STATE/marksharc/replaced/`, uninstall writes `~/.zshenv.marksharc-removed`; both print the path.
+- `MARKSHARC_CONFIG` is written to the stub unless the overlay is `~/.config/marksharc` (judged against `$HOME`, not `$XDG_CONFIG_HOME`); non-default `XDG_STATE_HOME`, `XDG_CACHE_HOME`, `XDG_DATA_HOME` produce a warning because the stub cannot carry them; uninstall names `XDG_STATE_HOME` when it finds no manifest. Trailing slashes of `MARKSHARC_CONFIG` are stripped.
+- `bin/marksharc` runs the CLI programs with `zsh -f` and the programs derive `MARKSHARC_HOME` from their own path, so a checkout never acts on the one the stub names.
+- `tests/e2e/install-e2e.sh` runs the `--home` pass and the piped, cloning pass (README `curl | sh` path).
+- Reload: `marksharc reload` stays the in-shell function (spec 6.10); module code is made function-safe. Every file-scope declaration in module `env.zsh`/`init.zsh` now says `-g`; `tests/support/function-safe-check.py` (modules, core, overlay hooks) and `tests/spec/zsh/function_safe_spec.sh` enforce it, plus a PTY spec comparing `marksharc reload` with `cs`. Rule documented in spec 6.4, `templates/overlay/local/post.zsh` and the overlay README. `core/zsh/zshenv.zsh` ends with `true`. The `reload` explainer no longer suggests `cs`/`li`.
+
+Known limitations (left as they are): clone provenance is lost after uninstall plus reinstall (the clone is then treated as pre-existing, the safe direction); an install interrupted between the manifest write and the dotfile removal leaves HOME files that uninstall reports as conflicts; disabling the path module removes `bin/` from PATH; a parse error in a core lib file does not trigger the stub fallback.
