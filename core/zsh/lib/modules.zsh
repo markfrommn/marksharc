@@ -90,6 +90,9 @@ _ms_config_load() {
             set)
                 if [[ ${reply[2]-} == *.* && $#reply -ge 3 ]]; then _ms_cfg_set[${reply[2]}]=${(j: :)reply[3,-1]}; fi
                 ;;
+            tiers)
+                (( $#reply >= 2 )) && _ms_cfg_set[path.tiers]=${(j: :)reply[2,-1]}
+                ;;
         esac
     done < "$file"
     done
@@ -237,7 +240,7 @@ _ms_module_requires_command() {
 
 # Bracket the sourcing of one module phase file: trace and per-module timing.
 _ms_module_begin() {
-    [[ -r ${_ms_mod_dir[$2]}/$1.zsh ]] || return 1
+    [[ -r ${_ms_mod_dir[$2]}/$1.zsh || ( $1 == env && ${_ms_rendered_modules[$2]-0} == 1 ) ]] || return 1
     if (( _ms_verbose )); then _ms_now; _ms_mod_t0=$REPLY; fi
     _ms_trace "module $2: $1.zsh"
     return 0
@@ -265,6 +268,11 @@ _ms_modules_setup_paths() {
     typeset -ga _ms_module_fpaths=()
     typeset -gA _ms_module_function_sources=()
     typeset -gU fpath
+    local generated=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/completions/zsh
+    if [[ -d $generated ]]; then
+        fpath=( "$generated" $fpath )
+        _ms_module_fpaths+=( "$generated" )
+    fi
     for name in $_ms_plan; do
         dir=${_ms_mod_dir[$name]}
         if [[ -d $dir/functions/zsh ]]; then

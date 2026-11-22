@@ -23,7 +23,7 @@ typeset -g _ms_starting=1 _ms_verbose=0
 typeset -gi _ms_reloading=${_ms_reloading:-0}
 [[ -n ${MARKSHARC_VERBOSE-} && $MARKSHARC_VERBOSE != 0 ]] && _ms_verbose=1
 
-for _ms_lib in util session facts zdot envid modules cache; do
+for _ms_lib in util session facts zdot envid modules render cache; do
     [[ -r $MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh ]] && source "$MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh"
 done
 unset _ms_lib
@@ -44,6 +44,14 @@ if [[ -z ${_ms_force_rebuild-} && ! -o login && -n $_ms_env_id_value && ${MARKSH
     _ms_env_rebuild=0
 fi
 _ms_trace "env id=${_ms_env_id_value:-none} rebuild=$_ms_env_rebuild"
+
+# A normal stale-input refresh writes only native env: completion generators run
+# during install, explicit render/update, or reload, never as a batch/agent side effect.
+if (( _ms_env_rebuild )); then
+    _ms_render_reset
+    if ! _ms_render_refresh "${_ms_reloading:-0}"; then _ms_trace "render: failed"; fi
+fi
+_ms_render_load
 
 # Modules that must see every other module's contribution (the path builder) register
 # a function here during the env phase; the finalizers run once, after the last module.

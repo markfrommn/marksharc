@@ -108,3 +108,115 @@ env HOST_NO other-no when host otherhost'
     The status should be success
   End
 End
+
+Describe 'renderer cache and generated completions'
+  render_cli() {
+    env -i HOME="$HOME" PATH="$PATH" TERM=dumb MARKSHARC_HOME="$MS_HOME" \
+      MARKSHARC_CONFIG="${MARKSHARC_CONFIG:-$XDG_CONFIG_HOME/marksharc}" \
+      XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" HOST=testhost \
+      /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+  }
+
+  completion_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$TEST_ROOT/bin/demo-gen" <<'DATA'
+#!/bin/sh
+printf 'ARGS:%s\n' "$*" >> "$OPLOG"
+printf '#compdef demo\n# generated:%s\n' "$*"
+DATA
+    chmod +x "$TEST_ROOT/bin/demo-gen"
+    ms_mod completer module.conf 'describe "completion"
+completion demo demo-gen "two words" when command demo-gen'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ $(<"$OPLOG") == 'ARGS:two words' ]] || { cat "$OPLOG"; return 2; }
+    [[ $(<"$cache/completions/zsh/_demo") == $'#compdef demo\n# generated:two words' ]] || { cat "$cache/completions/zsh/_demo"; return 3; }
+    [[ -s $cache/render-id && $(<"$cache/completion-id") == $(<"$cache/render-id") ]] || return 4
+    print '# remove the completion' > "$MS_HOME/modules/completer/module.conf"
+    render_cli || return 5
+    [[ ! -e $cache/completions/zsh/_demo ]]
+  }
+  It 'writes quoted generator output to cached completions and removes stale generated files'
+    When run completion_case
+    The status should be success
+  End
+
+  stale_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$TEST_ROOT/bin/stale-gen" <<'DATA'
+#!/bin/sh
+printf 'GENERATED\n' >> "$OPLOG"
+printf '#compdef stale\n'
+DATA
+    chmod +x "$TEST_ROOT/bin/stale-gen"
+    ms_mod stale module.conf 'describe "stale"
+env OLD_VALUE one
+completion stale stale-gen'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    : > "$OPLOG"
+    local cache="$XDG_CACHE_HOME/marksharc/testhost" first second
+    first=$(<"$cache/render-id")
+    ms_run HOST=testhost -c 'print -r -- "$MARKSHARC_ENV|$OLD_VALUE"' || { cat "$TEST_ROOT/err"; return 2; }
+    [[ $(<"$TEST_ROOT/out") == "$first|one" && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 3; }
+    ms_mod stale module.conf 'describe "stale"
+env NEW_VALUE two-new
+completion stale stale-gen'
+    ms_run HOST=testhost -c 'print -r -- "$MARKSHARC_ENV|$NEW_VALUE|${OLD_VALUE-unset}"' || { cat "$TEST_ROOT/err"; return 4; }
+    second=${$(<"$TEST_ROOT/out")%%|*}
+    [[ $second != "$first" && $(<"$TEST_ROOT/out") == "$second|two-new|unset" && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 5; }
+    [[ $(<"$cache/render-id") == "$second" && $(<"$cache/completion-id") == "$first" ]] || return 6
+    ms_run HOST=testhost -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || { cat "$TEST_ROOT/err"; return 7; }
+    [[ $(<"$OPLOG") == GENERATED && $(<"$cache/completion-id") == "$second" ]] || { cat "$OPLOG"; return 8; }
+    : > "$OPLOG"
+    ms_run HOST=testhost -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 9
+    [[ ! -s $OPLOG ]]
+  }
+  It 'detects stale inputs by render id and refreshes completions only on an explicit reload'
+    When run stale_case
+    The status should be success
+  End
+End
+
+Describe 'rendered overlay integration'
+  overlay_directives_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module path
+    mkdir -p "$HOME/custom" "$HOME/first" "$HOME/inherited" "$XDG_CONFIG_HOME/marksharc/hosts"
+    ms_mod demo module.conf 'describe "demo"
+order 40
+env MODULE_VALUE module'
+    cat > "$XDG_CONFIG_HOME/marksharc/config.conf" <<'DATA'
+tiers "user system"
+env COMMON_VALUE common
+path user "$HOME/custom"
+alias overlay-alias "print common"
+DATA
+    cat > "$XDG_CONFIG_HOME/marksharc/hosts/testhost.conf" <<'DATA'
+env COMMON_VALUE host
+path first "$HOME/first"
+alias overlay-alias "print host"
+DATA
+    ms_run HOST=testhost PATH="$HOME/inherited:/usr/bin:/bin" -c 'print -r -- "$COMMON_VALUE|$MODULE_VALUE|${+aliases[overlay-alias]}"; print -l -- "$path[@]"' || { cat "$TEST_ROOT/err"; return 1; }
+    local -a lines=( "${(@f)$(<"$TEST_ROOT/out")}" )
+    [[ $lines[1] == 'host|module|0' ]] || { print -l -- $lines; return 2; }
+    (( ${lines[(Ie)$HOME/first]} == 2 && ${lines[(Ie)$HOME/inherited]} == 3 )) || { print -l -- $lines; return 3; }
+    (( ${lines[(Ie)$HOME/custom]} > 0 && ${lines[(Ie)$HOME/custom]} < ${lines[(Ie)/bin]} )) || { print -l -- $lines; return 4; }
+    ms_pty HOST=testhost -dic '
+      print -r -- "alias=${aliases[overlay-alias]}"
+      print "tiers \"user system\"" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+      print "env COMMON_VALUE host" > "$XDG_CONFIG_HOME/marksharc/hosts/testhost.conf"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" >/dev/null 2>&1
+      print -r -- "removed=${+aliases[overlay-alias]}"
+      exit' || { cat "$TEST_ROOT/out"; return 5; }
+    [[ $(<"$TEST_ROOT/out") == *'alias=print host'* && $(<"$TEST_ROOT/out") == *'removed=0'* ]] || { cat "$TEST_ROOT/out"; return 6; }
+  }
+  It 'applies overlay path env alias and tiers lines and removes stale rendered aliases on reload'
+    When run overlay_directives_case
+    The status should be success
+  End
+End
