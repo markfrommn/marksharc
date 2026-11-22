@@ -18,14 +18,14 @@ fake_fw() {
 inst() {
   case ${INST_XDG:-sandbox} in
     default)
-      env SHELL=${INST_SHELL:-/bin/zsh} XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" \
+      env SHELL="${INST_SHELL:-/bin/zsh}" XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" \
         XDG_STATE_HOME="$HOME/.local/state" XDG_CACHE_HOME="$HOME/.cache" \
         sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
     unset)
-      env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME SHELL=${INST_SHELL:-/bin/zsh} \
+      env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME SHELL="${INST_SHELL:-/bin/zsh}" \
         sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
     *)
-      SHELL=${INST_SHELL:-/bin/zsh} sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
+      SHELL="${INST_SHELL:-/bin/zsh}" sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
   esac
 }
 # snapshot: the sorted names under the sandbox HOME.
