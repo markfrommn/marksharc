@@ -13,9 +13,15 @@ if sys.argv[1] == 'socket':
         sock.bind(sys.argv[2])
 elif sys.argv[1] == 'pty':
     master, slave = pty.openpty()
+    # PTY_INPUT (optional) is typed into the terminal once the child has started; the child
+    # does not see the variable.
+    typed = os.environ.get('PTY_INPUT')
+    child_env = {k: v for k, v in os.environ.items() if k != 'PTY_INPUT'}
     proc = subprocess.Popen(sys.argv[2:], stdin=slave, stdout=slave, stderr=slave,
-                            start_new_session=True, close_fds=True)
+                            start_new_session=True, close_fds=True, env=child_env)
     os.close(slave)
+    if typed is not None:
+        os.write(master, typed.encode())
     deadline = time.monotonic() + 15
     try:
         while True:
