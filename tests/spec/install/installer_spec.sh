@@ -5,19 +5,24 @@ Describe 'install.sh'
 
   fresh_case() {
     fake_fw "$TEST_ROOT/fw"
-    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
+    # With the XDG variables at their defaults the stub names no MARKSHARC_CONFIG.
+    INST_XDG=default inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
+    MF_FILE=$HOME/.local/state/marksharc/install.manifest
     [ -s "$TEST_ROOT/err" ] && { cat "$TEST_ROOT/err"; return 2; }
     head -n 1 "$HOME/.zshenv" | grep -q '^# marksharc: managed stub' || return 3
     grep -q "^MARKSHARC_HOME='$TEST_ROOT/fw'\$" "$HOME/.zshenv" || return 4
     grep -q '^MARKSHARC_CONFIG' "$HOME/.zshenv" && return 5
     zsh -n "$HOME/.zshenv" || return 6
-    [ -f "$XDG_CONFIG_HOME/marksharc/config.conf" ] && [ -f "$XDG_CONFIG_HOME/marksharc/local/post.zsh" ] || return 7
-    [ -e "$XDG_CONFIG_HOME/marksharc/.gitkeep" ] && return 8
+    [ -f "$HOME/.config/marksharc/config.conf" ] && [ -f "$HOME/.config/marksharc/local/post.zsh" ] || return 7
+    [ -e "$HOME/.config/marksharc/.gitkeep" ] && return 8
     [ "$(mf framework)" = "$TEST_ROOT/fw" ] && [ "$(mf framework_cloned)" = 0 ] || return 9
-    [ "$(mf home)" = "$HOME" ] && [ "$(mf config)" = "$XDG_CONFIG_HOME/marksharc" ] || return 10
+    [ "$(mf home)" = "$HOME" ] && [ "$(mf config)" = "$HOME/.config/marksharc" ] || return 10
     grep -q 'installed' "$TEST_ROOT/out" || return 11
     # The framework checkout is only read.
     [ -z "$(find "$TEST_ROOT/fw" -newer "$HOME/.zshenv" -print)" ] || return 12
+    # No XDG warnings when nothing is non-default.
+    grep -qi 'warning' "$TEST_ROOT/out" && return 13
+    return 0
   }
   It 'installs the stub, the template overlay and a manifest from a checkout'
     When run fresh_case

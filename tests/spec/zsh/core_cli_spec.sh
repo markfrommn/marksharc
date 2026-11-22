@@ -69,7 +69,7 @@ Describe 'marksharc CLI'
     emulate -L zsh
     cli_fw
     cli reload; [[ $? == 1 ]] || return 1
-    [[ ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/err") == *'current shell'* && $(<"$TEST_ROOT/err") == *cs* ]] || { cat "$TEST_ROOT/err"; return 2; }
+    [[ ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/err") == *'current shell'* && $(<"$TEST_ROOT/err") == *'interactive marksharc shell'* && $(<"$TEST_ROOT/err") != *'cs'* ]] || { cat "$TEST_ROOT/err"; return 2; }
   }
   It 'explains that reload runs inside a marksharc shell when run as a program'
     When run reload_direct_case

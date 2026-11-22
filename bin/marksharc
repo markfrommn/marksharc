@@ -30,7 +30,9 @@ esac
 
 cmd=$1; shift
 if [[ $cmd =~ '^[a-z][a-z-]*$' && -x $MARKSHARC_HOME/core/cli/$cmd ]]; then
-    exec "$MARKSHARC_HOME/core/cli/$cmd" "$@"
+    # zsh -f: no startup files, so the stub in ~/.zshenv cannot repoint MARKSHARC_HOME at another
+    # checkout and no second env phase runs.
+    exec zsh -f "$MARKSHARC_HOME/core/cli/$cmd" "$@"
 fi
 print -ru2 -- "marksharc: unknown command: $cmd (try: marksharc help)"
 exit 2

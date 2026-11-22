@@ -27,7 +27,7 @@ for arg; do
 done
 
 manifest=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/install.manifest
-[[ -r $manifest ]] || die "nothing to uninstall: no install manifest at $manifest"
+[[ -r $manifest ]] || die "nothing to uninstall: no install manifest at $manifest (looked under XDG_STATE_HOME=${XDG_STATE_HOME:-unset, so ~/.local/state}; if you installed with another XDG_STATE_HOME, export it and run this again)"
 
 typeset -A mf
 typeset -a files=() linknames=() linktargets=()
@@ -116,7 +116,19 @@ if (( purge && ! yes )); then
 fi
 
 # --- act -------------------------------------------------------------------------
-stub_is_ours && command rm -f -- "$stub"
+if stub_is_ours; then
+    # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
+    # file. The fingerprint recorded at install time tells an edit from the stub as written.
+    cur=$(command cksum < "$stub")
+    cur=${(j: :)${=cur}}
+    if [[ $cur != "${mf[stub_sum]-}" ]]; then
+        saved=$HOME/.zshenv.marksharc-removed
+        [[ -e $saved || -L $saved ]] && saved=$saved.$$
+        command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
+        print -r -- "marksharc: the stub had been edited; your copy is in $saved (merge any lines you still need)."
+    fi
+    command rm -f -- "$stub"
+fi
 restored=()
 for name in $files; do
     command cp -p -- "$backup/$name" "$HOME/$name" || die "could not restore $HOME/$name (the backup is in $backup)"

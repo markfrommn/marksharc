@@ -13,13 +13,25 @@ fake_fw() {
 }
 # inst ARGS...: run the installer in the sandbox; stdout/stderr land in $TEST_ROOT/out and err.
 # INST_SCRIPT and INST_SHELL override the script and the SHELL it sees.
+# INST_XDG=default exports the four XDG variables at their defaults under HOME; INST_XDG=unset
+# removes them; otherwise the sandbox values (non-default, inside HOME) apply.
 inst() {
-  SHELL=${INST_SHELL:-/bin/zsh} sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null
+  case ${INST_XDG:-sandbox} in
+    default)
+      env SHELL=${INST_SHELL:-/bin/zsh} XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" \
+        XDG_STATE_HOME="$HOME/.local/state" XDG_CACHE_HOME="$HOME/.cache" \
+        sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
+    unset)
+      env -u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_STATE_HOME -u XDG_CACHE_HOME SHELL=${INST_SHELL:-/bin/zsh} \
+        sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
+    *)
+      SHELL=${INST_SHELL:-/bin/zsh} sh "${INST_SCRIPT:-$MARKSHARC_ROOT/install.sh}" "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null ;;
+  esac
 }
 # snapshot: the sorted names under the sandbox HOME.
 snapshot() { (cd "$TEST_ROOT" && find home -print | sort); }
-# mf KEY: a value from the install manifest.
-mf() { awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$XDG_STATE_HOME/marksharc/install.manifest"; }
+# mf KEY: a value from the install manifest (MF_FILE overrides its location).
+mf() { awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "${MF_FILE:-$XDG_STATE_HOME/marksharc/install.manifest}"; }
 backup_dir() { mf backup; }
 # make_origin: a bare repository at $TEST_ROOT/origin.git holding a fake checkout.
 make_origin() {

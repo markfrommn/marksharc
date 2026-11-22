@@ -10,7 +10,9 @@
 # switch the loader to an explicit list), and disable refuses to remove the last listed
 # module of an explicit list (an empty list means "everything").
 
-: ${MARKSHARC_HOME:=${${(%):-%x}:A:h:h:h}}
+# The checkout this file belongs to, whatever the environment says (the ~/.zshenv stub of
+# another checkout may have set MARKSHARC_HOME).
+MARKSHARC_HOME=${${(%):-%x}:A:h:h:h}
 for _l in util modules; do source "$MARKSHARC_HOME/core/zsh/lib/$_l.zsh"; done
 unset _l
 _ms_verbose=0

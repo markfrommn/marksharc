@@ -80,8 +80,14 @@ xdg_dir XDG_CACHE_HOME "$HOME/.cache"; CACHE_BASE=$xd_value
 STATE_DIR=$STATE_BASE/marksharc
 CACHE_DIR=$CACHE_BASE/marksharc
 MANIFEST=$STATE_DIR/install.manifest
-DEFAULT_CONFIG=$CONFIG_BASE/marksharc
-CONFIG_DIR=${MARKSHARC_CONFIG:-$DEFAULT_CONFIG}
+# The overlay the core assumes when the stub names no MARKSHARC_CONFIG. It is judged against
+# ~/.config, not against $XDG_CONFIG_HOME: the old dotfiles that exported XDG_CONFIG_HOME are
+# moved aside, so a new shell cannot rely on it.
+DEFAULT_CONFIG=$HOME/.config/marksharc
+CONFIG_DIR=${MARKSHARC_CONFIG:-$CONFIG_BASE/marksharc}
+while [ "${#CONFIG_DIR}" -gt 1 ]; do
+  case $CONFIG_DIR in */) CONFIG_DIR=${CONFIG_DIR%/} ;; *) break ;; esac
+done
 REPO=${MARKSHARC_REPO:-$REPO_DEFAULT}
 case $CONFIG_DIR in /*) ;; *) die "MARKSHARC_CONFIG must be an absolute path" ;; esac
 for p in "$HOME" "$CONFIG_DIR" "$DATA_BASE" "$STATE_DIR" "$CACHE_DIR"; do
@@ -213,6 +219,8 @@ _ms_stub_ok=0
 unset _ms_stub_ok
 EOF
 }
+# cksum_of: "crc size" of the data on stdin (the stub fingerprint kept in the manifest).
+cksum_of() { cksum | tr -s ' ' ' '; }
 stub_is_ours() {
   [ -f "$STUB" ] && [ ! -L "$STUB" ] || return 1
   first_line=
@@ -226,6 +234,11 @@ if stub_is_ours; then
   mode=update
 else
   mode=fresh
+  # Backups from an earlier install are only recorded in the manifest: rebuilding it now would
+  # drop them (and a later uninstall --purge would delete them), so stop before any write.
+  if [ -f "$MANIFEST" ] && grep -Eq '^(backup|file|link)=' "$MANIFEST"; then
+    die "an earlier install moved your original dotfiles into $(mf_get backup), but $STUB is no longer the marksharc stub; installing again would lose that record. Run \"$(mf_get framework)/bin/marksharc uninstall\" first (move a replaced $STUB aside so the original can come back). If you already restored the files yourself, delete $MANIFEST and run this again."
+  fi
   for n in $DOTFILES; do
     if [ -L "$HOME/$n" ]; then
       backup_links="$backup_links $n"
@@ -323,6 +336,7 @@ write_manifest() {
   printf 'config_origin=%s\n' "$ov_origin"
   printf 'state=%s\n' "$STATE_DIR"
   printf 'cache=%s\n' "$CACHE_DIR"
+  printf 'stub_sum=%s\n' "$new_sum"
   if [ "$mode" = fresh ]; then
     [ -z "$backup" ] || printf 'backup=%s\n' "$backup"
     for n in $backup_files; do printf 'file=%s\n' "$n"; done
@@ -332,13 +346,28 @@ write_manifest() {
   fi
 }
 new_stub=$(stub_text; printf x); new_stub=${new_stub%x}
+new_sum=$(printf '%s' "$new_stub" | cksum_of)
 stub_current=0
-if [ "$mode" = update ] && [ "$(cat "$STUB"; printf x)" = "$new_stub"x ]; then stub_current=1; fi
+stub_edited=0
+if [ "$mode" = update ]; then
+  if [ "$(cat "$STUB"; printf x)" = "$new_stub"x ]; then
+    stub_current=1
+  else
+    # Not the text we would write: an edit of the stub unless it is exactly what we wrote last time
+    # (then the framework or the overlay moved).
+    cur_sum=$(cksum_of < "$STUB")
+    want_sum=$(mf_get stub_sum)
+    [ "$cur_sum" = "${want_sum:-$new_sum}" ] || stub_edited=1
+  fi
+fi
+stamp_now=$(date +%Y%m%dT%H%M%S)
+replaced_copy=$STATE_DIR/replaced/zshenv.$stamp_now.$$
 new_manifest=$(write_manifest; printf x); new_manifest=${new_manifest%x}
 manifest_current=0
 if [ -f "$MANIFEST" ] && [ "$(cat "$MANIFEST"; printf x)" = "$new_manifest"x ]; then manifest_current=1; fi
 
 if [ "$DRY" -eq 1 ]; then
+  if [ "$stub_edited" -eq 1 ]; then say "would keep a copy of the edited stub in $replaced_copy"; fi
   if [ "$stub_current" -eq 1 ]; then say "the stub $STUB is up to date"; else say "would write the stub $STUB"; fi
   if [ "$manifest_current" -eq 0 ]; then say "would write the manifest $MANIFEST"; fi
   for n in $backup_files $backup_links; do
@@ -355,6 +384,12 @@ else
   if [ "$stub_current" -eq 1 ]; then
     say "the stub $STUB is up to date"
   else
+    if [ "$stub_edited" -eq 1 ]; then
+      mkdir -p -- "$STATE_DIR/replaced"
+      chmod 700 "$STATE_DIR/replaced"
+      cp -p -- "$STUB" "$replaced_copy"
+      say "the stub had been edited by hand; your copy is kept in $replaced_copy (merge any lines you still need)"
+    fi
     TMP_STUB=$HOME/.zshenv.marksharc.$$
     printf '%s' "$new_stub" > "$TMP_STUB"
     mv -f -- "$TMP_STUB" "$STUB"
@@ -379,4 +414,13 @@ case ${SHELL:-} in
   */zsh) ;;
   *) say "your login shell is ${SHELL:-unknown}, not zsh; to make zsh the login shell run: chsh -s $(command -v zsh)" ;;
 esac
+# The stub cannot carry the other XDG variables; say so when they are not the defaults.
+for pair in "XDG_STATE_HOME:$HOME/.local/state" "XDG_CACHE_HOME:$HOME/.cache" "XDG_DATA_HOME:$HOME/.local/share"; do
+  xv=${pair%%:*}
+  xd=${pair#*:}
+  eval "xval=\"\${$xv:-}\""
+  if [ -n "$xval" ] && [ "$xval" != "$xd" ]; then
+    say "warning: $xv is $xval here, but new shells only see it if it is set in their environment; the stub does not save it (without it they use $xd)"
+  fi
+done
 say "undo with: marksharc uninstall"
