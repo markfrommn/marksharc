@@ -15,8 +15,13 @@ from pathlib import Path
 
 DECLARATIONS = {"typeset", "declare", "local", "integer", "float", "readonly", "private"}
 # After these words a command starts again.
-KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until", "!", "time", "nocorrect", "noglob"}
-FUNCTION_HEAD = re.compile(r"^(function\s+[^\s=()]+|[^\s=()]+\s*\(\s*\)|\(\s*\))$")
+# (builtin, command, exec and noglob are prefixes: the declaration follows them.)
+KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until", "!", "time", "nocorrect", "noglob",
+            "builtin", "command", "exec"}
+# name () | function name | function name () | function (anonymous) | () (anonymous)
+FUNCTION_HEAD = re.compile(
+    r"^(function(\s+[^\s=()]+)*\s*(\(\s*\))?|[^\s=()]+\s*\(\s*\)|\(\s*\))$"
+)
 
 
 def sanitize(text):
@@ -54,6 +59,11 @@ def sanitize(text):
             if i < n:
                 out.append(quote)
                 i += 1
+            word_start = False
+            continue
+        if text.startswith("<<<", i):  # a here-string, not a heredoc
+            out.append("<<<")
+            i += 3
             word_start = False
             continue
         heredoc = re.match(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1", text[i:])
@@ -99,6 +109,7 @@ def scan(text):
             line += 1
         pos = m.end()
     stack = []
+    cases = 0  # open case statements: a ")" at paren depth 0 ends a pattern and starts a command
     paren = 0
     start = True
     stmt = []
@@ -130,8 +141,15 @@ def scan(text):
         if tok == ")":
             paren = max(0, paren - 1)
             stmt.append(tok)
+            start = bool(cases) and paren == 0
+            continue
+        if tok == "esac":
+            cases = max(0, cases - 1)
+            stmt = []
             start = False
             continue
+        if start and tok == "case":
+            cases += 1
         if start and tok in KEYWORDS:
             stmt.append(tok)
             continue

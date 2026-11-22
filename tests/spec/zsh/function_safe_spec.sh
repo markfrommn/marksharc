@@ -10,17 +10,29 @@ Describe 'file-scope declarations are function-safe'
     emulate -L zsh
     local root=$TEST_ROOT/tree
     mkdir -p "$root/modules/a" "$root/templates/overlay/local"
+    # Clean file: every construct here must pass.
     cat > "$root/modules/a/env.zsh" <<'EOF'
 typeset -g ok1=1
 typeset +x -g PS1
 typeset -ga ok2=( one two )
 typeset -gi ok3=3
 integer -g ok4
+builtin typeset -g ok5
+command typeset -g ok6
 typeset -p ok1 >/dev/null
 typeset -f helper >/dev/null
+command -v typeset >/dev/null
 f() { typeset in_fn; local x; integer n }
 function g {
     typeset in_g
+}
+function h2() { local in_h2 }
+function h3 () {
+    local in_h3
+}
+function { local in_function_anon }
+function {
+    typeset in_function_anon_multi
 }
 h()
 {
@@ -35,29 +47,47 @@ print "typeset not_a_command"
 cat <<TXT
 typeset in_heredoc
 TXT
+read -r hs <<< "typeset in_here_string"
 x=( typeset local )
-echo ${#path} typeset
+echo §{#path} typeset
+case $hs in
+    a) typeset -g arm_ok1 ;;
+    (b|c) typeset -g arm_ok2 ;;
+esac
+case $hs in a) typeset -g arm_ok3 ;; b) typeset -g arm_ok4 ;; esac
 typeset -g after_everything
 EOF
     "$PYTHON" -I "$checker" "$root" > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 1; }
+    # Findings: every line marked BARE, and only those.
     cat > "$root/modules/a/init.zsh" <<'EOF'
-typeset bare1
+typeset bare1                                  # BARE
 if true; then
-    typeset bare2=1
-    integer bare3
+    typeset bare2=1                            # BARE
+    integer bare3                              # BARE
 fi
-{ local bare4 } always { :; }
-float bare5
-declare bare6
-readonly bare7
-f() { :; } && typeset bare8
+{ local bare4 } always { :; }                  # BARE
+float bare5                                    # BARE
+declare bare6                                  # BARE
+readonly bare7                                 # BARE
+f() { :; } && typeset bare8                    # BARE
+read -r hs <<< "text"
+typeset bare_after_here_string                 # BARE
+builtin typeset bare_builtin                   # BARE
+command typeset bare_command                   # BARE
+noglob typeset bare_noglob                     # BARE
+case $hs in a) typeset bare_arm1 ;; b) typeset -g ok_arm ;; esac   # BARE
+case $hs in
+    a) typeset bare_arm2 ;;                    # BARE
+    (b|c)
+        typeset bare_arm3 ;;                   # BARE
+esac
+function { :; }; typeset bare_after_function   # BARE
 EOF
     "$PYTHON" -I "$checker" "$root" > "$TEST_ROOT/out" 2>&1 && return 2
-    local n
-    for n in 1 3 4 6 7 8 9 10; do
-      grep -q "^modules/a/init.zsh:$n: " "$TEST_ROOT/out" || { echo "line $n not flagged"; cat "$TEST_ROOT/out"; return 3; }
-    done
-    [[ $(grep -c . "$TEST_ROOT/out") == 8 ]] || { cat "$TEST_ROOT/out"; return 4; }
+    local want got
+    want=$(grep -n '# BARE' "$root/modules/a/init.zsh" | cut -d: -f1 | tr '\n' ' ')
+    got=$(sed -n 's/^modules\/a\/init.zsh:\([0-9]*\): .*/\1/p' "$TEST_ROOT/out" | tr '\n' ' ')
+    [[ $got == $want ]] || { print -r -- "want: $want"; print -r -- "got:  $got"; return 3; }
     # the overlay hooks are checked as well
     rm "$root/modules/a/init.zsh"
     print -r -- 'typeset hook_var=1' > "$root/templates/overlay/local/post.zsh"
@@ -112,6 +142,31 @@ Describe 'reload from the marksharc function equals cs'
   }
   It 'leaves the same globals, PS1 and history settings as the cs alias'
     When run equal_case
+    The status should be success
+  End
+
+  # Module scratch variables and PS1 are set to markers before the reload. A module that
+  # declared them without -g would shadow them with function-locals during a reload from the
+  # function, leaving the markers in place; a correct module rewrites or unsets them.
+  poison() {
+    emulate -L zsh
+    ms_fixture_full
+    mkdir -p "$MS_HOME/bin"
+    ms_pty -dic 'export PS1=POISON; _ms_hosts=(POISON); _ms_hline=POISON; _ms_hwords=(POISON); _dirhistory_keymap=POISON; _dirhistory_sequence=POISON; _ms_gp=POISON; _ms_pd=POISON; '"$1"'; for v in PS1 _ms_hosts _ms_hline _ms_hwords _dirhistory_keymap _dirhistory_sequence _ms_gp _ms_pd; do print -r -- "STATE $(typeset -p $v 2>&1)"; done; exit' || return 1
+  }
+  poison_case() {
+    emulate -L zsh
+    local mode
+    for mode in 'marksharc reload' 'cs >/dev/null 2>&1' 'marksharc reload --verbose >/dev/null 2>&1'; do
+      poison "$mode" || return 1
+      [[ $(grep -c '^STATE ' "$TEST_ROOT/out") == 8 ]] || { print -r -- "$mode: no state dump"; cat "$TEST_ROOT/out"; return 2; }
+      # no scratch variable still holds a marker (PS1 keeps its value, but must be unexported)
+      if grep '^STATE ' "$TEST_ROOT/out" | grep -v 'PS1' | grep -q POISON; then print -r -- "$mode: marker left behind"; grep '^STATE ' "$TEST_ROOT/out"; return 3; fi
+      if grep '^STATE .*PS1' "$TEST_ROOT/out" | grep -q 'export'; then print -r -- "$mode: PS1 still exported"; return 4; fi
+    done
+  }
+  It 'leaves no marker in the module scratch variables and unexports PS1 after any reload'
+    When run poison_case
     The status should be success
   End
 End
