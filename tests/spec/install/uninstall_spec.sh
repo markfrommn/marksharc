@@ -57,6 +57,20 @@ Describe 'marksharc uninstall'
     [ -e "$HOME/.zshenv" ] && return 4
     return 0
   }
+  left_alone_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    inst --home "$FW" || return 1
+    printf 'someone else\n' > "$HOME/.zshenv"
+    uninstall || { cat "$TEST_ROOT/err"; return 2; }
+    [ "$(cat "$HOME/.zshenv")" = 'someone else' ] || return 3
+    grep -q 'left .*zshenv alone' "$TEST_ROOT/out" || { cat "$TEST_ROOT/out"; return 4; }
+  }
+  It 'leaves a replaced ~/.zshenv alone when there was no original'
+    When run left_alone_case
+    The status should be success
+  End
+
   It 'removes the stub when there was no original ~/.zshenv'
     When run no_original_case
     The status should be success
