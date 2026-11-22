@@ -7,8 +7,10 @@ environment in **bash** for scripts and agents. Functional areas are modules.
 Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
-> **Status:** early development. This repository holds the scaffold, tests and
-> CI. There is nothing to install yet; the installer arrives in a later release.
+> **Status:** early development. The zsh framework, the public modules, the
+> installer and the `marksharc` command (`reload`, `module`, `uninstall`,
+> `version`) are in place. fish and bash wiring, `marksharc sync` and
+> `marksharc doctor` come in later releases.
 
 ## Requirements
 
@@ -20,10 +22,62 @@ checkout stays read-only on every host.
 
 Day-to-day shell use needs only the native shell. The `marksharc` command needs zsh.
 
+## Install
+
+The installer is POSIX `sh` and needs only `zsh` (5.9 or later) and `git`.
+Either run it straight from GitHub:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/markfrommn/marksharc/main/install.sh | sh
+```
+
+or clone first, which keeps the checkout where you choose:
+
+```sh
+git clone https://github.com/markfrommn/marksharc.git
+sh marksharc/install.sh
+```
+
+Then open a new terminal, or run `exec zsh -l`.
+
+What it does:
+
+- **Framework.** Uses the checkout the script sits in, or `--home <checkout>`. Piped
+  from `curl`, it clones the repository into `${XDG_DATA_HOME:-~/.local/share}/marksharc`
+  (an existing clone is reused, never pulled; `MARKSHARC_REPO` names another repository).
+- **Overlay.** Copies the skeleton from `templates/overlay/` to
+  `${XDG_CONFIG_HOME:-~/.config}/marksharc` when nothing is there. `--overlay <path>`
+  links an existing directory instead; `--overlay <url>` clones one. An overlay that
+  already exists is never modified, and a different one requested with `--overlay` is an error.
+- **Dotfiles.** Moves `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin` and
+  `~/.zlogout` into `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
+  (symlinks are recorded by target), and writes a small `~/.zshenv` stub. If the core
+  cannot load, the stub sets a minimal PATH and prints one line on stderr.
+- **Login shell.** It never runs `chsh`; it prints the command when your login shell is not zsh.
+
+`sh install.sh --dry-run` prints every action and changes nothing. Running the installer
+again is safe: it makes no new backup and does not touch the overlay.
+
+Day 1:
+
+```sh
+marksharc module list              # enabled, disabled and skipped modules
+marksharc module disable <name>    # edits config.conf in your overlay
+marksharc reload                   # apply it in this shell (--verbose to trace)
+marksharc version
+marksharc uninstall                # restore the backed-up dotfiles, remove the stub
+```
+
+`marksharc uninstall --purge` also deletes the cache, the state and a clone made by the
+installer (it asks first; `--yes` answers). It never removes your overlay or a checkout you
+passed with `--home`.
+
 ## Layout
 
 | Path | Contents |
 | --- | --- |
+| `install.sh` | Day 0 installer (POSIX sh) |
+| `bin/marksharc` | The `marksharc` command |
 | `core/` | Per-shell loaders (`zsh/`, `fish/`, `bash/`) and CLI commands (`cli/`) |
 | `modules/` | Public modules, one directory each |
 | `templates/overlay/` | Skeleton for a new `~/.config/marksharc` overlay |

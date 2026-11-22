@@ -12,6 +12,8 @@ tests/check                                   # everything CI runs
 tests/lint                                    # zsh -n, shellcheck, fish --no-execute
 tests/run-tests --shell zsh spec/zsh          # zsh units
 tests/run-tests --shell sh spec/contract      # cross-shell startup contract
+tests/run-tests --shell sh spec/install       # install.sh, uninstall and the end-to-end install
+tests/e2e/install-e2e.sh <checkout>           # install into a fresh HOME and start shells
 tests/run-tests --shell sh spec/repo          # runner, lint and repository checks
 SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 ```
@@ -33,7 +35,9 @@ checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
 | `shellspec.pin` | ShellSpec version, commit and source used locally and in CI |
 | `spec/spec_helper.sh`, `spec/support/fixtures.sh` | Per-example sandbox and shared helpers (`stub_command`, `git_fixture`, `run_bounded`, `file_mode`) |
 | `support/pty_socket.py` | OS fixture support only: a PTY child supervisor and a Unix socket binder |
+| `e2e/install-e2e.sh` | Reusable end-to-end check: install a checkout into a fresh HOME, start login and interactive zsh shells, uninstall; needs only sh, zsh and git (python3 adds a terminal step); also run by CI on macOS and Ubuntu |
 | `spec/zsh/` | Specs run with `--shell zsh` |
+| `spec/install/` | Specs run with `--shell sh`: `install.sh`, `marksharc uninstall`, the end-to-end script and lint coverage, in a temporary HOME with local bare repositories |
 | `spec/contract/` | Contract suite run with `--shell sh`: launches the real zsh core (bash and fish join in their phases) and proves quiet startup, environment availability, idempotent re-source and writes confined to cache/state |
 | `spec/repo/` | Specs run with `--shell sh`: the harness itself and repository rules |
 
@@ -82,5 +86,14 @@ this table to cover every module.
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
 | cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |
+| Installer | Fresh install from a checkout: stub, template overlay, manifest; paths with spaces, quotes and dollars survive; non-default MARKSHARC_CONFIG named in the stub | `spec/install/installer_spec.sh` |
+| Installer | Existing zsh dotfiles (regular files, symlinks, a foreign `~/.zshenv`) backed up privately and recorded; idempotent re-run keeps the original backup | `spec/install/installer_spec.sh` |
+| Installer | `--dry-run` prints every action and writes nothing; framework from `--home`, own checkout or a clone (reused, never pulled); `--overlay` path, URL, conflict and existing overlay; zsh, git and zsh version checked before any write; chsh hint only; runs under dash | `spec/install/installer_spec.sh` |
+| Uninstall | Restores files and symlinks, removes stub and ZDOTDIR, keeps framework, overlay and cache; conflicts and missing backups fail before any change; `--purge` confirmation, scope and guards | `spec/install/uninstall_spec.sh` |
+| Install e2e | Install, login and interactive shells quiet with MARKSHARC_SESSION set and the command on PATH, uninstall; lint covers the installer and CLI files | `spec/install/e2e_spec.sh`, `e2e/install-e2e.sh` |
+| Stub fallback | Missing, unreadable, failing or unparsable core: minimal PATH, exactly one stderr line, clean stdout, batch, login, agent and PTY | `spec/zsh/fallback_spec.sh` |
+| CLI | usage, unknown commands, version (VERSION plus git describe), reload explanation, module list statuses, enable/disable edits (template lines, explicit lists, host override, symlinked config.conf, refusals) | `spec/zsh/core_cli_spec.sh` |
+| Core | `marksharc` function: quiet and verbose reload in the current shell, delegation, absent in batch and agent; bin/ on PATH in every class | `spec/zsh/core_cli_spec.sh` |
+| Overlay template | No active module line, one commented off line per public module, real option examples, silent post hook | `spec/zsh/template_overlay_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |

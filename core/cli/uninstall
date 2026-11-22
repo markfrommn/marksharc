@@ -136,6 +136,7 @@ if (( purge )); then
 fi
 
 print -r -- "marksharc: uninstalled. Restored: ${restored:-nothing to restore}. Removed the stub and the generated zsh startup files."
+[[ -e $stub || -L $stub ]] && (( ${restored[(Ie).zshenv]} == 0 )) && print -r -- "marksharc: left $stub alone (it is not a marksharc stub)."
 if (( purge )); then
     print -r -- "marksharc: removed ${(j:, :)purge_targets}."
     [[ ${mf[framework_cloned]-0} == 1 ]] || print -r -- "marksharc: kept the framework checkout ${mf[framework]} (not created by the installer)."

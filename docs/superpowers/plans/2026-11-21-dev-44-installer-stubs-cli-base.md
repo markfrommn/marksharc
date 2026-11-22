@@ -39,7 +39,10 @@
 - Manifest: line-oriented `key=value` (`file=<name>`, `link=<name>=<target>`), readable by POSIX sh and zsh, paths with spaces survive. Canonical file `${XDG_STATE_HOME:-~/.local/state}/marksharc/install.manifest`.
 - `module enable|disable` edit the overlay `config.conf` line by line. In non-explicit mode (no active `module <name>` line) `enable` only un-switches an off line and never adds a `module <name>` line (that would flip the loader to explicit-list mode); `disable` of the last explicit module is refused for the same reason.
 - `local/pre.zsh` is not shipped in the template: no phase sources it yet (only `local/post.zsh` is consumed by `core/zsh/zshrc.zsh`).
-- The stub's fallback reports a failed load with one line of its own; any diagnostic zsh prints for a syntax error inside the core is not suppressed (it would also hide interactive module diagnostics).
+- The stub's fallback reports a failed load with one line of its own; any diagnostic zsh prints for a syntax error inside the core is not suppressed (it would also hide interactive module diagnostics). The stub wraps the `source` in a `{ } always { }` block, because a parse error in a sourced file aborts an enclosing `if`/`else` before the else branch can run.
+- `marksharc uninstall` renames the manifest to `install.manifest.restored` after a default uninstall (a second run reports nothing to uninstall; the backup directory stays until `--purge`); the purge targets are validated against the manifest (basename `marksharc`, never inside the overlay).
+- `tests/support/pty_socket.py` gains an optional `PTY_INPUT` so a spec can answer the `--purge` prompt on a terminal.
+- `module list` reads the loader's tables through `_ms_discover_all` (disabled modules stay in, flagged in `_ms_mod_enabled`); the CLI computes only the two facts it needs (OS, host) so that listing never writes the fact cache.
 
 ---
 

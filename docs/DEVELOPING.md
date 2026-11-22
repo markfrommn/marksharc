@@ -22,7 +22,7 @@ pin, check out the commit in `tests/shellspec.pin` and point
 tests/check
 ```
 
-This runs `tests/lint` and both suites, in the same order as CI. See
+This runs `tests/lint` and every suite, in the same order as CI. See
 [tests/README.md](../tests/README.md) for single suites and the test rules.
 CI runs on `macos-latest` and `ubuntu-latest` for every pull request and every
 push to `main`; both must be green before a merge.
