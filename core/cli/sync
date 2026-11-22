@@ -1,0 +1,74 @@
+#!/usr/bin/env zsh
+# Synchronize checkout worktrees only when their configured upstream is a safe fast-forward.
+emulate -L zsh
+(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc sync'; exit 2; }
+export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never
+config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
+typeset -a candidates=( "$MARKSHARC_HOME" "$config" )
+typeset -a extras=()
+source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
+for conf in "$config/config.conf" "$config/hosts/${MARKSHARC_HOST:-${HOST%%.*}}.conf"; do
+    [[ -r $conf ]] || continue
+    while IFS= read -r line || [[ -n $line ]]; do
+        _ms_words "$line" || continue
+        if [[ ${reply[1]} == set && ${reply[2]-} == sync.repos ]]; then
+            extras+=( "${reply[@]:2}" )
+        fi
+    done < "$conf"
+done
+integer failed=0
+for candidate in "${extras[@]}"; do
+    if [[ ! -d $candidate ]] || ! command git -C "${candidate:A}" rev-parse --show-toplevel >/dev/null 2>&1; then
+        print -r -- "sync: invalid repository: $candidate"
+        failed=1
+    else
+        candidates+=( "$candidate" )
+    fi
+done
+typeset -a roots=()
+typeset -A seen=()
+for candidate in "${candidates[@]}"; do
+    [[ -d $candidate ]] || continue
+    root=$(command git -C "${candidate:A}" rev-parse --show-toplevel 2>/dev/null) || continue
+    root=${root:A}
+    [[ -n ${seen[$root]-} ]] && continue
+    seen[$root]=1
+    roots+=( "$root" )
+done
+for root in "${roots[@]}"; do
+    if ! worktree_status=$(command git -C "$root" status --porcelain --untracked-files=normal 2>/dev/null); then
+        print -r -- "sync: status failed: $root"
+        failed=1
+        continue
+    fi
+    if [[ -n $worktree_status ]]; then
+        print -r -- "sync: dirty: $root"
+        failed=1
+        continue
+    fi
+    branch=$(command git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null) || { print -r -- "sync: detached: $root"; failed=1; continue; }
+    upstream=$(command git -C "$root" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) || { print -r -- "sync: no upstream: $root"; failed=1; continue; }
+    remote=$(command git -C "$root" config --get "branch.$branch.remote") || { print -r -- "sync: no remote: $root"; failed=1; continue; }
+    if ! command git -C "$root" fetch --quiet -- "$remote"; then
+        print -r -- "sync: fetch failed: $root"
+        failed=1
+        continue
+    fi
+    counts=$(command git -C "$root" rev-list --left-right --count "HEAD...@{upstream}" 2>/dev/null) || { print -r -- "sync: cannot compare: $root"; failed=1; continue; }
+    typeset -a count_parts=( ${=counts} )
+    if (( count_parts[1] > 0 )); then
+        if (( count_parts[2] > 0 )); then state=diverged; else state=ahead; fi
+        print -r -- "sync: $state: $root"
+        failed=1
+    elif (( count_parts[2] > 0 )); then
+        if command git -C "$root" merge --ff-only --quiet '@{upstream}'; then
+            print -r -- "sync: updated: $root"
+        else
+            print -r -- "sync: fast-forward failed: $root"
+            failed=1
+        fi
+    else
+        print -r -- "sync: current: $root"
+    fi
+done
+exit $failed

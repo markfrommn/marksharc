@@ -426,7 +426,7 @@ In the MVP the existing `chdir-set-title`, `setup-herdr-sessions`, and `fix-tmux
 
 A host has two checkouts: the framework and the overlay (plus any private module repos listed in the overlay). Everything is fast-forward only.
 
-- `marksharc sync` fetches and fast-forwards each checkout, reports dirty, ahead, or diverged trees without touching them, re-renders, fetches newly pinned plugins, and prints a `doctor` summary.
+- `marksharc sync` fetches and fast-forwards each checkout, reports dirty, ahead, or diverged trees without touching them, refreshes existing caches (re-rendering once the P3.1 renderer exists), fetches newly pinned plugins, and prints a `doctor` summary.
 - **Notify**: an interactive shell starts a detached fetch when the last check is older than `sync.check_hours` (default 12). The result is written to a status file; the next eligible shell prints one line when the host is behind. This detached fetch is the explicit exception to the offline startup rule in 10.4.
 - **Poll-pull** (Modernization): a launchd agent or systemd user timer runs `marksharc sync --auto`.
 - **Push** (Modernization): `marksharc push [host…]` runs `marksharc sync` over ssh on each host in `hosts.conf` and reports per-host results.
@@ -439,7 +439,7 @@ A host has two checkouts: the framework and the overlay (plus any private module
 | `marksharc bootstrap` | Install packages declared by enabled modules and overlay bundles. Generates a Brewfile for Homebrew on macOS and Linux; prints and confirms apt or dnf commands that need sudo. |
 | `marksharc update` | One updater: sync, plugin pins, then each module's `update` steps (brew, codex, codegraph, collie, herdr-core, …). `--list`, `--only <label>`, `--dry-run`. Replaces `bin/do_updates.sh` and all startup-time pulls. |
 | `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |
-| `marksharc doctor` | Verify stubs and links, render freshness, missing commands for enabled modules, plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
+| `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for enabled modules, plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
 
