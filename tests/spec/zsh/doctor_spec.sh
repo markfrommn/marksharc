@@ -196,10 +196,13 @@ Describe 'marksharc doctor'
   timing_failure_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    # An empty .zshrc: the child starts without marksharc. With no startup files at all,
+    # Debian's zsh opens the blocking zsh-newuser-install menu and the child times out.
     mkdir -p "$TEST_ROOT/empty-zdot"
+    : > "$TEST_ROOT/empty-zdot/.zshrc"
     ms_env
     env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
-    [[ $(<"$TEST_ROOT/out") == *'startup failed'* ]]
+    [[ $(<"$TEST_ROOT/out") == *'startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
   }
   It 'reports a failed eligible interactive startup instead of a healthy time'
     When run timing_failure_case

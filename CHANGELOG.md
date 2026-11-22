@@ -19,6 +19,9 @@ All notable changes to this project are recorded here. The format follows
   enabled by default and skips itself (for example `herdr` on a host with only
   the herdr app). It reports a startup that outlives `doctor.startup_timeout_ms`
   (default 5000) as timed out instead of failed.
+- `setup-cc-providers` run by hand reports the commands it defined, the provider
+  files it skipped, or that it found no provider files and where it looked.
+  Startup calls it with `-q` and stays quiet.
 
 - zsh startup on Debian/Ubuntu: the distro-global `compinit` no longer runs
   (`skip_global_compinit` is set in the env phase), so non-tty and agent shells
