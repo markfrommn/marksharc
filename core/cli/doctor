@@ -59,7 +59,9 @@ for dotfile in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.zlogin" "$HOME/.zlogout"
     fi
 done
 typeset -A path_seen=()
-for entry in "${path[@]}"; do
+typeset -a inspected_path=( "${path[@]}" )
+if (( ${+MARKSHARC_DOCTOR_PATH} )); then inspected_path=( "${(@s/:/)MARKSHARC_DOCTOR_PATH}" ); fi
+for entry in "${inspected_path[@]}"; do
     [[ -n $entry ]] || continue
     if [[ -n ${path_seen[$entry]-} ]]; then
         print -r -- "doctor: duplicate PATH: $entry"
@@ -96,7 +98,8 @@ for candidate in "${candidates[@]}"; do
         (( ++issues ))
     fi
 done
-if [[ -n ${MARKSHARC_ENV-} ]]; then
+inherited_id=${MARKSHARC_DOCTOR_ENV-${MARKSHARC_ENV-}}
+if [[ -n $inherited_id ]]; then
     source "$MARKSHARC_HOME/core/zsh/lib/facts.zsh"
     source "$MARKSHARC_HOME/core/zsh/lib/envid.zsh"
     _ms_facts
@@ -115,7 +118,7 @@ if [[ -n ${MARKSHARC_ENV-} ]]; then
     fi
     _ms_env_id
     MARKSHARC_HOME=$original_home
-    if [[ -n $_ms_env_id_value && $MARKSHARC_ENV != $_ms_env_id_value ]]; then
+    if [[ -n $_ms_env_id_value && $inherited_id != $_ms_env_id_value ]]; then
         print -r -- 'doctor: stale environment ID (open a new shell or reload)'
         (( ++issues ))
     fi

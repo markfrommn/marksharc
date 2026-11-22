@@ -528,6 +528,12 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 - A change pushed from the Mac reaches sol with one `marksharc sync`.
 - sol shows the behind-notice before syncing.
 
+**Outcome:** DEV-45 implements fast-forward-only sync, pinned plugin refresh, a
+throttled detached behind check, minimal update, and doctor diagnostics. Local
+bare-repository tests exercise a pushed change, a subsequent PTY notice and sync;
+the actual Mac-to-sol transfer and notice remain unverified on those hosts.
+The renderer remains P3.1; MVP refreshes the existing caches and environment ID.
+
 #### P2.6 — Cutover: run hosts from marksharc (DEV-46)
 
 - **Repo:** mark-desktop-files and marksharc

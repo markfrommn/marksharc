@@ -116,6 +116,16 @@ Describe 'marksharc doctor'
     When run duplicate_path_case
     The status should be success
   End
+  parent_path_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_pty -ic 'typeset +U path; path+=(/usr/bin); marksharc doctor; exit' || return 1
+    [[ $(<"$TEST_ROOT/out") == *'duplicate PATH'*'/usr/bin'* ]]
+  }
+  It 'diagnoses duplicate PATH entries from the invoking interactive shell'
+    When run parent_path_case
+    The status should be success
+  End
   env_id_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"

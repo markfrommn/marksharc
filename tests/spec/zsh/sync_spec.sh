@@ -8,8 +8,8 @@ Describe 'marksharc sync'
     "$REAL_GIT" -C "$MS_HOME" init -q || return 2
     "$REAL_GIT" -C "$MS_HOME" -c user.name=Fixture -c user.email=f@example.invalid add . || return 3
     "$REAL_GIT" -C "$MS_HOME" -c user.name=Fixture -c user.email=f@example.invalid commit -qm initial || return 4
-    "$REAL_GIT" -C "$MS_HOME" remote add origin "$remote" || return 5
-    "$REAL_GIT" -C "$MS_HOME" push -qu origin HEAD || return 6
+    "$REAL_GIT" -C "$MS_HOME" remote add upstream "$remote" || return 5
+    "$REAL_GIT" -C "$MS_HOME" push -qu upstream HEAD || return 6
     "$REAL_GIT" clone -q "$remote" "$writer" || return 7
     print -r -- changed > "$writer/fixture-change"
     "$REAL_GIT" -C "$writer" add fixture-change || return 8

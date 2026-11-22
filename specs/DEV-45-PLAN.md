@@ -22,3 +22,8 @@ temporary HOME, disposable local repositories and stubs; actual hosts and servic
    bare-repository end-to-end exercise covering a subsequent shell notice. Commit logical
    checkpoints and audit `origin/main...HEAD` with stack-check. Report live Mac-to-sol behavior
    as unverified; this task does not authorize access to either host.
+
+Result: local bare-repository tests and the independent fresh-install fixture exercise
+the push, detached fetch, later PTY notice, fast-forward and notice clearing. The
+live Mac-to-sol acceptance remains unverified. The existing on-demand environment ID
+and caches provide the MVP refresh; the P3.1 renderer is deferred.

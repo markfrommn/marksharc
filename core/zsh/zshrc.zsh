@@ -52,6 +52,10 @@ marksharc() {
         . "$MARKSHARC_HOME/core/zsh/reload.zsh"
         return
     fi
+    if [[ ${1-} == doctor ]]; then
+        MARKSHARC_DOCTOR_PATH=$PATH MARKSHARC_DOCTOR_ENV=${MARKSHARC_ENV-} "$MARKSHARC_HOME/bin/marksharc" "$@"
+        return
+    fi
     "$MARKSHARC_HOME/bin/marksharc" "$@"
 }
 
