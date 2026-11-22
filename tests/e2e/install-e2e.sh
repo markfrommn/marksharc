@@ -29,7 +29,7 @@ home=
 fail() { echo "e2e: FAIL: $*" >&2; exit 1; }
 step() { echo "e2e: [$pass] $*"; }
 # clean_env CMD...: run CMD with a minimal environment and the pass's fresh HOME (no XDG variables).
-clean_env() { env -i HOME="$home" PATH="$PATH" TERM=dumb SHELL=/bin/sh LANG=C "$@"; }
+clean_env() { env -i HOME="$home" PATH="$PATH" TERM=dumb SHELL=/bin/sh LANG=C MARKSHARC_NOTIFY=0 "$@"; }
 # silent DESCRIPTION CMD...: run CMD (stdin closed); stdout goes to $out; nothing may reach stderr.
 silent() {
   desc=$1; shift

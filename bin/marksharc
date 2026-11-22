@@ -14,6 +14,9 @@ Usage: marksharc <command> [args]
 
 Commands:
   reload [--verbose]            reload the current shell (an interactive marksharc shell)
+  sync                          fast-forward configured checkouts and refresh plugin pins
+  update                        run sync and refresh plugin pins
+  doctor                        report installation and repository health
   module list                   list modules with their status
   module enable <name>          enable a module in the overlay's config.conf
   module disable <name>         disable a module in the overlay's config.conf

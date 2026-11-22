@@ -1,0 +1,56 @@
+#!/usr/bin/env zsh
+# Private worker: a detached, throttled fetch that never merges or refreshes plugins.
+emulate -L zsh
+[[ ${1-} == --check && $# == 1 ]] || exit 2
+export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never GIT_ASKPASS=/usr/bin/false SSH_ASKPASS=/usr/bin/false SSH_ASKPASS_REQUIRE=force
+config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
+host=${MARKSHARC_HOST:-${HOST%%.*}}
+dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/$host/sync
+command mkdir -p -- "$dir" || exit 1
+# Keep a stable inode: fcntl releases the advisory lock when this worker exits,
+# including SIGKILL or reboot. Never unlink it while another worker may use it.
+zmodload zsh/system 2>/dev/null || exit 0
+: >> "$dir/notify.lock" || exit 1
+zsystem flock -t 0 -f lockfd "$dir/notify.lock" 2>/dev/null || exit 0
+source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
+_ms_config_load
+hours=${_ms_cfg_set[sync.check_hours]-12}
+[[ $hours == <-> ]] || hours=12
+now=$(command date +%s) || exit 1
+last=0
+[[ -r $dir/checked ]] && IFS= read -r last < "$dir/checked"
+[[ $last == <-> ]] || last=0
+(( now >= last && now - last < hours * 3600 )) && exit 0
+print -r -- "$now" > "$dir/checked" || exit 1
+generation=
+[[ -r $dir/generation ]] && IFS= read -r generation < "$dir/generation"
+typeset -a candidates=( "$MARKSHARC_HOME" "$config" )
+typeset -a extras=()
+for conf in "$config/config.conf" "$config/hosts/$host.conf"; do
+    [[ -r $conf ]] || continue
+    while IFS= read -r line || [[ -n $line ]]; do
+        _ms_words "$line" || continue
+        if [[ ${reply[1]} == set && ${reply[2]-} == sync.repos ]] && (( $#reply >= 3 )); then
+            extras=( "${reply[@]:2}" )
+        fi
+    done < "$conf"
+done
+candidates+=( "${extras[@]}" )
+typeset -A seen=()
+result=current
+for candidate in "${candidates[@]}"; do
+    [[ -d $candidate ]] || continue
+    root=$(command git -C "${candidate:A}" rev-parse --show-toplevel 2>/dev/null) || continue
+    root=${root:A}
+    [[ -n ${seen[$root]-} ]] && continue
+    seen[$root]=1
+    branch=$(command git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null) || continue
+    remote=$(command git -C "$root" config --get "branch.$branch.remote" 2>/dev/null) || continue
+    merge_ref=$(command git -C "$root" config --get "branch.$branch.merge" 2>/dev/null) || continue
+    if ! command git -C "$root" fetch --quiet -- "$remote" "$merge_ref" >/dev/null 2>&1; then result=unknown; continue; fi
+    fetched=$(command git -C "$root" rev-parse --verify '@{upstream}^{commit}' 2>/dev/null) || { result=unknown; continue; }
+    counts=$(command git -C "$root" rev-list --left-right --count "HEAD...$fetched" 2>/dev/null) || { result=unknown; continue; }
+    typeset -a parts=( ${=counts} )
+    (( parts[2] > 0 )) && { result=behind; break; }
+done
+print -r -- "$result${generation:+|$generation}" > "$dir/status.tmp.$$" && command mv -f -- "$dir/status.tmp.$$" "$dir/status"

@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+# MVP update consists of sync and plugin pins; module updaters arrive later.
+(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc update'; exit 2; }
+exec zsh -f "$MARKSHARC_HOME/core/cli/sync"

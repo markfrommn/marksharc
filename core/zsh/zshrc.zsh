@@ -7,6 +7,27 @@
 typeset -g _ms_starting=1
 _ms_trace "init phase: start"
 
+# Read the previous detached check before starting another; reloads and doctor timing
+# do not initiate background work.
+if [[ ${MARKSHARC_NOTIFY:-1} != 0 && ${_ms_reloading:-0} != 1 ]]; then
+    typeset -g _ms_sync_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/sync
+    typeset -g _ms_notice= _ms_generation=
+    [[ -r $_ms_sync_dir/status ]] && _ms_notice=$(<"$_ms_sync_dir/status")
+    [[ -r $_ms_sync_dir/generation ]] && _ms_generation=$(<"$_ms_sync_dir/generation")
+    if [[ ( $_ms_notice == behind && -z $_ms_generation ) || ( -n $_ms_generation && $_ms_notice == "behind|$_ms_generation" ) ]]; then
+        print -r -- 'marksharc: updates available (run marksharc sync)'
+    fi
+    typeset -g _ms_last_check=0 _ms_check_hours=${_ms_cfg_set[sync.check_hours]-12}
+    [[ -r $_ms_sync_dir/checked ]] && IFS= read -r _ms_last_check < "$_ms_sync_dir/checked"
+    [[ $_ms_last_check == <-> ]] || _ms_last_check=0
+    [[ $_ms_check_hours == <-> ]] || _ms_check_hours=12
+    zmodload zsh/datetime 2>/dev/null
+    if [[ -x $MARKSHARC_HOME/core/cli/notify ]] && (( ${EPOCHSECONDS:-0} - _ms_last_check >= _ms_check_hours * 3600 )); then
+        command nohup zsh -f "$MARKSHARC_HOME/core/cli/notify" --check </dev/null >/dev/null 2>&1 &!
+    fi
+    unset _ms_sync_dir _ms_last_check _ms_check_hours _ms_notice _ms_generation
+fi
+
 # cs and li reload the core with a verbose trace (spec 6.10).
 alias cs='_ms_reload_login=0; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
 alias li='_ms_reload_login=1; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
@@ -29,6 +50,10 @@ marksharc() {
         done
         _ms_reload_login=0
         . "$MARKSHARC_HOME/core/zsh/reload.zsh"
+        return
+    fi
+    if [[ ${1-} == doctor ]]; then
+        MARKSHARC_DOCTOR_PATH=$PATH MARKSHARC_DOCTOR_ENV=${MARKSHARC_ENV-} "$MARKSHARC_HOME/bin/marksharc" "$@"
         return
     fi
     "$MARKSHARC_HOME/bin/marksharc" "$@"

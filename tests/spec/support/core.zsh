@@ -19,7 +19,7 @@ ms_mod() {
 # Hermetic child environment; leading VAR=value arguments are added to it.
 ms_env() {
   # SHLVL > 1 keeps nested test shells from behaving like a fresh login.
-  MS_ENV=( HOME="$HOME" PATH="$PATH" TERM=dumb SHLVL=2 MARKSHARC_MODULE_GUARD=0 OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT"
+  MS_ENV=( HOME="$HOME" PATH="$PATH" TERM=dumb SHLVL=2 MARKSHARC_MODULE_GUARD=0 MARKSHARC_NOTIFY=0 OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT"
     XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME"
     XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" )
 }

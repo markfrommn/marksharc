@@ -15,6 +15,8 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- `marksharc sync`, `update`, and `doctor`: fast-forward safe checkouts, refresh
+  plugin pins, report health, and notify interactively after a throttled detached fetch.
 - Installer and command: `install.sh` (`--home`, `--overlay`, `--dry-run`; backs up
   the HOME zsh dotfiles with a manifest, writes the `~/.zshenv` stub with a
   minimal-PATH fallback, safe to re-run), `bin/marksharc` (`reload`,
