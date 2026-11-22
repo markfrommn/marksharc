@@ -85,6 +85,8 @@ set sync.check_hours 12
 set doctor.startup_ms 500
 ```
 
+An assignment in `hosts/<hostname>.conf` replaces the global `sync.repos` list.
+
 An eligible interactive shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a
 notice when the cached result is behind. The fetch does not merge or update plugins;

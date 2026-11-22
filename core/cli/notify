@@ -25,13 +25,17 @@ print -r -- "$now" > "$dir/checked" || exit 1
 generation=
 [[ -r $dir/generation ]] && IFS= read -r generation < "$dir/generation"
 typeset -a candidates=( "$MARKSHARC_HOME" "$config" )
+typeset -a extras=()
 for conf in "$config/config.conf" "$config/hosts/$host.conf"; do
     [[ -r $conf ]] || continue
     while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
-        [[ ${reply[1]} == set && ${reply[2]-} == sync.repos ]] && candidates+=( "${reply[@]:2}" )
+        if [[ ${reply[1]} == set && ${reply[2]-} == sync.repos ]] && (( $#reply >= 3 )); then
+            extras=( "${reply[@]:2}" )
+        fi
     done < "$conf"
 done
+candidates+=( "${extras[@]}" )
 typeset -A seen=()
 result=current
 for candidate in "${candidates[@]}"; do
@@ -42,8 +46,10 @@ for candidate in "${candidates[@]}"; do
     seen[$root]=1
     branch=$(command git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null) || continue
     remote=$(command git -C "$root" config --get "branch.$branch.remote" 2>/dev/null) || continue
-    if ! command git -C "$root" fetch --quiet -- "$remote" >/dev/null 2>&1; then result=unknown; continue; fi
-    counts=$(command git -C "$root" rev-list --left-right --count 'HEAD...@{upstream}' 2>/dev/null) || { result=unknown; continue; }
+    merge_ref=$(command git -C "$root" config --get "branch.$branch.merge" 2>/dev/null) || continue
+    if ! command git -C "$root" fetch --quiet -- "$remote" "$merge_ref" >/dev/null 2>&1; then result=unknown; continue; fi
+    fetched=$(command git -C "$root" rev-parse --verify '@{upstream}^{commit}' 2>/dev/null) || { result=unknown; continue; }
+    counts=$(command git -C "$root" rev-list --left-right --count "HEAD...$fetched" 2>/dev/null) || { result=unknown; continue; }
     typeset -a parts=( ${=counts} )
     (( parts[2] > 0 )) && { result=behind; break; }
 done

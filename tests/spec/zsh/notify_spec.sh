@@ -52,6 +52,7 @@ Describe 'sync notification'
     "$REAL_GIT" -C "$MS_HOME" -c user.name=Fixture -c user.email=f@example.invalid commit -qm init || return 3
     "$REAL_GIT" -C "$MS_HOME" remote add origin "$TEST_ROOT/no-remote" || return 4
     "$REAL_GIT" -C "$MS_HOME" config branch.$("$REAL_GIT" -C "$MS_HOME" branch --show-current).remote origin
+    "$REAL_GIT" -C "$MS_HOME" config branch.$("$REAL_GIT" -C "$MS_HOME" branch --show-current).merge refs/heads/main
     stub_command git "if [ \"\$3\" = fetch ]; then print=unused; printf 'fetch\\n' >> '$OPLOG'; exit 1; fi; exec '$REAL_GIT' \"\$@\""
     mkdir -p "$TEST_ROOT/empty-zdot"
     ms_env
@@ -114,6 +115,7 @@ Describe 'sync notification'
     "$REAL_GIT" -C "$MS_HOME" -c user.name=Fixture -c user.email=f@example.invalid commit -qm init || return 3
     "$REAL_GIT" -C "$MS_HOME" remote add origin "$TEST_ROOT/no-remote" || return 4
     "$REAL_GIT" -C "$MS_HOME" config branch.$("$REAL_GIT" -C "$MS_HOME" branch --show-current).remote origin
+    "$REAL_GIT" -C "$MS_HOME" config branch.$("$REAL_GIT" -C "$MS_HOME" branch --show-current).merge refs/heads/main
     stub_command git "if [ \"\$3\" = fetch ]; then printf 'fetch\\n' >> '$OPLOG'; sleep 1; exit 1; fi; exec '$REAL_GIT' \"\$@\""
     mkdir -p "$TEST_ROOT/empty-zdot"
     ms_env
@@ -177,6 +179,50 @@ Describe 'sync notification'
   }
   It 'fetches in a detached first shell and notifies in the subsequent shell'
     When run shell_roundtrip_case
+    The status should be success
+  End
+  deleted_upstream_case() {
+    emulate -L zsh
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    local remote=$TEST_ROOT/remote.git writer=$TEST_ROOT/writer
+    "$REAL_GIT" init -q --bare "$remote" || return 1
+    "$REAL_GIT" -C "$MS_HOME" init -q || return 2
+    "$REAL_GIT" -C "$MS_HOME" add . || return 3
+    "$REAL_GIT" -C "$MS_HOME" -c user.name=Fixture -c user.email=f@example.invalid commit -qm initial || return 4
+    "$REAL_GIT" -C "$MS_HOME" remote add origin "$remote" || return 5
+    "$REAL_GIT" -C "$MS_HOME" push -qu origin HEAD || return 6
+    "$REAL_GIT" clone -q "$remote" "$writer" || return 7
+    print -r -- change > "$writer/change"
+    "$REAL_GIT" -C "$writer" add change || return 8
+    "$REAL_GIT" -C "$writer" -c user.name=Fixture -c user.email=f@example.invalid commit -qm change || return 9
+    "$REAL_GIT" -C "$writer" push -q || return 10
+    "$REAL_GIT" -C "$MS_HOME" fetch -q origin || return 11
+    local branch=$("$REAL_GIT" -C "$MS_HOME" branch --show-current)
+    "$REAL_GIT" --git-dir="$remote" update-ref refs/heads/other $("$REAL_GIT" -C "$writer" rev-parse HEAD) || return 12
+    "$REAL_GIT" --git-dir="$remote" update-ref -d "refs/heads/$branch" || return 13
+    mkdir -p "$TEST_ROOT/empty-zdot"
+    ms_env
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" notify --check || return 14
+    [[ $(<"$XDG_CACHE_HOME/marksharc/testhost/sync/status") == unknown ]]
+  }
+  It 'does not report a stale tracking ref as behind after the upstream is deleted'
+    When run deleted_upstream_case
+    The status should be success
+  End
+  host_override_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$TEST_ROOT/global" "$TEST_ROOT/host" "$TEST_ROOT/empty-zdot" "$XDG_CONFIG_HOME/marksharc/hosts"
+    print -r -- "set sync.repos '$TEST_ROOT/global'" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    print -r -- "set sync.repos '$TEST_ROOT/host'" > "$XDG_CONFIG_HOME/marksharc/hosts/testhost.conf"
+    stub_command git "if [ \"\$2\" = '$TEST_ROOT/global' ]; then printf global >> '$OPLOG'; fi; exec '$REAL_GIT' \"\$@\""
+    ms_env
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" notify --check || return 1
+    [[ ! -s $OPLOG ]]
+  }
+  It 'does not inspect repositories replaced by the host configuration'
+    When run host_override_case
     The status should be success
   End
 End

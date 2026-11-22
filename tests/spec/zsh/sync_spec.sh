@@ -241,4 +241,36 @@ Describe 'marksharc sync'
     When run overlay_owner_case
     The status should be success
   End
+  deleted_upstream_case() {
+    unsafe_setup || return 1
+    print -r -- remote > "$TEST_ROOT/writer/remote"
+    "$REAL_GIT" -C "$TEST_ROOT/writer" add remote || return 2
+    "$REAL_GIT" -C "$TEST_ROOT/writer" -c user.name=Fixture -c user.email=f@example.invalid commit -qm remote || return 3
+    "$REAL_GIT" -C "$TEST_ROOT/writer" push -q || return 4
+    "$REAL_GIT" -C "$MS_HOME" fetch -q origin || return 5
+    local branch=$("$REAL_GIT" -C "$MS_HOME" branch --show-current)
+    "$REAL_GIT" --git-dir="$REMOTE" update-ref refs/heads/other $("$REAL_GIT" -C "$TEST_ROOT/writer" rev-parse HEAD) || return 6
+    "$REAL_GIT" --git-dir="$REMOTE" update-ref -d "refs/heads/$branch" || return 7
+    local before=$("$REAL_GIT" -C "$MS_HOME" rev-parse HEAD)
+    unsafe_run; [[ $? != 0 ]] || return 8
+    [[ $("$REAL_GIT" -C "$MS_HOME" rev-parse HEAD) == "$before" && $(<"$TEST_ROOT/out") == *'fetch failed'* ]]
+  }
+  It 'does not fast-forward to a stale tracking ref after the upstream is deleted'
+    When run deleted_upstream_case
+    The status should be success
+  End
+  host_override_case() {
+    unsafe_setup || return 1
+    local config=$XDG_CONFIG_HOME/marksharc
+    mkdir -p "$config/hosts"
+    ln -s "$MS_HOME" "$TEST_ROOT/host path"
+    print -r -- "set sync.repos '$TEST_ROOT/invalid'" > "$config/config.conf"
+    print -r -- "set sync.repos '$TEST_ROOT/host path'" > "$config/hosts/${HOST%%.*}.conf"
+    unsafe_run || { cat "$TEST_ROOT/out" "$TEST_ROOT/err"; return 2; }
+    [[ $(<"$TEST_ROOT/out") != *'invalid repository'* ]]
+  }
+  It 'replaces the global extra repository list with the host override'
+    When run host_override_case
+    The status should be success
+  End
 End
