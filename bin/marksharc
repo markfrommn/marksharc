@@ -1,0 +1,36 @@
+#!/usr/bin/env zsh
+# marksharc command (spec 6.2): dispatch to the executable zsh programs in core/cli/.
+# Commands that must change the calling shell (reload) are the marksharc function that
+# the init phase defines (core/zsh/zshrc.zsh); this program only explains that.
+#
+# The framework is the checkout this file belongs to, whatever the caller's directory.
+
+emulate -L zsh
+export MARKSHARC_HOME=${${(%):-%x}:A:h:h}
+
+usage() {
+    cat <<'EOF'
+Usage: marksharc <command> [args]
+
+Commands:
+  reload [--verbose]            reload the current shell (an interactive marksharc shell)
+  module list                   list modules with their status
+  module enable <name>          enable a module in the overlay's config.conf
+  module disable <name>         disable a module in the overlay's config.conf
+  uninstall [--purge] [--yes]   restore the backed-up dotfiles and remove the stub
+  version                       print the version
+  help                          print this help
+EOF
+}
+
+case ${1-} in
+    ''|help|-h|--help) usage; exit 0 ;;
+    -V|--version) set -- version ;;
+esac
+
+cmd=$1; shift
+if [[ $cmd =~ '^[a-z][a-z-]*$' && -x $MARKSHARC_HOME/core/cli/$cmd ]]; then
+    exec "$MARKSHARC_HOME/core/cli/$cmd" "$@"
+fi
+print -ru2 -- "marksharc: unknown command: $cmd (try: marksharc help)"
+exit 2

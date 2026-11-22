@@ -75,7 +75,7 @@ _ms_config_load() {
 # tables and _ms_mod_names (enabled modules in load order: order, then name).
 _ms_modules_discover() {
     emulate -L zsh
-    typeset -gA _ms_mod_dir=() _ms_mod_describe=() _ms_mod_order=() _ms_mod_req_cmd=() _ms_mod_req_os=() _ms_mod_options=() _ms_mod_optdef=()
+    typeset -gA _ms_mod_dir=() _ms_mod_describe=() _ms_mod_order=() _ms_mod_req_cmd=() _ms_mod_req_os=() _ms_mod_options=() _ms_mod_optdef=() _ms_mod_enabled=()
     typeset -ga _ms_mod_names=()
     _ms_config_load
     local conf dir name line order root
@@ -92,11 +92,15 @@ _ms_modules_discover() {
         dir=${conf:h}
         name=${dir:t}
         [[ -n $name && $name != *[^A-Za-z0-9_-]* ]] || continue
+        # _ms_discover_all (set by the marksharc module command) keeps disabled modules in
+        # the tables, flagged in _ms_mod_enabled, so they can be listed.
+        _ms_mod_enabled[$name]=1
         if (( _ms_cfg_explicit )); then
-            [[ ${_ms_cfg_enabled[$name]-0} == 1 ]] || { _ms_trace "module $name: skipped (not enabled in config.conf)"; continue; }
+            [[ ${_ms_cfg_enabled[$name]-0} == 1 ]] || { _ms_trace "module $name: skipped (not enabled in config.conf)"; _ms_mod_enabled[$name]=0; }
         else
-            [[ ${_ms_cfg_enabled[$name]-1} == 1 ]] || { _ms_trace "module $name: skipped (off in config.conf)"; continue; }
+            [[ ${_ms_cfg_enabled[$name]-1} == 1 ]] || { _ms_trace "module $name: skipped (off in config.conf)"; _ms_mod_enabled[$name]=0; }
         fi
+        [[ ${_ms_mod_enabled[$name]} == 1 ]] || (( ${_ms_discover_all:-0} )) || continue
         _ms_mod_dir[$name]=$dir
         order=50
         while IFS= read -r line || [[ -n $line ]]; do

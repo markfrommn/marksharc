@@ -1,0 +1,140 @@
+#!/usr/bin/env zsh
+# marksharc module list | enable <name> | disable <name> (spec 6.15).
+#
+# list reads the same module tables the loader builds (core/zsh/lib/modules.zsh), with
+# disabled modules kept in. enable and disable edit config.conf in the overlay only, one
+# line at a time, following the loader's rules (see _ms_config_load):
+#  - no active "module <name>" line: every module loads except those "module <name> off";
+#  - any active "module <name>" line: only the modules listed that way load.
+# So enable never adds a plain "module <name>" line to an all-modules file (that would
+# switch the loader to an explicit list), and disable refuses to remove the last listed
+# module of an explicit list (an empty list means "everything").
+
+: ${MARKSHARC_HOME:=${${(%):-%x}:A:h:h:h}}
+for _l in util modules; do source "$MARKSHARC_HOME/core/zsh/lib/$_l.zsh"; done
+unset _l
+_ms_verbose=0
+# Only the facts the loader reads; the full fact set would write the cache.
+case $OSTYPE in
+    darwin*) MARKSHARC_OS=darwin ;;
+    linux*)  MARKSHARC_OS=linux ;;
+    *)       MARKSHARC_OS=${${OSTYPE%%[0-9.-]*}:l} ;;
+esac
+MARKSHARC_HOST=${HOST%%.*}
+typeset -g _ms_discover_all=1
+config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
+conf=$config/config.conf
+
+die() { print -ru2 -- "marksharc module: $*"; exit 1; }
+usage() {
+    print -ru2 -- "Usage: marksharc module list | enable <name> | disable <name>"
+    exit 2
+}
+
+cmd_list() {
+    local name state reason cmd
+    _ms_modules_discover
+    for name in ${(o)_ms_mod_names}; do
+        state=enabled
+        reason=
+        if [[ ${_ms_mod_enabled[$name]} != 1 ]]; then
+            state=disabled
+        elif [[ -n ${_ms_mod_req_os[$name]-} ]] && (( ! ${${=_ms_mod_req_os[$name]}[(Ie)$MARKSHARC_OS]} )); then
+            state=skipped
+            reason="requires os ${_ms_mod_req_os[$name]}"
+        else
+            for cmd in ${=_ms_mod_req_cmd[$name]-}; do
+                if ! whence -p -- "$cmd" >/dev/null 2>&1; then
+                    state=skipped
+                    reason="requires command $cmd"
+                    break
+                fi
+            done
+        fi
+        printf '%-22s %-9s %s%s\n' "$name" "$state" "${_ms_mod_describe[$name]-}" "${reason:+  ($reason)}"
+    done
+}
+
+# is_line NAME LINE: LINE is an active "module NAME [off]" line (sets is_off).
+is_line() {
+    is_off=0
+    _ms_words "$2" || return 1
+    [[ ${reply[1]} == module && ${reply[2]-} == "$1" ]] || return 1
+    [[ ${reply[3]-} == off ]] && is_off=1
+    return 0
+}
+
+cmd_edit() {
+    local action=$1 name=$2 verb
+    local want i line is_off target found=0 n_on=0 key
+    local -a lines=()
+    [[ -n $name ]] || usage
+    [[ $name =~ '^[A-Za-z0-9_-]+$' ]] || die "invalid module name: $name"
+    _ms_modules_discover
+    (( $+_ms_mod_dir[$name] )) || die "unknown module: $name (see: marksharc module list)"
+    [[ -d $config ]] || die "no overlay at $config; run install.sh or create the directory first"
+    if [[ $action == enable ]]; then want=1; verb=enabled; else want=0; verb=disabled; fi
+    if [[ ${_ms_mod_enabled[$name]} == $want ]]; then
+        print -r -- "marksharc: module $name is already $verb"
+        return 0
+    fi
+    if [[ $action == disable ]] && (( _ms_cfg_explicit )); then
+        for key in ${(k)_ms_cfg_enabled}; do [[ ${_ms_cfg_enabled[$key]} == 1 ]] && n_on=$(( n_on + 1 )); done
+        (( n_on > 1 )) || die "$name is the last module in the explicit list; with none left the loader would enable every module. Edit $conf by hand."
+    fi
+
+    target=$conf
+    [[ -e $conf || -L $conf ]] && target=${conf:A}
+    [[ -s $target ]] && lines=( "${(@f)$(<"$target")}" )
+
+    # Rewrite the lines that already state this module's setting.
+    for (( i = 1; i <= ${#lines}; i++ )); do
+        line=${lines[i]}
+        if is_line "$name" "$line"; then
+            if [[ $action == disable ]]; then
+                lines[i]="module $name off"
+            elif (( is_off )); then
+                if (( _ms_cfg_explicit )); then lines[i]="module $name"; else lines[i]="# module $name off"; fi
+            else
+                continue
+            fi
+            found=1
+        fi
+    done
+    if (( ! found )) && [[ $action == disable ]]; then
+        # The template ships a commented "# module <name> off" line: switch it on in place.
+        for (( i = 1; i <= ${#lines}; i++ )); do
+            if [[ ${lines[i]} =~ "^[[:space:]]*#[[:space:]]*module[[:space:]]+${name}[[:space:]]+off[[:space:]]*$" ]]; then
+                lines[i]="module $name off"
+                found=1
+                break
+            fi
+        done
+        (( found )) || { lines+=( "module $name off" ); found=1; }
+    elif (( ! found )) && [[ $action == enable ]] && (( _ms_cfg_explicit )); then
+        lines+=( "module $name" )
+        found=1
+    fi
+
+    if (( found )); then
+        local tmp=$target.marksharc.$$
+        [[ -e $target ]] && command cp -p -- "$target" "$tmp" 2>/dev/null
+        { print -r -- "${(F)lines}" > "$tmp" && command mv -f -- "$tmp" "$target" } 2>/dev/null || { command rm -f -- "$tmp"; die "cannot write $target"; }
+    fi
+
+    # The files after this one (hosts/<host>.conf) can still override the edit.
+    _ms_config_load
+    local now
+    if (( _ms_cfg_explicit )); then now=${_ms_cfg_enabled[$name]-0}; else now=${_ms_cfg_enabled[$name]-1}; fi
+    if [[ $now != $want ]]; then
+        local hostconf=$config/hosts/${MARKSHARC_HOST}.conf
+        die "$conf is updated, but $name is still not $verb: another line overrides it (check $hostconf)"
+    fi
+    print -r -- "marksharc: module $name $verb in $conf (run 'marksharc reload', or open a new shell, to apply)"
+}
+
+case ${1-} in
+    list) (( $# == 1 )) || usage; cmd_list ;;
+    enable|disable) (( $# == 2 )) || usage; cmd_edit "$1" "$2" ;;
+    *) usage ;;
+esac

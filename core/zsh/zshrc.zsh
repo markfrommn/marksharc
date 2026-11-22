@@ -11,6 +11,29 @@ _ms_trace "init phase: start"
 alias cs='_ms_reload_login=0; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
 alias li='_ms_reload_login=1; . "$MARKSHARC_HOME/core/zsh/reload.zsh"'
 
+# The marksharc command (spec 6.2, 6.10). `reload` has to act on this shell, which a child
+# process cannot, so it is a function that sources reload.zsh (quiet unless --verbose, where
+# cs and li always trace). Every other subcommand runs the CLI program. Bare `typeset`
+# in a module file is function-local during a reload from here, as it is in any function;
+# the aliases above reload at top level.
+marksharc() {
+    if [[ ${1-} == reload ]]; then
+        shift
+        local _ms_arg
+        _ms_reload_quiet=1
+        for _ms_arg; do
+            case $_ms_arg in
+                --verbose|-v) _ms_reload_quiet=0 ;;
+                *) print -ru2 -- "marksharc reload: unknown option: $_ms_arg"; unset _ms_reload_quiet; return 2 ;;
+            esac
+        done
+        _ms_reload_login=0
+        . "$MARKSHARC_HOME/core/zsh/reload.zsh"
+        return
+    fi
+    "$MARKSHARC_HOME/bin/marksharc" "$@"
+}
+
 # Each init may register cleanup for its own hooks before the next init plan.
 for _ms_cleanup in "${_ms_init_cleanups[@]}"; do
     (( $+functions[$_ms_cleanup] )) && "$_ms_cleanup"
