@@ -1,1 +1,1 @@
-setup-cc-providers || true
+setup-cc-providers -q || true

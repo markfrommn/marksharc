@@ -7,6 +7,22 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- Interactive zsh startup on the Mac drops from about 5 s to under 1 s: `node-nvm`
+  and `go-gvm` load nvm and gvm on first use instead of at startup. The env phase
+  already puts the default node and Go on PATH, and `go-gvm` sets `GOPATH` and
+  `gvm_go_name` itself. The `.nvmrc` and `go.mod` hooks load the manager only
+  when a switch may be needed.
+- `install.sh` fetches the pinned plugins, so fzf-tab works after a fresh install
+  (`--no-plugins` skips the fetch). `doctor` names `marksharc update` for a
+  missing pin.
+- `doctor` no longer reports a missing required command for a module that is
+  enabled by default and skips itself (for example `herdr` on a host with only
+  the herdr app). It reports a startup that outlives `doctor.startup_timeout_ms`
+  (default 5000) as timed out instead of failed.
+- `setup-cc-providers` run by hand reports the commands it defined, the provider
+  files it skipped, or that it found no provider files and where it looked.
+  Startup calls it with `-q` and stays quiet.
+
 - zsh startup on Debian/Ubuntu: the distro-global `compinit` no longer runs
   (`skip_global_compinit` is set in the env phase), so non-tty and agent shells
   no longer abort at startup; the completion module now runs `compinit -i`, so
