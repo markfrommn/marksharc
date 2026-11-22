@@ -361,7 +361,7 @@ The builder records the entries it manages. On reload it drops managed directori
 
 ### 6.8 Plugins
 
-There is no plugin manager. A `plugin` directive names a git URL and a commit. `marksharc update` clones or checks out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`. A missing clone is skipped silently and reported by `doctor`. Startup never touches the network.
+There is no plugin manager. A `plugin` directive names a git URL and a commit. `marksharc update` clones or checks out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`. A missing clone is skipped silently and reported by `doctor`. The plugin loader never touches the network; the separate notify fetch is the exception described in 6.14.
 
 The same directive serves fish: the fish loader adds the plugin's `functions` and `completions` directories and sources its `conf.d` files. This replaces fisher for the plugins marksharc depends on.
 

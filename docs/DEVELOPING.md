@@ -33,7 +33,9 @@ push to `main`; both must be green before a merge.
   command stubs, never real services.
 - Portable code (`core/`, `modules/`, `templates/`) holds no personal values:
   no user, host, org or site names, and no home paths.
-- Shell startup is quiet, offline and makes no installs.
+- Shell startup makes no installs or pulls. Eligible interactive shells may start the
+  detached, throttled notify fetch and print a cached behind notice; batch and agent
+  startup stays quiet and offline. Tests disable notify unless explicitly exercising it.
 - The framework checkout is never written at run time.
 - Agent configuration is never committed. `.gitignore` keeps `AGENTS.md`,
   `CLAUDE.md`, `.claude/`, `.agents/`, `.omp/`, `.codex/`, `.cursor/`,

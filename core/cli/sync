@@ -71,4 +71,26 @@ for root in "${roots[@]}"; do
         print -r -- "sync: current: $root"
     fi
 done
+plugin_functions=$MARKSHARC_HOME/modules/completion-fzf-tab/functions/zsh
+if [[ -r $plugin_functions/zsh-plugin-update ]]; then
+    fpath=( "$plugin_functions" $fpath )
+    autoload -Uz "$plugin_functions"/*(N-.:t)
+    if ! zsh-plugin-update; then
+        print -ru2 -- 'sync: plugin refresh failed'
+        failed=1
+    fi
+fi
+if (( ! failed )); then
+    syncdir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/sync
+    # These are derived files; they are rebuilt lazily on the next shell.
+    command rm -f -- "$syncdir:h"/init/*(N-.) "$syncdir:h"/guard/*(N-.)
+    if command mkdir -p -- "$syncdir"; then
+        generation="$$-$RANDOM-$RANDOM"
+        print -r -- "$generation" > "$syncdir/generation.tmp.$$" && command mv -f -- "$syncdir/generation.tmp.$$" "$syncdir/generation"
+        print -r -- current > "$syncdir/status.tmp.$$" && command mv -f -- "$syncdir/status.tmp.$$" "$syncdir/status"
+    fi
+fi
+if [[ -x $MARKSHARC_HOME/core/cli/doctor ]]; then
+    MARKSHARC_NOTIFY=0 zsh -f "$MARKSHARC_HOME/core/cli/doctor" || failed=1
+fi
 exit $failed

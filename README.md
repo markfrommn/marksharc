@@ -8,9 +8,8 @@ Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer and the `marksharc` command (`reload`, `module`, `uninstall`,
-> `version`) are in place. fish and bash wiring, `marksharc sync` and
-> `marksharc doctor` come in later releases.
+> installer and the `marksharc` command are in place. fish and bash wiring
+> and the full module updater come in later releases.
 
 ## Requirements
 
@@ -64,6 +63,9 @@ Day 1:
 marksharc module list              # enabled, disabled and skipped modules
 marksharc module disable <name>    # edits config.conf in your overlay
 marksharc reload                   # apply it in this shell (--verbose to trace)
+marksharc sync                     # fast-forward safe checkouts and refresh pins
+marksharc doctor                   # report local health
+marksharc update                   # MVP: sync and plugin pins
 marksharc version
 marksharc uninstall                # restore the backed-up dotfiles, remove the stub
 ```
@@ -71,6 +73,22 @@ marksharc uninstall                # restore the backed-up dotfiles, remove the 
 `marksharc uninstall --purge` also deletes the cache, the state and a clone made by the
 installer (it asks first; `--yes` answers). It never removes your overlay or a checkout you
 passed with `--home`.
+
+Sync uses each checkout's configured Git upstream. It reports dirty, ahead, diverged,
+detached or unavailable repositories without merging them. It finds the owning Git
+checkout of the overlay, including a linked overlay subdirectory. Add extra checkout
+paths in `config.conf`, quoting paths that contain spaces:
+
+```text
+set sync.repos "$HOME/work/one" "$HOME/work/two"
+set sync.check_hours 12
+set doctor.startup_ms 500
+```
+
+An eligible interactive shell starts a detached fetch when the last check is older
+than `sync.check_hours` (12 hours by default). A later interactive shell prints a
+notice when the cached result is behind. The fetch does not merge or update plugins;
+set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a session.
 
 ## Layout
 
