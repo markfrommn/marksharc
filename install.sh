@@ -8,6 +8,7 @@
 #   --home DIR       use DIR (a marksharc checkout) as the framework
 #   --overlay SRC    link a local directory, or git-clone a URL, as the overlay
 #   --dry-run        print every action and change nothing
+#   --no-plugins     do not fetch the pinned plugins (run "marksharc update" later)
 #
 # The framework is the checkout this script sits in, else a clone made into
 # $XDG_DATA_HOME/marksharc ($MARKSHARC_REPO overrides the repository). Existing
@@ -17,6 +18,7 @@ set -eu
 
 REPO_DEFAULT=https://github.com/markfrommn/marksharc.git
 DRY=0
+PLUGINS=1
 FW_ARG=
 OVERLAY_ARG=
 DOTFILES=".zshenv .zshrc .zprofile .zlogin .zlogout"
@@ -34,12 +36,13 @@ trap 'exit 130' HUP INT TERM
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--home DIR] [--overlay PATH|URL] [--dry-run]
+Usage: install.sh [--home DIR] [--overlay PATH|URL] [--dry-run] [--no-plugins]
 
   --home DIR        use DIR, a marksharc checkout, as the framework
   --overlay SRC     link a local directory, or git-clone a URL, as the overlay
                     (default: copy the template when no overlay exists)
   --dry-run         print every action and change nothing
+  --no-plugins      do not fetch the pinned plugins; "marksharc update" does it later
   -h, --help        show this help
 
 Without --home the framework is the checkout containing this script, else a
@@ -57,6 +60,7 @@ while [ $# -gt 0 ]; do
     --overlay) [ $# -ge 2 ] && [ -n "$2" ] || die "--overlay needs a path or URL"; OVERLAY_ARG=$2; shift 2 ;;
     --overlay=*) OVERLAY_ARG=${1#--overlay=}; [ -n "$OVERLAY_ARG" ] || die "--overlay needs a path or URL"; shift ;;
     --dry-run|-n) DRY=1; shift ;;
+    --no-plugins) PLUGINS=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1 (try --help)" ;;
   esac
@@ -400,6 +404,28 @@ else
   for n in $backup_files $backup_links; do
     [ "$n" = .zshenv ] || rm -f -- "$HOME/$n"
   done
+fi
+
+# 5. plugin pins: fetched here and by "marksharc update", never at startup (spec 6.8). A fetch
+# that fails (offline, say) leaves the install in place; doctor reports the missing clone.
+plugin_fns=$FW/modules/completion-fzf-tab/functions/zsh
+if [ "$PLUGINS" -eq 0 ]; then
+  say "plugins: not fetched (--no-plugins); fetch them later with: marksharc update"
+elif [ "$DRY" -eq 1 ]; then
+  # A framework the real run would clone cannot be read yet; assume it pins plugins.
+  if [ "$fw_action" = clone ] || [ -r "$plugin_fns/zsh-plugin-update" ]; then
+    say "would fetch the pinned plugins into $CACHE_DIR/plugins"
+  fi
+elif [ ! -r "$plugin_fns/zsh-plugin-update" ]; then
+  :
+else
+  # shellcheck disable=SC2016 # the zsh code is single-quoted on purpose
+  if MARKSHARC_HOME=$FW MARKSHARC_CONFIG=$CONFIG_DIR XDG_CACHE_HOME=$CACHE_BASE \
+    zsh -f -c 'fpath=( "$1" $fpath ); autoload -Uz "$1"/*(N-.:t); zsh-plugin-update' zsh "$plugin_fns"; then
+    say "plugins: fetched the pinned plugins into $CACHE_DIR/plugins"
+  else
+    say "warning: could not fetch the pinned plugins; the shell starts without them until you run: marksharc update"
+  fi
 fi
 
 # --- done -------------------------------------------------------------------

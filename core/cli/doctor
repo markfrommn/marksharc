@@ -128,12 +128,16 @@ if [[ -n $inherited_id ]]; then
     fi
 fi
 for name in "${_ms_mod_names[@]}"; do
-    for required in ${=_ms_mod_req_cmd[$name]-}; do
-        if ! whence -p -- "$required" >/dev/null 2>&1; then
-            print -r -- "doctor: missing command: $required ($name)"
-            (( ++issues ))
-        fi
-    done
+    # "requires command" is a load condition: a module enabled by default skips itself
+    # when the command is absent. Only a module the overlay names explicitly must have it.
+    if [[ ${_ms_cfg_enabled[$name]-} == 1 ]]; then
+        for required in ${=_ms_mod_req_cmd[$name]-}; do
+            if ! whence -p -- "$required" >/dev/null 2>&1; then
+                print -r -- "doctor: missing command: $required ($name)"
+                (( ++issues ))
+            fi
+        done
+    fi
     registry=${_ms_mod_dir[$name]}/zsh.plugins
     [[ -r $registry ]] || continue
     while IFS= read -r line || [[ -n $line ]]; do
@@ -141,20 +145,22 @@ for name in "${_ms_mod_names[@]}"; do
         [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
         plugin_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${reply[2]}@${reply[4]}
         if [[ ! -d $plugin_dir/.git ]] || [[ $(command git -C "$plugin_dir" rev-parse HEAD 2>/dev/null) != ${reply[4]} ]]; then
-            print -r -- "doctor: missing plugin or incorrect pin: ${reply[2]}"
+            print -r -- "doctor: missing plugin or incorrect pin: ${reply[2]} (run marksharc update)"
             (( ++issues ))
         fi
     done < "$registry"
 done
 budget=${_ms_cfg_set[doctor.startup_ms]-500}
 [[ $budget == <-> ]] || budget=500
+timeout_ms=${_ms_cfg_set[doctor.startup_timeout_ms]-5000}
+[[ $timeout_ms == <1-> ]] || timeout_ms=5000
 if zmodload zsh/datetime 2>/dev/null && zmodload zsh/zpty 2>/dev/null && zmodload zsh/zselect 2>/dev/null; then
     started=$EPOCHREALTIME
     output=
     # A PTY makes the child an eligible interactive session. The marker also
     # verifies its session class and exit status; never launch notify from timing.
     if zpty -b msdoctor "unset CLAUDECODE AI_AGENT CODEX_SESSION_ID CODEX_SANDBOX OPENCODE GEMINI_CLI CURSOR_AGENT COPILOT_CLI KILO_CLI_MODE VSCODE_INJECTION VSCODE_NONCE; MARKSHARC_NOTIFY=0 zsh -ic '[[ \$MARKSHARC_SESSION == interactive ]] && print -r -- __MS_INTERACTIVE_OK__'; print -r -- __MS_CHILD_STATUS__\$?"; then
-        while (( EPOCHREALTIME - started < 5 )); do
+        while (( (EPOCHREALTIME - started) * 1000 < timeout_ms )); do
             while zpty -r -t msdoctor chunk 2>/dev/null; do output+=$chunk; done
             [[ $output == *__MS_CHILD_STATUS__* ]] && break
             zpty -t msdoctor || break
@@ -164,8 +170,11 @@ if zmodload zsh/datetime 2>/dev/null && zmodload zsh/zpty 2>/dev/null && zmodloa
         zpty -d msdoctor 2>/dev/null
     fi
     elapsed=$(( (EPOCHREALTIME - started) * 1000 ))
-    if [[ $output != *__MS_INTERACTIVE_OK__* || $output != *__MS_CHILD_STATUS__0* ]]; then
-        print -r -- 'doctor: interactive startup failed or timed out'
+    if [[ $output != *__MS_CHILD_STATUS__* ]] && (( elapsed >= timeout_ms )); then
+        print -r -- "doctor: interactive startup timed out after $timeout_ms ms"
+        (( ++issues ))
+    elif [[ $output != *__MS_INTERACTIVE_OK__* || $output != *__MS_CHILD_STATUS__0* ]]; then
+        print -r -- 'doctor: interactive startup failed'
         (( ++issues ))
     elif (( elapsed > budget )); then
         printf 'doctor: startup budget exceeded: %.1f ms (budget %s ms)\n' "$elapsed" "$budget"

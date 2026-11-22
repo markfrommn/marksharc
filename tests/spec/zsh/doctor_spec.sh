@@ -3,12 +3,26 @@ Describe 'marksharc doctor'
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
     ms_mod needs-tool module.conf $'describe "fixture"\nrequires command marksharc-no-such-command'
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    print -r -- 'module needs-tool' > "$XDG_CONFIG_HOME/marksharc/config.conf"
     ms_env
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
-    [[ $(<"$TEST_ROOT/out") == *'marksharc-no-such-command'* ]]
+    [[ $(<"$TEST_ROOT/out") == *'missing command: marksharc-no-such-command (needs-tool)'* ]]
   }
-  It 'reports missing commands for enabled modules'
+  It 'reports missing commands for modules the overlay enables explicitly'
     When run missing_command_case
+    The status should be success
+  End
+  optional_command_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_mod needs-tool module.conf $'describe "fixture"\nrequires command marksharc-no-such-command'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'marksharc-no-such-command'* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'treats requires command as a load condition for modules enabled by default'
+    When run optional_command_case
     The status should be success
   End
   missing_stub_case() {
@@ -85,7 +99,7 @@ Describe 'marksharc doctor'
     ms_mod sample zsh.plugins 'plugin sample /not-used abc shell zsh kind source'
     ms_env
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
-    [[ $(<"$TEST_ROOT/out") == *'missing plugin'*sample* ]]
+    [[ $(<"$TEST_ROOT/out") == *'missing plugin'*sample*'(run marksharc update)'* ]]
   }
   It 'reports a missing enabled-module plugin clone'
     When run plugin_missing_case
@@ -189,6 +203,21 @@ Describe 'marksharc doctor'
   }
   It 'reports a failed eligible interactive startup instead of a healthy time'
     When run timing_failure_case
+    The status should be success
+  End
+  timing_timeout_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_mod slow module.conf 'describe slow'
+    ms_mod slow init.zsh 'sleep 3'
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    print -r -- 'set doctor.startup_timeout_ms 300' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *'interactive startup timed out after 300 ms'* && $(<"$TEST_ROOT/out") != *'startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'reports a startup that outlives the timeout as timed out, not failed'
+    When run timing_timeout_case
     The status should be success
   End
   timing_notify_case() {

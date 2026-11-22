@@ -361,7 +361,7 @@ The builder records the entries it manages. On reload it drops managed directori
 
 ### 6.8 Plugins
 
-There is no plugin manager. A `plugin` directive names a git URL and a commit. `marksharc update` clones or checks out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`. A missing clone is skipped silently and reported by `doctor`. The plugin loader never touches the network; the separate notify fetch is the exception described in 6.14.
+There is no plugin manager. A `plugin` directive names a git URL and a commit. `install.sh` and `marksharc update` clone or check out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`. A missing clone is skipped silently and reported by `doctor`. The plugin loader never touches the network; the separate notify fetch is the exception described in 6.14.
 
 The same directive serves fish: the fish loader adds the plugin's `functions` and `completions` directories and sources its `conf.d` files. This replaces fisher for the plugins marksharc depends on.
 
@@ -435,11 +435,11 @@ A host has two checkouts: the framework and the overlay (plus any private module
 
 | Command | Purpose |
 |---|---|
-| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up and write the stubs, render. |
+| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up and write the stubs, fetch the plugin pins (`--no-plugins` skips; a failed fetch warns and leaves the install in place), render. |
 | `marksharc bootstrap` | Install packages declared by enabled modules and overlay bundles. Generates a Brewfile for Homebrew on macOS and Linux; prints and confirms apt or dnf commands that need sudo. |
 | `marksharc update` | One updater: sync, plugin pins, then each module's `update` steps (brew, codex, codegraph, collie, herdr-core, …). `--list`, `--only <label>`, `--dry-run`. Replaces `bin/do_updates.sh` and all startup-time pulls. |
 | `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |
-| `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for enabled modules, plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
+| `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
 

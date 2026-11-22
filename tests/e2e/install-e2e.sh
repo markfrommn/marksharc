@@ -46,12 +46,12 @@ exercise() {
   case $pass in
     checkout)
       fw=$checkout
-      clean_env sh "$checkout/install.sh" --home "$checkout" > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh failed"; }
+      clean_env sh "$checkout/install.sh" --home "$checkout" --no-plugins > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh failed"; }
       ;;
     clone)
       fw=$home/.local/share/marksharc
       # The installer is piped in and run from a directory that is not a checkout.
-      (cd "$work/$pass/cwd" && clean_env MARKSHARC_REPO="$checkout" sh < "$checkout/install.sh") > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "piped install.sh failed"; }
+      (cd "$work/$pass/cwd" && clean_env MARKSHARC_REPO="$checkout" sh -s -- --no-plugins < "$checkout/install.sh") > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "piped install.sh failed"; }
       [ -d "$fw/.git" ] && [ -r "$fw/core/zsh/zshenv.zsh" ] || fail "the installer did not clone the framework into $fw"
       grep -q '^framework_cloned=1$' "$home/.local/state/marksharc/install.manifest" || fail "the manifest does not record the clone"
       ;;

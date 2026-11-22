@@ -52,6 +52,10 @@ What it does:
   `~/.zlogout` into `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
   (symlinks are recorded by target), and writes a small `~/.zshenv` stub. If the core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
+- **Plugins.** Clones the pinned plugins (fzf-tab) into
+  `${XDG_CACHE_HOME:-~/.cache}/marksharc/plugins/`. Shell startup never fetches them. A
+  failed fetch, when offline for example, leaves the install in place with a warning;
+  `marksharc update` fetches them later. `--no-plugins` skips this step.
 - **Login shell.** It never runs `chsh`; it prints the command when your login shell is not zsh.
 
 `sh install.sh --dry-run` prints every action and changes nothing. Running the installer
@@ -83,7 +87,14 @@ paths in `config.conf`, quoting paths that contain spaces:
 set sync.repos "$HOME/work/one" "$HOME/work/two"
 set sync.check_hours 12
 set doctor.startup_ms 500
+set doctor.startup_timeout_ms 5000
 ```
+
+`doctor` times an interactive startup against `doctor.startup_ms` and gives up after
+`doctor.startup_timeout_ms`, reporting the startup as timed out. It reports a missing
+`requires command` only for a module that the overlay names with a `module <name>` line (in `config.conf`
+or `hosts/<host>.conf`);
+a module enabled by default skips itself when its command is absent.
 
 An assignment in `hosts/<hostname>.conf` replaces the global `sync.repos` list.
 

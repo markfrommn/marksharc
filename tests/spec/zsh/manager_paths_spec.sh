@@ -282,6 +282,33 @@ DATA
     When run nvm_hook_case
     The status should be success
   End
+  lazy_case() {
+    emulate -L zsh
+    hook_fixture
+    mkdir -p "$HOME/.nvm" "$HOME/.gvm/scripts" "$HOME/.gvm/gos/go1.27/bin"
+    printf '#!/bin/sh\n' > "$HOME/.gvm/gos/go1.27/bin/go"; chmod +x "$HOME/.gvm/gos/go1.27/bin/go"
+    cat > "$HOME/.nvm/nvm.sh" <<'DATA'
+print -r -- "nvm.sh sourced $*" >> "$OPLOG"
+nvm() { print -r -- "nvm $*" >> "$OPLOG"; }
+DATA
+    cat > "$HOME/.gvm/scripts/gvm" <<'DATA'
+print -r -- "gvm sourced" >> "$OPLOG"
+export GVM_VERSION=stub
+gvm() { print -r -- "gvm $*" >> "$OPLOG"; }
+DATA
+    # Startup and a directory change with no .nvmrc or go.mod load neither manager.
+    ms_pty -dic 'cd "$HOME/project"; cd "$HOME"; print "READY GOPATH=$GOPATH NAME=$gvm_go_name"' || return 1
+    [[ $(<"$TEST_ROOT/out") == *"READY GOPATH=$HOME/.gvm/pkgsets/go1.27/global NAME=go1.27"* ]] || { cat "$TEST_ROOT/out"; return 2; }
+    [[ ! -s $OPLOG ]] || { cat "$OPLOG"; return 3; }
+    # The first call loads each one once (nvm without switching node) and runs the command.
+    ms_pty -dic 'nvm ls; nvm current; gvm list; gvm list; print READY' || return 4
+    [[ $(<"$TEST_ROOT/out") == *READY* ]] || { cat "$TEST_ROOT/out"; return 5; }
+    [[ $(<"$OPLOG") == $'nvm.sh sourced --no-use\nnvm ls\nnvm current\ngvm sourced\ngvm list\ngvm list' ]] || { cat "$OPLOG"; return 6; }
+  }
+  It 'loads nvm and gvm on first use, not at startup or on a plain cd'
+    When run lazy_case
+    The status should be success
+  End
   gvm_hook_case() {
     emulate -L zsh
     hook_fixture
@@ -293,19 +320,23 @@ export GVM_VERSION=stub
 gvm() {
   case $1 in
     list) print '   go1.26'; print '=> go1.27' ;;
-    use) print "gvm $*" >> "$OPLOG" ;;
+    use) export gvm_go_name=$2; print "gvm $*" >> "$OPLOG" ;;
   esac
   return 0
 }
+# Like gvm-default: sourcing ends in cd ., which fires the chpwd hooks.
+cd .
 DATA
     print 'go 1.26' > "$HOME/gomod/go.mod"
-    # Startup activates the newest Go once; entering a go.mod directory switches to its version.
-    ms_pty -dic 'cd "$HOME/gomod"; print READY' || return 1
-    [[ $(<"$TEST_ROOT/out") == *READY* ]] || { cat "$TEST_ROOT/out"; return 2; }
-    [[ $(grep -c '^gvm use go1.27$' "$OPLOG") == 1 && $(grep -c '^gvm use go1.26$' "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 3; }
+    # Startup names the newest Go without running gvm; entering a go.mod directory loads gvm
+    # and switches to its version, once.
+    # Loading gvm leaves cd - (OLDPWD) as the user's own cds set it.
+    ms_pty -dic 'print "NAME=$gvm_go_name"; cd "$HOME/project"; cd "$HOME/gomod"; print "OLD=$OLDPWD"; cd .; print READY' || return 1
+    [[ $(<"$TEST_ROOT/out") == *NAME=go1.27*"OLD=$HOME/project"*READY* ]] || { cat "$TEST_ROOT/out"; return 2; }
+    [[ $(grep -c '^gvm use go1.27$' "$OPLOG") == 0 && $(grep -c '^gvm use go1.26$' "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 3; }
     [[ ! -e $HOME/.gvm/environments/default ]]
   }
-  It 'switches Go from go.mod on cd after activating gvm once without --default'
+  It 'switches Go from go.mod on cd, loading gvm only then and without --default'
     When run gvm_hook_case
     The status should be success
   End

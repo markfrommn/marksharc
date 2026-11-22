@@ -62,12 +62,17 @@ DATA
   interactive_gvm_case() {
     emulate -L zsh
     real_tree_fixture
-    ms_pty -dic 'print READY' || return 1
-    [[ $(<"$TEST_ROOT/out") == READY ]] || { print -r -- "OUT=[$(<$TEST_ROOT/out)]"; return 2; }
-    [[ $(grep -c '^GVM_SOURCED$' "$OPLOG") == 1 && $(grep -c '^gvm use go1.26$' "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 3; }
-    [[ ! -e $HOME/.gvm/environments/default ]] || return 4
+    # Startup names the selected Go without sourcing gvm or running go.
+    ms_pty -dic 'print READY $gvm_go_name' || return 1
+    [[ $(<"$TEST_ROOT/out") == 'READY go1.26' ]] || { print -r -- "OUT=[$(<$TEST_ROOT/out)]"; return 2; }
+    ! grep -Eq '^(GVM_SOURCED|gvm |go )' "$OPLOG" || { cat "$OPLOG"; return 3; }
+    # The first gvm call sources it once, quietly; the selected Go needs no gvm use.
+    ms_pty -dic 'gvm list >/dev/null; gvm list >/dev/null; print READY' || return 4
+    [[ $(<"$TEST_ROOT/out") == READY ]] || { print -r -- "OUT=[$(<$TEST_ROOT/out)]"; return 5; }
+    [[ $(grep -c '^GVM_SOURCED$' "$OPLOG") == 1 && $(grep -c '^gvm use' "$OPLOG") == 0 ]] || { cat "$OPLOG"; return 6; }
+    [[ ! -e $HOME/.gvm/environments/default ]] || return 7
   }
-  It 'activates gvm once in an interactive shell without output and without --default'
+  It 'loads gvm once on first use in an interactive shell, without output and without --default'
     When run interactive_gvm_case
     The status should be success
   End
