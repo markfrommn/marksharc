@@ -64,19 +64,28 @@ Describe 'sync notification'
     The status should be success
   End
 
-  stale_lock_case() {
+  killed_lock_case() {
+    unsetopt bg_nice
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
     local dir=$XDG_CACHE_HOME/marksharc/testhost/sync
-    mkdir -p "$dir/lock" "$TEST_ROOT/empty-zdot"
-    print -r -- 99999999 > "$dir/lock/pid"
-    touch -t 200001010000 "$dir/lock"
+    mkdir -p "$dir" "$TEST_ROOT/empty-zdot"
+    : > "$dir/notify.lock"
+    /bin/zsh -f -c 'zmodload zsh/system zsh/zselect; zsystem flock -t 0 -f fd "$1" || exit 1; print ready > "$2"; while :; do zselect -t 100; done' -- "$dir/notify.lock" "$TEST_ROOT/ready" </dev/null >/dev/null 2>&1 &
+    local holder=$! i result=0
+    for (( i=0; i<100; i++ )); do [[ -f $TEST_ROOT/ready ]] && break; sleep 0.05; done
+    [[ -f $TEST_ROOT/ready ]] || result=1
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" notify --check || return 1
-    [[ -f $dir/status && ! -d $dir/lock ]]
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" notify --check || result=2
+    [[ ! -e $dir/status ]] || result=3
+    kill -KILL "$holder" 2>/dev/null
+    wait "$holder" 2>/dev/null
+    (( result == 0 )) || return $result
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" notify --check || return 4
+    [[ -f $dir/status ]]
   }
-  It 'recovers an old lock owned by a dead worker'
-    When run stale_lock_case
+  It 'excludes a live lock holder and recovers after it is killed'
+    When run killed_lock_case
     The status should be success
   End
   stale_notice_case() {

@@ -7,30 +7,11 @@ config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 host=${MARKSHARC_HOST:-${HOST%%.*}}
 dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/$host/sync
 command mkdir -p -- "$dir" || exit 1
-if ! command mkdir -- "$dir/lock" 2>/dev/null; then
-    # A dead worker may leave a lock after SIGKILL or reboot. Reap only an old
-    # directory whose recorded owner is gone; a nested mkdir serializes reapers.
-    zmodload -F zsh/stat b:zstat 2>/dev/null || exit 0
-    typeset -A lock_before lock_after
-    zstat -H lock_before -- "$dir/lock" 2>/dev/null || exit 0
-    now=$(command date +%s) || exit 0
-    (( now - lock_before[mtime] >= 900 )) || exit 0
-    command mkdir -- "$dir/lock/reap" 2>/dev/null || exit 0
-    zstat -H lock_after -- "$dir/lock" 2>/dev/null || exit 0
-    owner=
-    [[ -r $dir/lock/pid ]] && IFS= read -r owner < "$dir/lock/pid"
-    if [[ ${lock_before[inode]} == ${lock_after[inode]} ]] && { [[ $owner != <-> ]] || ! kill -0 "$owner" 2>/dev/null; }; then
-        command rm -f -- "$dir/lock/pid"
-        command rmdir -- "$dir/lock/reap" "$dir/lock" 2>/dev/null || exit 0
-        command mkdir -- "$dir/lock" 2>/dev/null || exit 0
-    else
-        command rmdir -- "$dir/lock/reap" 2>/dev/null
-        exit 0
-    fi
-fi
-print -r -- $$ > "$dir/lock/pid" || exit 1
-trap 'command rm -f -- "$dir/lock/pid"; command rmdir -- "$dir/lock" 2>/dev/null' EXIT
-trap 'exit 1' HUP INT TERM
+# Keep a stable inode: fcntl releases the advisory lock when this worker exits,
+# including SIGKILL or reboot. Never unlink it while another worker may use it.
+zmodload zsh/system 2>/dev/null || exit 0
+: >> "$dir/notify.lock" || exit 1
+zsystem flock -t 0 -f lockfd "$dir/notify.lock" 2>/dev/null || exit 0
 source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 _ms_config_load
 hours=${_ms_cfg_set[sync.check_hours]-12}
