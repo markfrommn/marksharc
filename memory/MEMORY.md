@@ -20,4 +20,3 @@ note and keep bullets under 600 characters
 
 ## Index
 
-- [perl-mdf-root-move](perl-mdf-root-move.md) — move-unit perl one-liners: `\Q$MDF_ROOT\E` interpolates to an empty pattern and shreds files; escape the `$`, re-copy fresh, then grep for leftovers and `config/zsh` hand-edit cases. Retire when DEV-43/DEV-44 are merged.
