@@ -2,6 +2,8 @@
 # Loaded by ShellSpec (see tests/.shellspec) from the tests directory.
 # shellcheck source=tests/spec/support/fixtures.sh
 . ./spec/support/fixtures.sh
+# shellcheck source=tests/spec/support/installer.sh
+. ./spec/support/installer.sh
 # zsh-only core-loader helpers (not POSIX; only the zsh suites may see them).
 if [ -n "${ZSH_VERSION:-}" ]; then
   . ./spec/support/core.zsh
