@@ -6,6 +6,8 @@ Describe 'install end to end'
     PATH="/usr/bin:/bin:/usr/sbin:/sbin:$(dirname "$REAL_GIT"):$(dirname "$PYTHON")" \
       "$MARKSHARC_ROOT/tests/e2e/install-e2e.sh" "$MARKSHARC_ROOT" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null || { cat "$TEST_ROOT/out" "$TEST_ROOT/err"; return 1; }
     grep -q '^e2e: ok$' "$TEST_ROOT/out" || { cat "$TEST_ROOT/out"; return 2; }
+    # both README paths ran: --home from a checkout, and the piped installer that clones
+    grep -q '^e2e: \[checkout\] uninstall$' "$TEST_ROOT/out" && grep -q '^e2e: \[clone\] uninstall$' "$TEST_ROOT/out" || { cat "$TEST_ROOT/out"; return 4; }
     [ ! -s "$TEST_ROOT/err" ] || { cat "$TEST_ROOT/err"; return 3; }
   }
   It 'installs this checkout into a fresh HOME, starts login and interactive shells, and uninstalls'
