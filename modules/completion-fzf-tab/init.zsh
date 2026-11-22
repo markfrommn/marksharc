@@ -5,11 +5,11 @@ if have_command ag; then
     export FZF_DEFAULT_COMMAND='ag --hidden -g ""'
 fi
 
-typeset _ms_registry=${_ms_mod_dir[completion-fzf-tab]:-$MARKSHARC_HOME/modules/completion-fzf-tab}/zsh.plugins
+typeset -g _ms_registry=${_ms_mod_dir[completion-fzf-tab]:-$MARKSHARC_HOME/modules/completion-fzf-tab}/zsh.plugins
 if (( ! ${_ms_reloading:-0} )) && [[ -r $_ms_registry ]]; then
-    typeset _ms_pline _ms_pkind
-    typeset -a _ms_pwords
-    integer _ms_pi
+    typeset -g _ms_pline _ms_pkind
+    typeset -ga _ms_pwords
+    integer -g _ms_pi
     while IFS= read -r _ms_pline || [[ -n $_ms_pline ]]; do
         _ms_pline=${_ms_pline#"${_ms_pline%%[![:space:]]*}"}
         [[ -z ${_ms_pline//[[:space:]]/} || ${_ms_pline[1]} == \# ]] && continue

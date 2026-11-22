@@ -1,0 +1,7 @@
+#!/usr/bin/env zsh
+# marksharc reload, run as a program. A child process cannot reload its parent shell, so
+# the real command is the marksharc function of an interactive marksharc shell
+# (core/zsh/zshrc.zsh). This explains that and fails.
+
+print -ru2 -- "marksharc: reload acts on the current shell, so run it in an interactive marksharc shell, where marksharc is a shell function; a program cannot reload its parent shell. Open a new terminal if this one is not a marksharc shell."
+exit 1

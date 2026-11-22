@@ -5,7 +5,8 @@ ms_fixture() {
   MS_HOME="$TEST_ROOT/ms"; export MS_HOME
   mkdir -p "$MS_HOME/modules"
   cp -R "$MARKSHARC_ROOT/core" "$MS_HOME/core"
-  # The installer's stub ships with P2.4; specs use this generated equivalent.
+  # A hand-written equivalent of the installer's stub (no fallback). The real stub is covered by
+  # spec/install and spec/zsh/fallback_spec.sh.
   print -r -- "export MARKSHARC_HOME=\"$MS_HOME\"
 source \"\$MARKSHARC_HOME/core/zsh/zshenv.zsh\"" > "$HOME/.zshenv"
 }

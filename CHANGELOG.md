@@ -15,6 +15,12 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Installer and command: `install.sh` (`--home`, `--overlay`, `--dry-run`; backs up
+  the HOME zsh dotfiles with a manifest, writes the `~/.zshenv` stub with a
+  minimal-PATH fallback, safe to re-run), `bin/marksharc` (`reload`,
+  `module list|enable|disable`, `uninstall [--purge]`, `version`), the overlay
+  template in `templates/overlay/`, and an install end-to-end CI job on macOS and
+  Ubuntu (`tests/e2e/install-e2e.sh`).
 - Repository layout from the specification (`core/`, `modules/`,
   `templates/overlay/`, `tests/`, `docs/`, `specs/`, `memory/`).
 - ShellSpec test harness with a pinned runner, per-example sandbox and smoke specs.

@@ -7,10 +7,10 @@
 # (seen on ubuntu-latest CI) must not be trusted.
 autoload -Uz compinit
 if (( ! ${_ms_reloading:-0} )); then
-    typeset _ms_cache="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}"
-    typeset _ms_dump="$_ms_cache/zcompdump"
-    typeset _ms_fpath="$_ms_dump.fpath"
-    typeset _ms_fpath_value="${(j.:.)fpath}"
+    typeset -g _ms_cache="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}"
+    typeset -g _ms_dump="$_ms_cache/zcompdump"
+    typeset -g _ms_fpath="$_ms_dump.fpath"
+    typeset -g _ms_fpath_value="${(j.:.)fpath}"
     mkdir -p "$_ms_cache"
     if [[ ! -f $_ms_dump || ! -r $_ms_fpath || "$(<"$_ms_fpath")" != "$_ms_fpath_value" ]]; then
         rm -f -- "$_ms_dump"
@@ -75,9 +75,9 @@ zstyle ':completion:*:processes-names' command 'ps axho command'
 
 # Host completion from /etc/hosts, read with builtins: the host names (fields 2-5 of
 # active lines, minus the ip6- entries) and the names after "#%" in comment lines.
-typeset -a _ms_hosts=()
-typeset _ms_hline
-typeset -a _ms_hwords
+typeset -ga _ms_hosts=()
+typeset -g _ms_hline
+typeset -ga _ms_hwords
 if [[ -r /etc/hosts ]]; then
     while IFS= read -r _ms_hline || [[ -n $_ms_hline ]]; do
         if [[ $_ms_hline == '#%'* ]]; then

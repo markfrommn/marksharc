@@ -1,0 +1,176 @@
+#!/usr/bin/env zsh
+# marksharc uninstall [--purge] [--yes] (spec 6.15, design rule 8).
+#
+# Restores the dotfiles install.sh moved aside (from the install manifest), removes the
+# stub and the generated ZDOTDIR, and keeps the framework, the overlay and the caches.
+# --purge also deletes the cache and state directories and a framework clone the installer
+# made; it asks first (--yes answers for non-interactive use). The overlay is never
+# removed. Every check runs before the first change.
+#
+# The manifest is line-oriented key=value (see install.sh): file=<name>,
+# link=<name>=<target>, and single-valued keys.
+
+print_usage() {
+    print -ru2 -- "Usage: marksharc uninstall [--purge] [--yes]"
+    exit 2
+}
+die() { print -ru2 -- "marksharc uninstall: $*"; exit 1; }
+
+purge=0 yes=0
+for arg; do
+    case $arg in
+        --purge) purge=1 ;;
+        --yes|-y) yes=1 ;;
+        -h|--help) print -r -- "Usage: marksharc uninstall [--purge] [--yes]"; exit 0 ;;
+        *) print_usage ;;
+    esac
+done
+
+manifest=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/install.manifest
+[[ -r $manifest ]] || die "nothing to uninstall: no install manifest at $manifest (looked under XDG_STATE_HOME=${XDG_STATE_HOME:-unset, so ~/.local/state}; if you installed with another XDG_STATE_HOME, export it and run this again)"
+
+typeset -A mf
+typeset -a files=() linknames=() linktargets=()
+while IFS= read -r line || [[ -n $line ]]; do
+    [[ -z $line || $line == '#'* || $line != *=* ]] && continue
+    key=${line%%=*}
+    val=${line#*=}
+    case $key in
+        file) files+=( "$val" ) ;;
+        link) linknames+=( "${val%%=*}" ); linktargets+=( "${val#*=}" ) ;;
+        *) mf[$key]=$val ;;
+    esac
+done < "$manifest"
+
+[[ ${mf[version]-} == 1 ]] || die "unsupported manifest version in $manifest"
+[[ ${mf[home]-} == "$HOME" ]] || die "the manifest is for HOME ${mf[home]-unknown}, not $HOME"
+
+stub=$HOME/.zshenv
+stub_mark='# marksharc: managed stub'
+stub_is_ours() {
+    local first
+    [[ -f $stub && ! -L $stub ]] || return 1
+    IFS= read -r first < "$stub" || :
+    [[ $first == "$stub_mark"* ]]
+}
+
+typeset -a problems=()
+backup=${mf[backup]-}
+typeset -a names=( $files $linknames )
+for name in $names; do
+    [[ $name == (.zshenv|.zshrc|.zprofile|.zlogin|.zlogout) ]] || problems+=( "the manifest names an unexpected file: $name" )
+done
+for name in $files; do
+    [[ -n $backup && -f $backup/$name ]] || problems+=( "the backup copy of $name is missing (looked in ${backup:-no backup directory})" )
+done
+for name in $names; do
+    if [[ -e $HOME/$name || -L $HOME/$name ]]; then
+        if [[ $name == .zshenv ]] && stub_is_ours; then continue; fi
+        problems+=( "$HOME/$name exists and is not the marksharc stub; move it aside so the original can be restored" )
+    fi
+done
+
+# Purge targets: only directories that are plainly marksharc's, and never the overlay.
+typeset -a purge_targets=()
+if (( purge )); then
+    cfg=${mf[config]:A}
+    for kind in cache state; do
+        dir=${mf[$kind]-}
+        if [[ $dir == /* && ${dir:t} == marksharc && $dir != "$HOME" && $dir != / ]]; then
+            purge_targets+=( "$dir" )
+        else
+            problems+=( "refusing to purge $kind directory '$dir': not an absolute path ending in /marksharc" )
+        fi
+    done
+    if [[ ${mf[framework_cloned]-0} == 1 ]]; then
+        dir=${mf[framework]-}
+        if [[ $dir == /* && ${dir:t} == marksharc && $dir != "$HOME" && -d $dir/.git && -r $dir/core/zsh/zshenv.zsh ]]; then
+            purge_targets+=( "$dir" )
+        else
+            problems+=( "refusing to delete the framework clone '$dir': not a git checkout named marksharc" )
+        fi
+    fi
+    for dir in $purge_targets; do
+        if [[ $cfg == "${dir:A}" || $cfg == "${dir:A}"/* || ${dir:A} == "$cfg"/* ]]; then
+            problems+=( "refusing to purge $dir: it holds or sits inside the overlay $cfg" )
+        fi
+    done
+    if (( ! yes )) && [[ ! -t 0 ]]; then
+        problems+=( "--purge deletes files and needs confirmation: run it in a terminal, or pass --yes" )
+    fi
+fi
+
+if (( ${#problems} )); then
+    print -ru2 -- "marksharc uninstall: nothing was changed. Fix the following and run it again:"
+    print -ru2 -- "  - ${(pj:\n  - :)problems}"
+    exit 1
+fi
+
+if (( purge && ! yes )); then
+    print -r -- "This will delete:"
+    for dir in $purge_targets; do print -r -- "  $dir"; done
+    print -r -- "Your overlay (${mf[config]}) is kept."
+    print -rn -- "Type 'yes' to continue: "
+    read -r answer || answer=
+    [[ $answer == yes ]] || { print -r -- "Aborted; nothing was changed."; exit 1; }
+fi
+
+# --- act -------------------------------------------------------------------------
+if stub_is_ours; then
+    # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
+    # file. The fingerprint recorded at install time tells an edit from the stub as written.
+    cur=$(command cksum < "$stub")
+    cur=${(j: :)${=cur}}
+    if [[ $cur != "${mf[stub_sum]-}" ]]; then
+        saved=$HOME/.zshenv.marksharc-removed
+        [[ -e $saved || -L $saved ]] && saved=$saved.$$
+        command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
+        print -r -- "marksharc: the stub had been edited; your copy is in $saved (merge any lines you still need)."
+    fi
+    command rm -f -- "$stub"
+fi
+restored=()
+for name in $files; do
+    command cp -p -- "$backup/$name" "$HOME/$name" || die "could not restore $HOME/$name (the backup is in $backup)"
+    restored+=( $name )
+done
+integer i
+for (( i = 1; i <= ${#linknames}; i++ )); do
+    command ln -s -- "${linktargets[i]}" "$HOME/${linknames[i]}" || die "could not restore the link $HOME/${linknames[i]}"
+    restored+=( "${linknames[i]}" )
+done
+state=${mf[state]-}
+[[ ${state:t} == marksharc ]] && command rm -rf -- "$state/zdot"
+(( purge )) || command mv -f -- "$manifest" "$manifest.restored"
+
+if (( purge )); then
+    # Copies of hand-edited stubs that install re-runs kept in the state directory would go with
+    # it: move them next to the restored files first.
+    for saved in "$state"/replaced/*(N.); do
+        dest=$HOME/.zshenv.marksharc-replaced.${${saved:t}#zshenv.}
+        [[ -e $dest || -L $dest ]] && dest=$dest.$$
+        command cp -p -- "$saved" "$dest" || die "could not keep $saved; the purge was not carried out"
+        print -r -- "marksharc: kept an earlier edited stub as $dest (merge any lines you still need)."
+    done
+    for dir in $purge_targets; do command rm -rf -- "$dir"; done
+fi
+
+print -r -- "marksharc: uninstalled. Restored: ${restored:-nothing to restore}. Removed the stub and the generated zsh startup files."
+[[ -e $stub || -L $stub ]] && (( ${restored[(Ie).zshenv]} == 0 )) && print -r -- "marksharc: left $stub alone (it is not a marksharc stub)."
+if (( purge )); then
+    print -r -- "marksharc: removed ${(j:, :)purge_targets}."
+    [[ ${mf[framework_cloned]-0} == 1 ]] || print -r -- "marksharc: kept the framework checkout ${mf[framework]} (not created by the installer)."
+    print -r -- "marksharc: kept your overlay ${mf[config]}; remove it yourself if you no longer want it."
+else
+    print -r -- "marksharc: kept, so you can remove them yourself:"
+    if [[ ${mf[framework_cloned]-0} == 1 ]]; then
+        print -r -- "  framework  ${mf[framework]}    (rm -rf)"
+    else
+        print -r -- "  framework  ${mf[framework]}    (a checkout you provided; remove it as you remove any repository)"
+    fi
+    print -r -- "  overlay    ${mf[config]}    (your configuration; marksharc never removes it)"
+    print -r -- "  cache      ${mf[cache]}    (rm -rf)"
+    print -r -- "  state      ${mf[state]}    (backup of the replaced files; rm -rf)"
+    print -r -- "  Or run: marksharc uninstall --purge   (cache, state and an installer-made clone)"
+fi
+print -r -- "Open a new terminal to get the restored shell configuration."

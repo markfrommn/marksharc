@@ -2,7 +2,7 @@
 # options live in the nav module.
 
 # The prompt is rebuilt by starship each time; keep PS1 out of children.
-typeset +x PS1
+typeset -g +x PS1
 
 # If terminal is xterm set xterm color
 if [[ $TERM == xterm ]]; then

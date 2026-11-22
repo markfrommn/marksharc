@@ -1,0 +1,14 @@
+#!/usr/bin/env zsh
+# marksharc version: the VERSION file, plus the git description when the framework is a
+# git checkout.
+
+# The checkout this file belongs to, whatever the environment says (the ~/.zshenv stub of
+# another checkout may have set MARKSHARC_HOME).
+MARKSHARC_HOME=${${(%):-%x}:A:h:h:h}
+version=unknown
+[[ -r $MARKSHARC_HOME/VERSION ]] && read -r version < "$MARKSHARC_HOME/VERSION"
+desc=
+if [[ -e $MARKSHARC_HOME/.git ]] && (( $+commands[git] )); then
+    desc=$(command git -C "$MARKSHARC_HOME" describe --tags --always --dirty 2>/dev/null)
+fi
+print -r -- "marksharc $version${desc:+ ($desc)}"

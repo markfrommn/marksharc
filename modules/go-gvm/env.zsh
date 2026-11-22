@@ -73,7 +73,7 @@ _ms_gvm_finalize() {
 
 if (( ${_ms_env_rebuild:-1} )); then
     if (( ${+functions[_ms_path_add]} )) && _ms_gvm_select; then
-        typeset _ms_gvm_root=${GVM_ROOT:-$HOME/.gvm} _ms_gvm_name=$REPLY
+        typeset -g _ms_gvm_root=${GVM_ROOT:-$HOME/.gvm} _ms_gvm_name=$REPLY
         if [[ $MARKSHARC_SESSION == interactive ]]; then
             # An interactive gvm activation sets GOPATH to the pkgset, so go install writes to
             # its global/bin, which gvm puts on PATH before it exists: add it unchecked, with

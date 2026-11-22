@@ -147,6 +147,8 @@ _ms_path_contribute() {
     _ms_path_add system /sbin /usr/sbin
     _ms_path_add_bindirs local /usr/local /opt
     _ms_path_add_bindirs user "$HOME" "$HOME/.local" "$HOME/usr/local"
+    # The marksharc command, in every session class (spec 6.2).
+    _ms_path_add user "$MARKSHARC_HOME/bin"
 }
 
 # Finalizer: late contributions (directories that have no module of their own and must

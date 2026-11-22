@@ -495,6 +495,13 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 
 - A clean macOS account or Linux container reaches a working shell with the template overlay from the README command.
 
+**Outcome:** Delivered in [PR #4](https://github.com/markfrommn/marksharc/pull/4), pending human review and merge; task plan [2026-11-21-dev-44-installer-stubs-cli-base.md](../docs/superpowers/plans/2026-11-21-dev-44-installer-stubs-cli-base.md).
+
+- **Installer and stub:** `install.sh` (POSIX sh) uses `--home`, else its own checkout, else clones into `${XDG_DATA_HOME:-~/.local/share}/marksharc` (`MARKSHARC_REPO` overrides the source). It moves all five HOME zsh dotfiles into a manifest-backed backup and writes a single `~/.zshenv` stub, which falls back to a minimal PATH and one stderr line when the core fails to load. It never runs `chsh`.
+- **CLI:** `marksharc` provides `version`, `module list|enable|disable` and `uninstall [--purge]`; `reload` is an interactive-shell function, so module file-scope declarations now use `-g` (spec 6.4). These installer choices were made by the operator in the phase session.
+- **Gates:** local gates on macOS: lint 66 files; zsh 331, contract 4, install 40, repo 26 examples, 0 failures.
+- **Day 0 verification:** `tests/e2e/install-e2e.sh` passes in a `debian:stable-slim` container for both the `--home` and the piped clone installs, and CI runs it on macOS and Ubuntu. The literal README `curl … | sh` command remains a manual check once the repository is public; it is private today.
+
 #### P2.5 — Sync and doctor (DEV-45)
 
 - **Repo:** marksharc
