@@ -195,7 +195,14 @@ _ms_bash_finish() {
         [[ -n $entry && $entry != . ]] || continue
         found=0
         for tier in "${_ms_first[@]}" "${main[@]}" "${_ms_last[@]}"; do [[ $entry != "$tier" ]] || found=1; done
-        if (( found )); then seen=1; elif (( seen )); then after+=("$entry"); else before+=("$entry"); fi
+        if (( found )); then
+            for tier in "${_ms_first[@]}"; do [[ $entry != "$tier" ]] || continue 2; done
+            seen=1
+        elif (( seen )); then
+            after+=("$entry")
+        else
+            before+=("$entry")
+        fi
     done
     result=()
     for entry in "${_ms_first[@]}" "${before[@]}" "${main[@]}" "${after[@]}" "${_ms_last[@]}"; do
@@ -220,5 +227,8 @@ _ms_bash_finish() {
             break
         done
     fi
-    case ${_ms_bash_agent_env-} in on|1|yes|true) export BASH_ENV=$MARKSHARC_HOME/core/bash/env.bash ;; esac
+    case ${_ms_bash_agent_env-} in
+        on|1|yes|true) export BASH_ENV=$MARKSHARC_HOME/core/bash/env.bash ;;
+        *) [[ ${BASH_ENV-} != "$MARKSHARC_HOME/core/bash/env.bash" ]] || unset BASH_ENV ;;
+    esac
 }

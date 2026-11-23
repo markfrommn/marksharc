@@ -349,7 +349,8 @@ Describe 'cross-shell contract: bash core'
   End
 
   inherited_case() {
-    mkdir -p "$HOME/.bun"
+    mkdir -p "$HOME/.bun" "$XDG_CONFIG_HOME/marksharc"
+    printf '%s\n' 'set agent.bash_env on' > "$XDG_CONFIG_HOME/marksharc/config.conf"
     env -i HOME="$HOME" PATH="$PATH" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
       BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" /bin/bash -c \
       'export PATH="$PATH:/manual"; export BUN_INSTALL=retained; CODEX_SESSION_ID=1 /bin/bash -c '\''[[ $PATH == *:/manual && $BUN_INSTALL == retained && $MARKSHARC_SESSION == agent ]]'\''' \
@@ -358,6 +359,59 @@ Describe 'cross-shell contract: bash core'
   }
   It 'preserves inherited environment while reclassifying a nonlogin child'
     When run inherited_case
+    The status should be success
+  End
+
+  git_worktree_options_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    printf '%s\n' 'set git-worktree.roots ~/repositories' 'set git-worktree.orgs alpha beta' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i HOME="$HOME" PATH="$PATH" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" /bin/bash -c \
+      'env | grep -Fx "_ms_opt_git_worktree_roots=$HOME/repositories" >/dev/null && env | grep -Fx "_ms_opt_git_worktree_orgs=alpha beta" >/dev/null' \
+      >"$TEST_ROOT/out" 2>"$TEST_ROOT/err" || return 1
+    [ ! -s "$TEST_ROOT/out" ] && [ ! -s "$TEST_ROOT/err" ]
+  }
+  It 'exports git-worktree options to child commands from Bash'
+    When run git_worktree_options_case
+    The status should be success
+  End
+
+  bash_hook_toggle_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    printf '%s\n' 'set agent.bash_env on' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    : > "$TEST_ROOT/foreign-hook"
+    env -i HOME="$HOME" PATH="$PATH" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      TEST_ROOT="$TEST_ROOT" BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" /bin/bash -c '
+        [ "$BASH_ENV" = "$MARKSHARC_HOME/core/bash/env.bash" ] || exit 1
+        sleep 1
+        printf "%s\n" "set agent.bash_env off" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+        source "$MARKSHARC_HOME/core/bash/env.bash"
+        [ -z "${BASH_ENV+x}" ] || exit 2
+        export BASH_ENV="$TEST_ROOT/foreign-hook"
+        source "$MARKSHARC_HOME/core/bash/env.bash"
+        [ "$BASH_ENV" = "$TEST_ROOT/foreign-hook" ] || exit 3
+      ' >"$TEST_ROOT/out" 2>"$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
+    [ ! -s "$TEST_ROOT/out" ] && [ ! -s "$TEST_ROOT/err" ]
+  }
+  It 'removes only the owned Bash hook when its option is switched off'
+    When run bash_hook_toggle_case
+    The status should be success
+  End
+
+  first_inherited_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/first" "$HOME/virtualenv" "$HOME/manager"
+    printf '%s\n' 'path first ~/first' 'path manager ~/manager' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    initial_path="$HOME/first:$HOME/virtualenv:/bin:/usr/bin"
+    env -i HOME="$HOME" PATH="$initial_path" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f -c \
+      'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh"; printf "%s\n" "$PATH"' >"$TEST_ROOT/zsh" || return 1
+    env -i HOME="$HOME" PATH="$initial_path" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" /bin/bash -c 'printf "%s\n" "$PATH"' >"$TEST_ROOT/bash" || return 2
+    case $(cat "$TEST_ROOT/bash") in "$HOME/first:$HOME/virtualenv:$HOME/manager:"*) ;; *) return 3 ;; esac
+    cmp -s "$TEST_ROOT/zsh" "$TEST_ROOT/bash"
+  }
+  It 'keeps inherited virtualenv entries between first and manager tiers'
+    When run first_inherited_case
     The status should be success
   End
 End
