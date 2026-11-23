@@ -135,7 +135,7 @@ Describe 'marksharc sync'
     chmod +x "$MS_HOME/core/cli/sync"
     ms_env
     env -i "${MS_ENV[@]}" MARKSHARC_HOME="$MS_HOME" /bin/zsh -f "$MS_HOME/core/cli/update" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
-    [[ $(<"$TEST_ROOT/out") == sync-ran ]]
+    [[ $(<"$TEST_ROOT/out") == *sync-ran* && $(<"$TEST_ROOT/out") == *'pins: ok'* ]]
     [[ -s $XDG_CACHE_HOME/marksharc/${HOST%%.*}/render-id ]]
   }
   It 'runs the sync and pin updater through the minimal update command'

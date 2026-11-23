@@ -3,9 +3,8 @@ Describe 'cloud module'
     emulate -L zsh
     printf '#!/bin/sh\nprintf "%%s\\n" "curl $*" >> "$OPLOG"\nexit 22\n' > "$TEST_ROOT/bin/curl"
     chmod +x "$TEST_ROOT/bin/curl"
-    load_mfn cloud install-krew
     local tmp="$TEST_ROOT/tmp"; mkdir -p "$tmp"
-    TMPDIR=$tmp install-krew > "$TEST_ROOT/out" 2>&1
+    TMPDIR=$tmp "$MARKSHARC_ROOT/modules/cloud/installers/krew" > "$TEST_ROOT/out" 2>&1
     [[ $? == 22 && $(<"$OPLOG") == 'curl -fsSLO https://github.com/kubernetes-sigs/krew/releases/latest/download/krew-'* ]] || return 1
     [[ -z $(print -l "$tmp"/*(N)) ]] || return 2
   }

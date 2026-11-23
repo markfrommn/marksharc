@@ -16,7 +16,10 @@ Commands:
   reload [--verbose]            reload the current shell (an interactive marksharc shell)
   render                        render declarative env and generated completions to the cache
   sync                          fast-forward configured checkouts and refresh plugin pins
-  update                        run sync and refresh plugin pins
+  bootstrap                     install declared packages after confirmation
+  update [--list|--dry-run] [--only <label>]
+                                sync, refresh pins, and run module updates
+  install <name>                run an explicitly registered installer
   doctor                        report installation and repository health
   module list                   list modules with their status
   module enable <name>          enable a module in the overlay's config.conf

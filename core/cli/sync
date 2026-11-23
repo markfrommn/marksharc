@@ -5,6 +5,7 @@ emulate -L zsh
 export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 typeset -a candidates=( "$MARKSHARC_HOME" "$config" )
+[[ ${MARKSHARC_SYNC_PART-} == pins ]] && candidates=()
 typeset -a extras=()
 source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 for conf in "$config/config.conf" "$config/hosts/${MARKSHARC_HOST:-${HOST%%.*}}.conf"; do
@@ -18,6 +19,7 @@ for conf in "$config/config.conf" "$config/hosts/${MARKSHARC_HOST:-${HOST%%.*}}.
 done
 integer failed=0
 for candidate in "${extras[@]}"; do
+    [[ ${MARKSHARC_SYNC_PART-} == pins ]] && continue
     if [[ ! -d $candidate ]] || ! command git -C "${candidate:A}" rev-parse --show-toplevel >/dev/null 2>&1; then
         print -r -- "sync: invalid repository: $candidate"
         failed=1
@@ -74,7 +76,7 @@ for root in "${roots[@]}"; do
     fi
 done
 plugin_functions=$MARKSHARC_HOME/modules/completion-fzf-tab/functions/zsh
-if [[ -r $plugin_functions/zsh-plugin-update ]]; then
+if [[ ${MARKSHARC_SYNC_PART-} != repositories && -r $plugin_functions/zsh-plugin-update ]]; then
     fpath=( "$plugin_functions" $fpath )
     autoload -Uz "$plugin_functions"/*(N-.:t)
     if ! zsh-plugin-update; then
@@ -92,7 +94,7 @@ if (( ! failed )); then
         print -r -- current > "$syncdir/status.tmp.$$" && command mv -f -- "$syncdir/status.tmp.$$" "$syncdir/status"
     fi
 fi
-if [[ -x $MARKSHARC_HOME/core/cli/doctor ]]; then
+if [[ ${MARKSHARC_SYNC_PART-} != repositories && -x $MARKSHARC_HOME/core/cli/doctor ]]; then
     MARKSHARC_NOTIFY=0 zsh -f "$MARKSHARC_HOME/core/cli/doctor" || failed=1
 fi
 exit $failed

@@ -1,5 +1,48 @@
 #!/usr/bin/env zsh
-# Update syncs pins, then refreshes the declarative env and generated completions.
-(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc update'; exit 2; }
-zsh -f "$MARKSHARC_HOME/core/cli/sync" || exit $?
-exec zsh -f "$MARKSHARC_HOME/core/cli/render"
+emulate -L zsh
+typeset only= mode=run
+while (( $# )); do
+    case $1 in
+        --list) mode=list ;;
+        --dry-run) mode=dry ;;
+        --only) shift; (( $# )) || { print -ru2 -- 'update: --only requires a label'; exit 2; }; only=$1 ;;
+        *) print -ru2 -- "update: unknown argument: $1"; exit 2 ;;
+    esac
+    shift
+done
+source "$MARKSHARC_HOME/core/cli/day2-lib.zsh"
+typeset -a results=()
+integer failed=0 selected=0
+integer validating=1
+typeset -A labels=( sync 1 pins 1 render 1 )
+_day2_step() {
+    local label=$1; shift
+    [[ -z $only || $label == $only ]] || return 0
+    (( selected++ ))
+    if [[ $mode == list ]]; then print -r -- "$label"; return 0; fi
+    if [[ $mode == dry ]]; then print -r -- "$label: ${(j: :)${(@q)@}}"; return 0; fi
+    if ! whence -p -- "$1" >/dev/null 2>&1; then results+=( "$label: skipped (command unavailable)" ); return 0; fi
+    if "$@"; then results+=( "$label: ok" ); else results+=( "$label: failed" ); failed=1; fi
+    return 0
+}
+_day2_directive() {
+    [[ $1 == update ]] || return 0
+    (( $# >= 3 )) || { print -ru2 -- 'update: invalid directive'; return 1; }
+    if (( validating )); then
+        [[ -n $2 && -z ${labels[$2]-} ]] || { print -ru2 -- "update: duplicate or empty label: $2"; return 1; }
+        labels[$2]=1
+        return 0
+    fi
+    shift
+    [[ $2 == ./* ]] && 2=$_day2_dir/${2#./}
+    _day2_step "$@"
+}
+_day2_collect || exit 1
+validating=0
+_day2_step sync env MARKSHARC_SYNC_PART=repositories zsh -f "$MARKSHARC_HOME/core/cli/sync"
+_day2_step pins env MARKSHARC_SYNC_PART=pins zsh -f "$MARKSHARC_HOME/core/cli/sync"
+_day2_collect || exit 1
+if [[ -z $only && $mode == run ]]; then _day2_step render zsh -f "$MARKSHARC_HOME/core/cli/render"; fi
+if [[ $mode == run ]]; then print -r -l -- "${results[@]}"; fi
+(( selected )) || { print -ru2 -- "update: unknown step: $only"; exit 1; }
+exit $failed

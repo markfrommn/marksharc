@@ -9,6 +9,7 @@ lives here.
 | `config.conf` | Module selection and options plus declarative `env`, `path`, `alias` and `tiers` lines |
 | `hosts/<short-host-name>.conf` | Per-host additions and overrides, read after `config.conf` |
 | `modules/<name>/` | Private modules, same contract as the public ones |
+| `packages/` | Optional Brewfile fragments and apt/dnf package lists |
 | `local/post.zsh` | Native zsh run at the end of interactive startup |
 
 Useful commands:
