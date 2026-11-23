@@ -745,6 +745,10 @@ contracts remain unverified beyond stubs and disposable repositories.
 - A new macOS host and a new Ubuntu host come up from zero with `install.sh` and `marksharc bootstrap`.
 - `marksharc update` replaces `do_updates.sh` on the Mac and sol.
 
+The [task plan](DEV-52-PLAN.md) records the framework and overlay verification. The personal
+bundles and legacy entry points live in `mark-desktop-files`. The overlay cutover follows the
+framework delivery, and DEV-59 removes the retired script paths.
+
 #### P3.5 — Multiplexer adapters and mux-aware X11 (DEV-53)
 
 - **Repo:** marksharc
