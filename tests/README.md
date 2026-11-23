@@ -23,7 +23,9 @@ SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 commit, then put it on PATH or set `SHELLSPEC_BIN`. The wrapper finds the
 runner before it replaces HOME, then starts it with an explicit environment:
 `PATH`, a throwaway `HOME` and XDG directories, `MARKSHARC_ROOT` (this
-checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
+checkout), `REAL_GIT`, `REAL_FISH`, `PYTHON` and `TERM=dumb`. Fixtures create
+a private launcher for the selected fish executable so it remains available
+after PATH is restricted.
 
 ## Layout
 
