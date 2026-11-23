@@ -7,14 +7,19 @@
 # id and correctly imposes no generator work on the child.
 _ms_render_cache_valid() {
     emulate -L zsh
+    local require_completions=${1:-0}
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
-    local current= completed=
+    local current= completed= file
     [[ -r $cache/render-id && -r $cache/env.zsh ]] || return 1
     current=$(<"$cache/render-id")
     [[ $current == "$_ms_env_id_value" ]] || return 1
+    (( require_completions )) && [[ ! -r $cache/completion-id ]] && return 1
     if [[ -r $cache/completion-id ]]; then
         completed=$(<"$cache/completion-id")
-        [[ $completed == "$_ms_env_id_value" && -d $cache/completions/zsh ]] || return 1
+        [[ $completed == "$_ms_env_id_value" && -d $cache/completions/zsh && -r $cache/completion-files ]] || return 1
+        for file in "${(@f)$(<"$cache/completion-files")}"; do
+            [[ -z $file || -r $cache/completions/zsh/$file ]] || return 1
+        done
     fi
     return 0
 }
@@ -24,12 +29,11 @@ _ms_render_cache_valid() {
 _ms_render_refresh() {
     emulate -L zsh
     local full=${1:-0} cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
-    local current= completed= need=0 generate=0
+    local current= need=0 generate=0
     [[ -r $cache/render-id ]] && current=$(<"$cache/render-id")
     [[ -n $_ms_env_id_value && -r $cache/env.zsh && $current == "$_ms_env_id_value" ]] || need=1
     if (( full )); then
-        [[ -r $cache/completion-id ]] && completed=$(<"$cache/completion-id")
-        [[ $completed == "$_ms_env_id_value" ]] || need=1
+        _ms_render_cache_valid 1 || need=1
         (( need )) && generate=1
     fi
     (( need )) || return 0

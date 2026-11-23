@@ -145,7 +145,7 @@ completion demo demo-gen "two words" when command demo-gen'
     local cache="$XDG_CACHE_HOME/marksharc/testhost"
     [[ $(<"$OPLOG") == 'ARGS:two words' ]] || { cat "$OPLOG"; return 2; }
     [[ $(<"$cache/completions/zsh/_demo") == $'#compdef demo\n# generated:two words' ]] || { cat "$cache/completions/zsh/_demo"; return 3; }
-    [[ -s $cache/render-id && $(<"$cache/completion-id") == $(<"$cache/render-id") ]] || return 4
+    [[ -s $cache/render-id && $(<"$cache/completion-id") == $(<"$cache/render-id") && $(<"$cache/completion-files") == _demo ]] || { print -r -- "IDS $(<$cache/render-id) $(<$cache/completion-id) FILES=$(<$cache/completion-files)"; return 4; }
     print '# remove the completion' > "$MS_HOME/modules/completer/module.conf"
     render_cli || return 5
     [[ ! -e $cache/completions/zsh/_demo ]]
@@ -195,6 +195,41 @@ completion pending pending-tool when command pending-tool'
   }
   It 'resolves required commands supplied by earlier ordered path directives during standalone render'
     When run pending_requires_case
+    The status should be success
+  End
+
+  partial_completion_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$TEST_ROOT/bin/demo-gen" <<'DATA'
+#!/bin/sh
+printf 'GENERATED\n' >> "$OPLOG"
+printf '#compdef demo\n'
+DATA
+    chmod +x "$TEST_ROOT/bin/demo-gen"
+    ms_mod completer module.conf 'describe "partial completion"
+completion demo demo-gen'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost" id
+    id=$(<"$cache/render-id")
+    mv "$cache/completions/zsh/_demo" "$TEST_ROOT/_demo.saved"
+    : > "$OPLOG"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || { cat "$TEST_ROOT/err"; return 2; }
+    [[ -r $cache/completions/zsh/_demo ]] || { print restored=no; return 3; }
+    [[ $(<"$OPLOG") == GENERATED ]] || { cat "$OPLOG"; return 4; }
+    : > "$OPLOG"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 5
+    [[ ! -s $OPLOG ]] || { cat "$OPLOG"; return 6; }
+    rm "$cache/completions/zsh/_demo"
+    : > "$OPLOG"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'print -r -- "$_ms_env_rebuild"' || { cat "$TEST_ROOT/err"; return 7; }
+    [[ $(<"$TEST_ROOT/out") == 1 && $(<"$cache/completions/zsh/_demo") == '#compdef demo' && $(<"$OPLOG") == GENERATED ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 8; }
+    : > "$OPLOG"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'print -r -- "$_ms_env_rebuild"' || return 9
+    [[ $(<"$TEST_ROOT/out") == 0 && ! -s $OPLOG ]]
+  }
+  It 'repairs individual missing completion files on reload and inherit without warm generator repeats'
+    When run partial_completion_case
     The status should be success
   End
 

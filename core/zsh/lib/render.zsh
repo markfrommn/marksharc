@@ -131,7 +131,9 @@ _ms_render_conf() {
                     _ms_render_pending_command "${generator[1]}" && generator[1]=$REPLY
                 fi
                 out=$_ms_render_stage/zsh/_$name
-                if ! command "${generator[@]}" > "$out" 2>/dev/null; then
+                if command "${generator[@]}" > "$out" 2>/dev/null; then
+                    _ms_render_completion_files+=( "_$name" )
+                else
                     _ms_render_failed=1
                     _ms_trace "completion $name: generator failed"
                 fi
@@ -160,7 +162,7 @@ _ms_render() {
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
     local tmp=$cache/env.zsh.tmp.$$ name old key
-    local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=() _ms_render_pending_paths=()
+    local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=() _ms_render_pending_paths=() _ms_render_completion_files=()
     local _ms_render_generate=${1:-1} _ms_render_stage=$cache/completions.tmp.$$
     integer _ms_render_failed=0
     _ms_modules_plan env
@@ -230,6 +232,11 @@ _ms_render() {
             return 1
         }
         command rm -rf -- "$old"
+        for name in "${_ms_render_completion_files[@]}"; do print -r -- "$name"; done > "$cache/completion-files.tmp.$$" && \
+            command mv -f -- "$cache/completion-files.tmp.$$" "$cache/completion-files" || {
+            command rm -f -- "$cache/completion-files.tmp.$$"
+            return 1
+        }
         print -r -- "$_ms_env_id_value" > "$cache/completion-id.tmp.$$" && \
             command mv -f -- "$cache/completion-id.tmp.$$" "$cache/completion-id" || {
             command rm -f -- "$cache/completion-id.tmp.$$"
