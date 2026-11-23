@@ -29,6 +29,20 @@ Describe 'install.sh'
     The status should be success
   End
 
+  render_case() {
+    mkdir -p "$TEST_ROOT/overlay"
+    printf 'module path\n' > "$TEST_ROOT/overlay/config.conf"
+    inst --home "$MARKSHARC_ROOT" --overlay "$TEST_ROOT/overlay" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    host=$(zsh -fc 'print -r -- ${HOST%%.*}')
+    cache="$XDG_CACHE_HOME/marksharc/$host"
+    [ -s "$cache/env.zsh" ] && [ -s "$cache/render-id" ] || return 2
+    [ "$(sed -n '2p' "$cache/env.zsh")" = "# render id: $(cat "$cache/render-id")" ]
+  }
+  It 'writes the first declarative render into the cache'
+    When run render_case
+    The status should be success
+  End
+
   quoting_case() {
     fake_fw "$TEST_ROOT/my fw's \$dir"
     inst --home "$TEST_ROOT/my fw's \$dir" || { cat "$TEST_ROOT/err"; return 1; }
