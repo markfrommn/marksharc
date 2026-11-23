@@ -1,4 +1,39 @@
 Describe 'safe worktree cleanup'
+  executable_cancel_case() {
+    emulate -L zsh
+    git_fixture || return 1
+    print n | bash -c '"$MARKSHARC_ROOT/modules/git-worktree/bin/gwt-clean"' > "$TEST_ROOT/output" 2>&1
+    [[ $? != 0 && -d "$TEST_ROOT/worktree" && $(<"$TEST_ROOT/output") == *'Cleanup cancelled'* ]]
+  }
+  It 'keeps the worktree on cancellation when called from bash'
+    When run executable_cancel_case
+    The status should be success
+  End
+  late_failure_case() {
+    emulate -L zsh
+    git_fixture || return 1
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    load_mfn git-worktree gwt-clean
+    cat > "$TEST_ROOT/bin/git" <<'DATA'
+#!/bin/sh
+case "$1 $2" in 'branch -d') exit 9 ;; esac
+exec "$REAL_GIT" "$@"
+DATA
+    cat > "$TEST_ROOT/bin/cwf" <<'DATA'
+#!/bin/sh
+printf '%s\n' 'no cwf environment'
+DATA
+    chmod +x "$TEST_ROOT/bin/git" "$TEST_ROOT/bin/cwf"
+    path=( "$MARKSHARC_ROOT/modules/git-worktree/bin" $path )
+    print y > "$TEST_ROOT/answer"
+    gwt-clean < "$TEST_ROOT/answer" > "$TEST_ROOT/output" 2>&1
+    local rc=$?
+    [[ $rc != 0 && $PWD == "$TEST_ROOT/base" && ! -d "$TEST_ROOT/worktree" ]]
+  }
+  It 'moves the caller to the base if branch deletion fails after worktree removal'
+    When run late_failure_case
+    The status should be success
+  End
   cleanup_case() {
     emulate -L zsh
     git_fixture "${2:-main}" || return
@@ -95,7 +130,42 @@ Describe 'safe worktree cleanup'
     fi
     local response=y
     [[ $mode == (cancel|hook-after-cancel) ]] && response=n
-    print -r -- "$response" | gwt-clean > "$TEST_ROOT/output" 2>&1
+    cat > "$TEST_ROOT/bin/git" <<'DATA'
+#!/bin/sh
+case "$FIXTURE_MODE:$*" in
+  status-fail:status*) exit 7 ;;
+  pull-fail:*' fetch --prune --prune-tags') exit 0 ;;
+  pull-fail:*' pull --ff-only') exit 9 ;;
+  update-fail:fetch*|update-fail:pull*) printf '%s\n' update >> "$OPLOG"; exit 9 ;;
+esac
+exec "$REAL_GIT" "$@"
+DATA
+    cat > "$TEST_ROOT/bin/cwf" <<'DATA'
+#!/bin/sh
+case "$*" in
+  'env status') [ "$FIXTURE_MODE" != no-env ] || printf '%s\n' 'no cwf environment' ;;
+  'env destroy --data delete --yes') printf '%s\n' destroy >> "$OPLOG"; [ "$FIXTURE_MODE" != destroy-fail ] ;;
+  *) exit 1 ;;
+esac
+DATA
+    cat > "$TEST_ROOT/bin/gh" <<'DATA'
+#!/bin/sh
+printf '%s\t%s\n' "$FIXTURE_PR_HEAD" "$FIXTURE_MERGE_COMMIT"
+DATA
+    cat > "$TEST_ROOT/bin/hook_ok" <<'DATA'
+#!/bin/sh
+printf 'hook:%s|%s|%s\n' "$1" "$2" "$3" >> "$OPLOG"
+DATA
+    cat > "$TEST_ROOT/bin/hook_fail" <<'DATA'
+#!/bin/sh
+printf '%s\n' hook-fail >> "$OPLOG"
+exit 5
+DATA
+    chmod +x "$TEST_ROOT/bin/git" "$TEST_ROOT/bin/cwf" "$TEST_ROOT/bin/gh" "$TEST_ROOT/bin/hook_ok" "$TEST_ROOT/bin/hook_fail"
+    [[ $mode != root-metadata ]] || rm "$TEST_ROOT/bin/cwf"
+    print -r -- "$response" | FIXTURE_MODE="$mode" FIXTURE_PR_HEAD="$fixture_pr_head" FIXTURE_MERGE_COMMIT="$fixture_merge_commit" \
+      MARKSHARC_GWT_CLEAN_HOOKS=${(F)gwt_clean_pre_remove_hooks} \
+      "$MARKSHARC_ROOT/modules/git-worktree/bin/gwt-clean" > "$TEST_ROOT/output" 2>&1
     local rc=$?
     case $mode in
       dirty|untracked|unmerged|published|squash-stale-head|squash-stack|detached|base|dirty-base|occupied|locked|root-metadata|status-fail|cancel|pull-fail|update-fail)

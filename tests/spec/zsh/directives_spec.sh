@@ -78,9 +78,9 @@ Describe 'caller-state directives'
     export SHOULD_STAY=original
     _ms_run_with_directives helper_fail
     local rc=$?
-    [[ $rc == 7 && $SHOULD_STAY == original ]]
+    [[ $rc == 7 && $SHOULD_STAY == old ]]
   }
-  It 'keeps the caller unchanged when the command fails'
+  It 'applies completed state changes while preserving a command failure'
     When run failure_case
     The status should be success
   End

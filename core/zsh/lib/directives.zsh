@@ -47,13 +47,13 @@ _ms_apply_directives() {
 
 _ms_run_with_directives() {
     emulate -L zsh
-    local _ms_directives_file _ms_directives_rc
+    local _ms_directives_file _ms_directives_rc _ms_apply_rc
     _ms_directives_file=$(command mktemp "${TMPDIR:-/tmp}/marksharc-directives.XXXXXXXX") || return 1
     MARKSHARC_DIRECTIVES=$_ms_directives_file "$@"
     _ms_directives_rc=$?
-    if (( _ms_directives_rc == 0 )); then
-        _ms_apply_directives "$_ms_directives_file" || _ms_directives_rc=$?
-    fi
+    _ms_apply_directives "$_ms_directives_file"
+    _ms_apply_rc=$?
+    (( _ms_directives_rc != 0 )) || _ms_directives_rc=$_ms_apply_rc
     command rm -f -- "$_ms_directives_file"
     return $_ms_directives_rc
 }
