@@ -32,6 +32,39 @@ DATA
     When run bash_directive_case
     The status should be success
   End
+  interactive_case() {
+    emulate -L zsh
+    mkdir -p "$HOME/.ssh"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/agent space"
+    cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
+#!/bin/sh
+if [ "$1" = -l ]; then exit 1; fi
+echo ADD >> "$OPLOG"
+exit "${ADD_STATUS:-0}"
+DATA
+    cat > "$TEST_ROOT/bin/ps" <<'DATA'
+#!/bin/sh
+exit 1
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ps"
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    load_mfn ssh-agent setup-ssh-agent
+    PATH="$MARKSHARC_ROOT/modules/ssh-agent/bin:$PATH"
+    export SSH_AUTH_SOCK="$HOME/agent space" SSH_AGENT_PID=999999999 MARKSHARC_HOST=fixture ADD_STATUS="$1"
+    local MARKSHARC_SESSION=interactive
+    typeset +x MARKSHARC_SESSION
+    setup-ssh-agent > "$TEST_ROOT/out" 2>&1
+    local rc=$?
+    [[ $rc == "$1" && $(<"$OPLOG") == ADD && $SSH_AUTH_SOCK == "$HOME/agent space" && -z ${SSH_AGENT_PID-} ]]
+  }
+  It 'passes unexported interactive session context to key loading'
+    When run interactive_case 0
+    The status should be success
+  End
+  It 'applies completed discovery even when key loading fails'
+    When run interactive_case 17
+    The status should be success
+  End
   agent_case() {
     emulate -L zsh
     local mode=$1

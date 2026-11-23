@@ -28,15 +28,15 @@ fi
 export SSH_AUTH_SOCK
 [[ -z $SSH_AGENT_PID ]] || export SSH_AGENT_PID
 _ms_agent_save || return 1
-ssh-add -l >/dev/null 2>&1
-result=$?
-if (( result == 1 )) && [[ ${MARKSHARC_SESSION-} == interactive ]]; then
-    ssh-add || return $?
-fi
 _ms_directive_emit setenv SSH_AUTH_SOCK "$SSH_AUTH_SOCK" || return 1
 if [[ -n $SSH_AGENT_PID ]]; then
     _ms_directive_emit setenv SSH_AGENT_PID "$SSH_AGENT_PID" || return 1
 else
     _ms_directive_emit unsetenv SSH_AGENT_PID || return 1
+fi
+ssh-add -l >/dev/null 2>&1
+result=$?
+if (( result == 1 )) && [[ ${MARKSHARC_SESSION-} == interactive ]]; then
+    ssh-add || return $?
 fi
 return 0

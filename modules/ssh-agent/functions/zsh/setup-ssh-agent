@@ -1,2 +1,2 @@
 emulate -L zsh
-_ms_run_with_directives command setup-ssh-agent "$@"
+MARKSHARC_SESSION=${MARKSHARC_SESSION-} _ms_run_with_directives command setup-ssh-agent "$@"
