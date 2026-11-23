@@ -38,14 +38,16 @@ _ms_rendered_env() {
     case \$1 in
         alpha)
             (( \${_ms_env_rebuild:-1} )) && export GREETING='two words'
-            _ms_rendered_exports+=( GREETING )
+            (( \${_ms_env_rebuild:-1} )) && _ms_rendered_exports+=( GREETING )
+            (( \${_ms_env_rebuild:-1} )) || { [[ \${GREETING+x} && \${GREETING-} == 'two words' ]] && _ms_rendered_exports+=( GREETING ); }
             (( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} )) && _ms_path_add user '$HOME/my tools'
             [[ \$MARKSHARC_SESSION == interactive ]] && alias 'gs'='git status'
             [[ \$MARKSHARC_SESSION == interactive ]] && _ms_rendered_aliases+=( gs )
             ;;
         overlay)
             (( \${_ms_env_rebuild:-1} )) && export OVERLAY_VALUE='from overlay'
-            _ms_rendered_exports+=( OVERLAY_VALUE )
+            (( \${_ms_env_rebuild:-1} )) && _ms_rendered_exports+=( OVERLAY_VALUE )
+            (( \${_ms_env_rebuild:-1} )) || { [[ \${OVERLAY_VALUE+x} && \${OVERLAY_VALUE-} == 'from overlay' ]] && _ms_rendered_exports+=( OVERLAY_VALUE ); }
             ;;
     esac
 }"
@@ -458,6 +460,29 @@ DATA
   }
   It 'recovers deleted cached env and completions before inherit-skip without warm generator repeats'
     When run deleted_cache_case
+    The status should be success
+  End
+End
+
+Describe 'renderer export ownership'
+  collision_case() {
+    emulate -L zsh
+    ms_fixture
+    printf '#!/bin/sh\n' > "$TEST_ROOT/bin/flip-tool"
+    chmod +x "$TEST_ROOT/bin/flip-tool"
+    ms_mod collision module.conf 'describe "collisions"
+env COLLISION managed when command absent-tool-xyz
+env TRANSITION managed when command flip-tool'
+    ms_pty HOST=testhost COLLISION=unmanaged -dic '
+      print -r -- "before=$COLLISION|$TRANSITION|${_ms_rendered_exports[*]}"
+      rm "$TEST_ROOT/bin/flip-tool"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" || exit 11
+      print -r -- "after=$COLLISION|${TRANSITION-unset}|${_ms_rendered_exports[*]}"
+      exit' || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") == *'before=unmanaged|managed|'* && $(<"$TEST_ROOT/out") == *'after=unmanaged|unset|'* ]] || { cat "$TEST_ROOT/out"; return 2; }
+  }
+  It 'keeps false-guard collisions unmanaged while clearing exports whose guard turns false'
+    When run collision_case
     The status should be success
   End
 End
