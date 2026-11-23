@@ -37,6 +37,37 @@ DATA
     When run shim_case
     The status should be success
   End
+  expansion_case() {
+    emulate -L zsh
+    mkdir -p "$HOME/providers" "$TEST_ROOT/stage"
+    cat > "$HOME/providers/a.conf" <<'DATA'
+env A "$key"
+env B "$raw"
+env C "$value"
+env D "$name"
+env E "$rest"
+env F "$REPLY"
+env G '$raw'
+env H "prefix"$raw'-literal'
+DATA
+    cat > "$TEST_ROOT/bin/claude" <<'DATA'
+#!/bin/sh
+printf '%s\n' "$A" "$B" "$C" "$D" "$E" "$F" "$G" "$H" > "$HOME/expanded"
+DATA
+    chmod +x "$TEST_ROOT/bin/claude"
+    source "$MARKSHARC_ROOT/core/zsh/lib/modules.zsh"
+    source "$MARKSHARC_ROOT/core/zsh/lib/shims.zsh"
+    local MARKSHARC_HOME=$MARKSHARC_ROOT
+    typeset -a _ms_plan=(cc-providers)
+    typeset -A _ms_mod_dir=(cc-providers "$MARKSHARC_ROOT/modules/cc-providers") _ms_cfg_set=(cc-providers.dir "$HOME/providers") _ms_mod_optdef=()
+    _ms_shims_render "$TEST_ROOT/stage" || return 1
+    key=one raw=$'two\nline%' value=three name=four rest=five REPLY=six "$TEST_ROOT/stage/claudea" || return 2
+    [[ $(<"$HOME/expanded") == $'one\ntwo\nline%\nthree\nfour\nfive\nsix\n$raw\nprefixtwo\nline%-literal' ]]
+  }
+  It 'expands provider references from the invoking environment even for lexer names'
+    When run expansion_case
+    The status should be success
+  End
   invalid_case() {
     emulate -L zsh
     mkdir -p "$HOME/providers" "$TEST_ROOT/stage"

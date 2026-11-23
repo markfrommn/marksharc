@@ -1,5 +1,13 @@
 #!/bin/zsh -f
 emulate -L zsh
+# Capture exported values before lexer locals and result parameters can shadow them.
+zmodload zsh/parameter || exit 1
+typeset -A _ms_provider_environment=()
+for _ms_provider_snapshot_name in "${(@k)parameters}"; do
+    if [[ ${parameters[$_ms_provider_snapshot_name]} == *export* ]]; then
+        _ms_provider_environment[$_ms_provider_snapshot_name]=${(P)_ms_provider_snapshot_name}
+    fi
+done
 _ms_provider_home=$1 _ms_provider_file=$2 _ms_provider_mode=$3
 shift 3
 source "$_ms_provider_home/core/zsh/lib/modules.zsh" || exit 1
