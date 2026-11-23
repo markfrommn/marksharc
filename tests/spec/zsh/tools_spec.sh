@@ -124,7 +124,9 @@ Describe 'interactive tool modules (init phase)'
     rm "$TEST_ROOT/bin/eza"
     ms_unit 'MARKSHARC_SESSION=interactive; source "$MARKSHARC_HOME/modules/ls/init.zsh"; _ms_test_render_module ls
       print -r -- "${aliases[ls]}|${aliases[ll]}|${aliases[la]}|${aliases[dir]}|${aliases[lf]}|${aliases[lsf]}"' || return 3
-    [[ $(<"$TEST_ROOT/out") == 'ls --color=auto|ls -lA|ls -a|ls -l|ls -FA|ls -F' ]] || { cat "$TEST_ROOT/out"; return 4; }
+    local expected_ls='ls --color=auto'
+    [[ $OSTYPE == darwin* ]] && expected_ls='ls -G'
+    [[ $(<"$TEST_ROOT/out") == "$expected_ls|ls -lA|ls -a|ls -l|ls -FA|ls -F" ]] || { cat "$TEST_ROOT/out"; return 4; }
     ms_unit 'MARKSHARC_OS=darwin; source "$MARKSHARC_HOME/modules/ls/init.zsh"; print -r -- "${aliases[ls]}"' || return 5
     [[ $(<"$TEST_ROOT/out") == 'ls -G' ]] || return 6
     # No other module defines the family again (the old file defined ll twice).

@@ -107,9 +107,15 @@ env HOST_NO other-no when host otherhost'
     render_cli || { cat "$TEST_ROOT/err"; return 1; }
     local cache="$XDG_CACHE_HOME/marksharc/testhost"
     [[ $(<"$cache/env.zsh") == *'_ms_command_available '\''guard-tool'\'' && _ms_render_dir '* && $(<"$cache/env.zsh") == *' && _ms_render_file '* ]] || { cat "$cache/env.zsh"; return 2; }
-    [[ $(<"$cache/env.zsh") != *OS_NO* && $(<"$cache/env.zsh") != *HOST_NO* ]] || { cat "$cache/env.zsh"; return 3; }
-    ms_unit "MARKSHARC_SESSION=batch; _ms_env_rebuild=1; source $cache/env.zsh; _ms_rendered_env guarded; print -r -- \"BOTH=\$BOTH OS=\$OS_YES HOST=\$HOST_YES MISSING=\${MISSING-unset}\"" || { cat "$TEST_ROOT/err"; return 4; }
-    [[ $(<"$TEST_ROOT/out") == 'BOTH=yes OS=linux-ok HOST=host-ok MISSING=unset' ]] || { cat "$TEST_ROOT/out"; return 5; }
+    if [[ $OSTYPE == darwin* ]]; then
+      [[ $(<"$cache/env.zsh") == *OS_NO* && $(<"$cache/env.zsh") != *OS_YES* && $(<"$cache/env.zsh") != *HOST_NO* ]] || { cat "$cache/env.zsh"; return 3; }
+    else
+      [[ $(<"$cache/env.zsh") == *OS_YES* && $(<"$cache/env.zsh") != *OS_NO* && $(<"$cache/env.zsh") != *HOST_NO* ]] || { cat "$cache/env.zsh"; return 3; }
+    fi
+    ms_unit "MARKSHARC_SESSION=batch; _ms_env_rebuild=1; source $cache/env.zsh; _ms_rendered_env guarded; print -r -- \"BOTH=\$BOTH OS_YES=\${OS_YES-unset} OS_NO=\${OS_NO-unset} HOST=\$HOST_YES MISSING=\${MISSING-unset}\"" || { cat "$TEST_ROOT/err"; return 4; }
+    local expected='BOTH=yes OS_YES=linux-ok OS_NO=unset HOST=host-ok MISSING=unset'
+    [[ $OSTYPE == darwin* ]] && expected='BOTH=yes OS_YES=unset OS_NO=darwin-no HOST=host-ok MISSING=unset'
+    [[ $(<"$TEST_ROOT/out") == "$expected" ]] || { cat "$TEST_ROOT/out"; return 5; }
     rm "$HOME/guard file"
     ms_unit "MARKSHARC_SESSION=batch; _ms_env_rebuild=1; source $cache/env.zsh; _ms_rendered_env guarded; print -r -- \"BOTH=\${BOTH-unset}\"" || return 6
     [[ $(<"$TEST_ROOT/out") == 'BOTH=unset' ]]
