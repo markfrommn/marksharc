@@ -647,8 +647,8 @@ contract 4/4, install 46/46, repository 26/26, and fresh-HOME install e2e. Indep
 quality review is clean after all findings were fixed and re-reviewed; stack-check passes.
 Final matched 30-round warm-start medians improved from 55.63 to 43.34 ms batch and from
 130.54 to 121.16 ms interactive. The real cwf shell-integration contract passes through
-render and cached init. Live Mac/sol parity and real herdr completion remain unverified
-beyond hermetic fixtures and stubs; hosted macOS/Ubuntu CI is required before merge.
+render and cached init. Hosted macOS/Ubuntu CI and install e2e pass. Live Mac/sol
+parity and real herdr completion remain unverified beyond hermetic fixtures and stubs.
 
 #### P3.2 — Bash environment parity (DEV-50)
 
