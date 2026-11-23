@@ -151,6 +151,22 @@ completion demo demo-gen "two words" when command demo-gen'
     The status should be success
   End
 
+  required_completion_case() {
+    emulate -L zsh
+    ms_fixture
+    stub_command optional-gen 'print GENERATED >> "$OPLOG"; exit 99'
+    ms_mod optional module.conf 'describe "optional completion"
+requires command absent-required-command-xyz
+completion optional optional-gen'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ ! -s $OPLOG && ! -e $cache/completions/zsh/_optional && -s $cache/completion-id ]] || { cat "$OPLOG"; return 2; }
+  }
+  It 'skips completion generation when the owning module requires an absent command'
+    When run required_completion_case
+    The status should be success
+  End
+
   metadata_case() {
     emulate -L zsh
     ms_fixture

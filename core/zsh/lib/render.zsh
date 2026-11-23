@@ -55,7 +55,7 @@ _ms_render_completion_guards() {
 # Print the native statements for the env/path/alias lines in one conf file.
 _ms_render_conf() {
     emulate -L zsh
-    local file=$1 line kind name value guard out
+    local file=$1 module=$2 line kind name value guard out
     local -a generator=()
     integer i end
     [[ -r $file ]] || return 0
@@ -89,6 +89,7 @@ _ms_render_conf() {
                 print -r -- "            $guard && _ms_rendered_aliases+=( ${(q)name} )"
                 ;;
             completion)
+                [[ -z $module ]] || _ms_module_requires_command "$module" || continue
                 name=${reply[2]-}
                 [[ $name =~ '^[A-Za-z0-9_][A-Za-z0-9+_.-]*$' && $#reply -ge 3 ]] || continue
                 end=$(( $#reply + 1 ))
@@ -167,7 +168,7 @@ _ms_render() {
         print -r -- '    case $1 in'
         for name in "${_ms_plan[@]}"; do
             (( ${envplan[(Ie)$name]} )) && print -r -- "        $name)"
-            _ms_render_conf "${_ms_mod_dir[$name]}/module.conf"
+            _ms_render_conf "${_ms_mod_dir[$name]}/module.conf" "$name"
             (( ${envplan[(Ie)$name]} )) && print -r -- '            ;;'
         done
         print -r -- '        overlay)'
