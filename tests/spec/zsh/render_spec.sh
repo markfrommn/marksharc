@@ -136,6 +136,28 @@ Describe 'renderer cache and generated completions'
       /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
   }
 
+  shim_stage_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$MS_HOME/core/zsh/lib/shims.zsh" <<'DATA'
+_ms_shims_render() {
+    print -r -- shim > "$1/generated"
+    [[ ! -e $TEST_ROOT/fail-shims ]]
+}
+DATA
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ $(<"$cache/bin/generated") == shim && $(file_mode "$cache/bin") == 700 ]] || return 2
+    print old > "$cache/bin/generated"
+    touch "$TEST_ROOT/fail-shims"
+    render_cli && return 3
+    [[ $(<"$cache/bin/generated") == old ]]
+  }
+  It 'privately stages shim artifacts and retains the previous bin when generation fails'
+    When run shim_stage_case
+    The status should be success
+  End
+
   completion_case() {
     emulate -L zsh
     ms_fixture
