@@ -20,7 +20,9 @@ no render. `models` requires `MODELS_URL`, `curl`, and `jq`.
 Herdr and Collie session commands are generated from the session list during
 render. Run `marksharc render` to refresh them after sessions change.
 
-Hooks for write-once commands are executable programs rather than shell function
-arrays. Configure the corresponding command's executable hooks as documented in
-its module; a hook runs in a separate process and cannot modify the caller's
-shell state.
+Hooks for write-once commands are executable programs rather than shell
+functions. The zsh arrays `gwt_clean_pre_remove_hooks` and
+`cwf_new_post_create_hooks` contain executable names or paths. For direct
+executable calls, set `MARKSHARC_GWT_CLEAN_HOOKS` or
+`MARKSHARC_CWF_NEW_HOOKS` to newline-separated executable names or paths.
+Hooks run in separate processes and cannot modify the caller's shell state.

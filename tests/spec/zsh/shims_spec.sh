@@ -7,6 +7,10 @@ Describe 'generated command shims'
 
 env ANTHROPIC_AUTH_TOKEN 'secret % value'
 env LITERAL '$(touch "$HOME/INJECTED")'
+env mode malicious
+env home malicious
+env key malicious
+env _ms_provider_mode malicious
 env MODELS_URL https://fixture.invalid/models
 DATA
     cat > "$TEST_ROOT/bin/claude" <<'DATA'
@@ -24,7 +28,8 @@ DATA
     ! grep -q 'secret % value' "$TEST_ROOT/stage/claudea" || return 3
     /bin/bash -c '"$1" "$2"' _ "$TEST_ROOT/stage/claudea" 'a b;$(touch BAD)' || return 4
     [[ $(<"$HOME/result") == $'secret % value\n$(touch "$HOME/INJECTED")\na b;$(touch BAD)' && ! -e $HOME/INJECTED && ! -e $TEST_ROOT/BAD ]] || { cat "$HOME/result" >&2; return 5; }
-    sed -i 's/secret % value/changed/' "$HOME/providers/a.conf"
+    sed 's/secret % value/changed/' "$HOME/providers/a.conf" > "$HOME/providers/a.tmp" || return 6
+    mv "$HOME/providers/a.tmp" "$HOME/providers/a.conf" || return 6
     "$TEST_ROOT/stage/claudea" x || return 6
     [[ $(head -1 "$HOME/result") == changed ]]
   }

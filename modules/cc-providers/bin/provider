@@ -1,15 +1,16 @@
 #!/bin/zsh -f
 emulate -L zsh
-home=$1 file=$2 mode=$3
+_ms_provider_home=$1 _ms_provider_file=$2 _ms_provider_mode=$3
 shift 3
-source "$home/core/zsh/lib/modules.zsh" || exit 1
-source "$home/core/zsh/lib/shims.zsh" || exit 1
-_ms_provider_read "$file" || exit 1
-for key value in "${(@kv)_ms_provider_values}"; do
-    export "$key=$value"
+source "$_ms_provider_home/core/zsh/lib/modules.zsh" || exit 1
+source "$_ms_provider_home/core/zsh/lib/shims.zsh" || exit 1
+_ms_provider_read "$_ms_provider_file" || exit 1
+typeset -a _ms_provider_env=()
+for _ms_provider_key _ms_provider_value in "${(@kv)_ms_provider_values}"; do
+    _ms_provider_env+=( "$_ms_provider_key=$_ms_provider_value" )
 done
-case $mode in
-    claude*) exec claude "$@" ;;
+case $_ms_provider_mode in
+    claude*) exec env "${_ms_provider_env[@]}" claude "$@" ;;
     models*)
         [[ -n ${_ms_provider_values[MODELS_URL]-} ]] || { print -ru2 'Provider has no MODELS_URL'; exit 1; }
         setopt pipefail
