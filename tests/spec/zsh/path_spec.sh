@@ -11,7 +11,7 @@ Describe 'path module: tiered PATH builder'
   golden_macos_case() {
     emulate -L zsh
     path_layout
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin )
       $PRE
       _ms_path_add brew /opt/homebrew/bin /opt/homebrew/sbin
@@ -30,7 +30,7 @@ Describe 'path module: tiered PATH builder'
     emulate -L zsh
     path_layout
     mkdir -p "$TEST_ROOT/root/usr/local/cuda/bin"
-    ms_unit "ostype=Linux hwtype=x86_64 MARKSHARC_OS=linux uid=1000 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=linux MARKSHARC_ARCH=x86_64 uid=1000 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin )
       $PRE
       _ms_path_add app /usr/local/cuda/bin
@@ -52,13 +52,13 @@ Describe 'path module: tiered PATH builder'
     mkdir -p "$TEST_ROOT/root/usr/local/cuda/bin" "$TEST_ROOT/root/home/linuxbrew/.linuxbrew/bin" "$TEST_ROOT/root/home/linuxbrew/.linuxbrew/sbin" "$TEST_ROOT/root/opt/dell/bin" "$HOME/.lmstudio/bin" "$HOME/mgr-nvm" "$HOME/mgr-gvm"
     mkdir -p "$TEST_ROOT/root/dev"; : > "$TEST_ROOT/root/dev/nvidiactl"
     rm -rf "$TEST_ROOT/root/opt/homebrew"   # a Linux host has no /opt/homebrew
-    ms_unit "ostype=Linux hwtype=x86_64 MARKSHARC_OS=linux uid=1000 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=linux MARKSHARC_ARCH=x86_64 uid=1000 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin )
       $PRE
-      source \"\$MARKSHARC_HOME/modules/brew/env.zsh\"
+      _ms_test_render_module brew
       _ms_path_add manager $HOME/mgr-nvm $HOME/mgr-gvm
-      source \"\$MARKSHARC_HOME/modules/cuda/env.zsh\"
-      source \"\$MARKSHARC_HOME/modules/lmstudio/env.zsh\"
+      _ms_test_render_module cuda
+      _ms_test_render_module lmstudio
       _ms_path_finalize
       print -l -- \"\$path[@]\"" || return 1
     # Today's Linux order: managers, system, user, app (CUDA, LM Studio), then local
@@ -76,7 +76,7 @@ Describe 'path module: tiered PATH builder'
     emulate -L zsh
     path_layout
     mkdir -p "$HOME/venv/bin" "$HOME/tool-after" "$HOME/over" "$HOME/mgr"
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( $HOME/venv/bin /usr/bin /bin $HOME/tool-after )
       $PRE
       _ms_path_add first $HOME/over
@@ -99,7 +99,7 @@ Describe 'path module: tiered PATH builder'
     emulate -L zsh
     path_layout
     mkdir -p "$HOME/vanishing" "$HOME/tool-new"
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin )
       $PRE
       _ms_path_add user $HOME/vanishing
@@ -123,13 +123,13 @@ Describe 'path module: tiered PATH builder'
   dot_case() {
     emulate -L zsh
     path_layout
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=0 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=0 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin . /bin '' )
       $PRE
       _ms_path_finalize
       print -r -- \"\${(j:|:)path}\"" || return 1
     [[ $(<"$TEST_ROOT/out") != *'|.|'* && $(<"$TEST_ROOT/out") != *'|.' && $(<"$TEST_ROOT/out") != *'||'* ]] || { cat "$TEST_ROOT/out"; return 2; }
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_core_dot_in_path=off
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_core_dot_in_path=off
       path=( /usr/bin /bin . )
       $PRE
       _ms_path_finalize
@@ -144,7 +144,7 @@ Describe 'path module: tiered PATH builder'
     emulate -L zsh
     path_layout
     mkdir -p "$HOME/my tools/bin" "$HOME/inherited space"
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( '$HOME/inherited space' /usr/bin /bin )
       $PRE
       _ms_path_add_bindirs user '$HOME/my tools'
@@ -160,7 +160,7 @@ Describe 'path module: tiered PATH builder'
   rebuild_zero_case() {
     emulate -L zsh
     path_layout
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin ); first=\$PATH
       _ms_env_rebuild=0
       $PRE
@@ -179,7 +179,7 @@ Describe 'path module: tiered PATH builder'
     local d
     for d in usr/X11R6/bin usr/ucb usr/openwin/bin opt/openwin/bin usr/xpg4/bin usr/ccs/bin; do mkdir -p "$TEST_ROOT/root/$d"; done
     # Inherited user entries survive; the removed legacy directories are never generated.
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin /usr/X11R6/bin /usr/ucb )
       $PRE
       _ms_path_finalize
@@ -202,7 +202,7 @@ Describe 'path module: tiered PATH builder'
   tiers_option_case() {
     emulate -L zsh
     path_layout
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_path_tiers='first system local user brew'
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_path_tiers='first system local user brew'
       path=( /usr/bin /bin )
       $PRE
       _ms_path_add brew /opt/homebrew/bin
@@ -219,7 +219,7 @@ Describe 'path module: tiered PATH builder'
     emulate -L zsh
     path_layout
     mkdir -p "$HOME/lastdir"
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root
       path=( /usr/bin /bin $HOME/tool-after )
       $PRE
       _ms_path_add last $HOME/lastdir
@@ -235,7 +235,7 @@ Describe 'path module: tiered PATH builder'
   tiers_omitted_case() {
     emulate -L zsh
     path_layout
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_path_tiers='first system'
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501 _ms_fs_root=$TEST_ROOT/root _ms_opt_path_tiers='first system'
       path=( /usr/bin /bin )
       $PRE
       _ms_path_add brew /opt/homebrew/bin
@@ -254,7 +254,7 @@ Describe 'path module: tiered PATH builder'
   pending_case() {
     emulate -L zsh
     mkdir -p "$HOME/pend/bin"; printf '#!/bin/sh\n' > "$HOME/pend/bin/pendtool"; chmod +x "$HOME/pend/bin/pendtool"
-    ms_unit "ostype=Darwin hwtype=arm64 MARKSHARC_OS=darwin uid=501
+    ms_unit "MARKSHARC_OS=darwin MARKSHARC_ARCH=arm64 uid=501
       path=( /usr/bin /bin )
       $PRE
       _ms_command_pending pendtool && exit 11

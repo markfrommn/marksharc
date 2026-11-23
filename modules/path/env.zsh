@@ -63,7 +63,7 @@ _ms_path_add() {
 _ms_path_add_bindirs() {
     emulate -L zsh
     (( ${_ms_env_rebuild:-1} )) || return 0
-    local tier=$1 base sub osarch=bin.${ostype-}.${hwtype-}
+    local tier=$1 base sub osarch=bin.${(C)MARKSHARC_OS}.$MARKSHARC_ARCH
     shift
     for base in "$@"; do
         _ms_isdir "$base" || continue

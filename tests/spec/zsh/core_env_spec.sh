@@ -7,29 +7,16 @@ Describe 'core env phase, host facts, ZDOTDIR and MARKSHARC_ENV'
       printf '#!/bin/sh\necho "FORBIDDEN %s" >> "$OPLOG"\nexit 99\n' "$tool" > "$TEST_ROOT/bin/$tool"
       chmod +x "$TEST_ROOT/bin/$tool"
     done
-    ms_run -c 'print -r -- "$MARKSHARC_OS|$MARKSHARC_ARCH|$MARKSHARC_HOST|$ostype|$hwtype|$shorthost|$hostbase|$hname|$idcmd|$uid|$gid"' || return 1
+    ms_run -c 'print -r -- "$MARKSHARC_OS|$MARKSHARC_ARCH|$MARKSHARC_HOST|$hostbase|$hname|$idcmd|$uid|$gid|${+ostype}|${+hwtype}|${+shorthost}|${+distro}|${+dname}"' || return 1
     [[ ! -s $OPLOG ]] || { cat "$OPLOG"; return 2; }
     local os=${$(/usr/bin/uname -s):l} arch=$(/usr/bin/uname -m) host=$(/bin/hostname | /usr/bin/awk -F. '{print $1}')
-    local base=$(print -r -- "$host" | /usr/bin/awk -F- '{print $1}') kernel=$(/usr/bin/uname -s)
-    local expect="$os|$arch|$host|$kernel|$arch|$host|$base|$(/bin/hostname)|/usr/bin/id|$(/usr/bin/id -u)|$(/usr/bin/id -g)"
+    local base=$(print -r -- "$host" | /usr/bin/awk -F- '{print $1}')
+    local expect="$os|$arch|$host|$base|$(/bin/hostname)|/usr/bin/id|$(/usr/bin/id -u)|$(/usr/bin/id -g)|0|0|0|0|0"
     [[ $(<"$TEST_ROOT/out") == "$expect" ]] || { print -r -- "GOT=$(<$TEST_ROOT/out)"; print -r -- "WANT=$expect"; return 3; }
     [[ ! -s $TEST_ROOT/err ]]
   }
-  It 'computes host facts with builtins only and keeps today'\''s compatibility values'
+  It 'computes modern host facts with builtins only and no compatibility values'
     When run facts_case
-    The status should be success
-  End
-  dname_case() {
-    emulate -L zsh
-    ms_fixture
-    ms_run -c 'print -r -- "$dname"' || return 1
-    local want dncommand
-    dncommand=$(command -v domainname) && want=$($dncommand)
-    if [[ -z $want || $want == "(none)" ]]; then want=$(egrep /etc/resolv.conf -e "^(search|domain)" | head -1 | /usr/bin/awk '{ print $2}'); fi
-    [[ $(<"$TEST_ROOT/out") == "$want" ]]
-  }
-  It 'derives dname like the old forking code on this host'
-    When run dname_case
     The status should be success
   End
   fake_root_case() {
@@ -41,51 +28,37 @@ Describe 'core env phase, host facts, ZDOTDIR and MARKSHARC_ENV'
     source "$MS_HOME/core/zsh/lib/facts.zsh"
     local OSTYPE=linux-gnu CPUTYPE=aarch64 HOST=box-one.example.test
     _ms_facts
-    [[ $MARKSHARC_OS == linux && $MARKSHARC_ARCH == aarch64 && $MARKSHARC_HOST == box-one && $ostype == Linux && $hwtype == aarch64 && $shorthost == box-one && $hostbase == box && $statfmtarg == -c ]] || return 1
-    [[ $distro == unknown && $MARKSHARC_DISTRO == unknown && -z $dname ]] || return 2
+    [[ $MARKSHARC_OS == linux && $MARKSHARC_ARCH == aarch64 && $MARKSHARC_HOST == box-one && $hostbase == box && $statfmtarg == -c ]] || return 1
+    [[ $MARKSHARC_DISTRO == unknown && ${+ostype} == 0 && ${+hwtype} == 0 && ${+shorthost} == 0 && ${+distro} == 0 && ${+dname} == 0 ]] || return 2
     print -r -- "ID=Ubuntu" > "$fake/etc/os-release"
     print -r -- "NAME=x" > "$fake/etc/os-release"; print -r -- "ID=ubuntu" >> "$fake/etc/os-release"
     print -r -- "(none)" > "$fake/proc/sys/kernel/domainname"
     printf "nameserver 1.1.1.1\nsearch lab.example.test other.test\ndomain later.test\n" > "$fake/etc/resolv.conf"
     _ms_facts
-    [[ $distro == ubuntu && $MARKSHARC_DISTRO == ubuntu && $dname == lab.example.test ]] || { print -r -- "distro=$distro dname=$dname"; return 3; }
+    [[ $MARKSHARC_DISTRO == ubuntu && ${+dname} == 0 ]] || return 3
     print -r -- "nis.example.test" > "$fake/proc/sys/kernel/domainname"
     _ms_facts
-    [[ $dname == nis.example.test ]] || return 4
+    [[ ${+dname} == 0 ]] || return 4
     touch "$fake/etc/redhat-release"
     mkdir -p "$fake/opt/psa"
     _ms_facts
-    [[ $distro == redhat && $dname == nis.example.test ]] || return 5
+    [[ $MARKSHARC_DISTRO == redhat && ${+dname} == 0 ]] || return 5
     OSTYPE=darwin25.0 CPUTYPE=arm64
-    unset distro
+    unset MARKSHARC_DISTRO
     _ms_facts
-    [[ $MARKSHARC_OS == darwin && $ostype == Darwin && $statfmtarg == -f && $MARKSHARC_DISTRO == macos && ${+distro} == 0 ]]
+    [[ $MARKSHARC_OS == darwin && $statfmtarg == -f && $MARKSHARC_DISTRO == macos && ${+ostype} == 0 && ${+distro} == 0 ]]
   }
-  It 'maps OSTYPE, CPUTYPE, HOST, distro files and domain sources without forking'
+  It 'maps OSTYPE, CPUTYPE, HOST and distro files without forking or reading domain sources'
     When run fake_root_case
-    The status should be success
-  End
-  site_override_case() {
-    emulate -L zsh
-    # The portable core holds no site names; a private overlay module may set them.
-    ms_fixture_full
-    mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/site-demo"
-    print 'describe "site demo"' > "$XDG_CONFIG_HOME/marksharc/modules/site-demo/module.conf"
-    print 'dname=demo-site' > "$XDG_CONFIG_HOME/marksharc/modules/site-demo/env.zsh"
-    ms_run -c 'print -r -- "$dname"' || return 1
-    [[ $(<"$TEST_ROOT/out") == demo-site ]]
-  }
-  It 'lets a private overlay module own the site name, not the core'
-    When run site_override_case
     The status should be success
   End
   compat_export_case() {
     emulate -L zsh
     ms_fixture
-    ms_run -c 'print -r -- "${(t)ostype} ${(t)hwtype} ${(t)shorthost} ${(t)dname} ${(t)MARKSHARC_OS} ${(t)MARKSHARC_HOST} ${(t)zdir}"' || return 1
-    [[ $(<"$TEST_ROOT/out") != *export* && $(<"$TEST_ROOT/out") == scalar* ]]
+    ms_run -c 'print -r -- "${+ostype}|${+hwtype}|${+shorthost}|${+distro}|${+dname}|${(t)MARKSHARC_OS}|${(t)MARKSHARC_HOST}|${(t)zdir}"' || return 1
+    [[ $(<"$TEST_ROOT/out") == '0|0|0|0|0|scalar|scalar|scalar' ]]
   }
-  It 'keeps compatibility variables and host facts out of the environment'
+  It 'keeps host facts in the shell and leaves compatibility names absent'
     When run compat_export_case
     The status should be success
   End

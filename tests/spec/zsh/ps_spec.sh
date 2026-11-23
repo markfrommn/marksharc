@@ -76,7 +76,7 @@ DATA
     ps_stub
     local os
     for os in Darwin Linux; do
-      ostype=$os MARKSHARC_OS=${os:l}
+      MARKSHARC_OS=${os:l}
       : > "$OPLOG"
       pss foo > /dev/null
       [[ $(<"$OPLOG") == 'ps ax -o pid,ppid,user,stat,etime,command' ]] || return 1

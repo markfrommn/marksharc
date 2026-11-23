@@ -4,55 +4,42 @@
 
 _ms_facts() {
     emulate -L zsh
-    local root=${_ms_fs_root-} line kernel
-    local -a words
+    local root=${_ms_fs_root-} line kernel distro_name
 
+    # Modernization removes the old compatibility names, including on reload in a
+    # shell that still has values from an earlier core.
+    unset ostype hwtype shorthost distro dname
     case $OSTYPE in
-        darwin*) ostype=Darwin ;;
-        linux*)  ostype=Linux ;;
-        *)       kernel=${OSTYPE%%[0-9.-]*}; ostype=${(C)kernel} ;;
+        darwin*) MARKSHARC_OS=darwin ;;
+        linux*)  MARKSHARC_OS=linux ;;
+        *)       kernel=${OSTYPE%%[0-9.-]*}; MARKSHARC_OS=${kernel:l} ;;
     esac
-    hwtype=$CPUTYPE
+    MARKSHARC_ARCH=$CPUTYPE
     hname=$HOST
-    shorthost=${HOST%%.*}
-    hostbase=${shorthost%%-*}
+    MARKSHARC_HOST=${HOST%%.*}
+    hostbase=${MARKSHARC_HOST%%-*}
     idcmd=/usr/bin/id
-    if [[ $ostype == Darwin ]]; then statfmtarg=-f; else statfmtarg=-c; fi
-    MARKSHARC_OS=${ostype:l}
-    MARKSHARC_ARCH=$hwtype
-    MARKSHARC_HOST=$shorthost
+    if [[ $MARKSHARC_OS == darwin ]]; then statfmtarg=-f; else statfmtarg=-c; fi
 
     # Linux distribution: a redhat-release file wins, then os-release ID.
-    if [[ $ostype == Linux ]]; then
+    if [[ $MARKSHARC_OS == linux ]]; then
         if [[ -f $root/etc/redhat-release ]]; then
-            distro=redhat
+            MARKSHARC_DISTRO=redhat
         else
-            distro=unknown
+            MARKSHARC_DISTRO=unknown
             if [[ -r $root/etc/os-release ]]; then
                 while IFS= read -r line; do
-                    if [[ $line == ID=* ]]; then distro=${${${line#ID=}//[\"\']/}:l}; break; fi
+                    if [[ $line == ID=* ]]; then MARKSHARC_DISTRO=${${${line#ID=}//[\"\']/}:l}; break; fi
                 done < "$root/etc/os-release"
             fi
         fi
-        MARKSHARC_DISTRO=$distro
+    elif [[ $MARKSHARC_OS == darwin ]]; then
+        MARKSHARC_DISTRO=macos
     else
-        unset distro
-        if [[ $ostype == Darwin ]]; then MARKSHARC_DISTRO=macos; else MARKSHARC_DISTRO=$MARKSHARC_OS; fi
+        MARKSHARC_DISTRO=$MARKSHARC_OS
     fi
 
-    # Domain: the NIS domain, else the first search/domain line of resolv.conf.
-    # Site-name mappings belong to the private overlay.
-    dname=
-    [[ -r $root/proc/sys/kernel/domainname ]] && read -r dname < "$root/proc/sys/kernel/domainname"
-    if [[ -z $dname || $dname == "(none)" ]]; then
-        dname=
-        if [[ -r $root/etc/resolv.conf ]]; then
-            while IFS= read -r line; do
-                if [[ $line == (search|domain)* ]]; then words=( ${=line} ); dname=${words[2]-}; break; fi
-            done < "$root/etc/resolv.conf"
-        fi
-    fi
-
+    # Site naming lives in per-host overlay files, not in a core domain fact.
     # Identity facts used by the PATH builder and the umask rule. The group
     # name needs `id -gn`, so it is cached per host and gid.
     uid=$EUID

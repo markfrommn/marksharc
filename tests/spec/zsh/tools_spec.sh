@@ -9,7 +9,7 @@ Describe 'tool-root modules (env phase)'
   tool_run() {
     local os=$1 body=$2
     cat > "$TEST_ROOT/child.zsh" <<DATA
-ostype=${os}; hwtype=x86_64; MARKSHARC_OS=${os:l}; uid=1000; _ms_fs_root=$TEST_ROOT/root
+MARKSHARC_OS=${os:l}; MARKSHARC_ARCH=x86_64; uid=1000; _ms_fs_root=$TEST_ROOT/root
 path=( /usr/bin /bin )
 source "\$MARKSHARC_HOME/modules/path/env.zsh"
 ${body}
@@ -23,12 +23,12 @@ DATA
     emulate -L zsh
     tool_layout
     mkdir -p "$TEST_ROOT/root/home/linuxbrew/.linuxbrew/bin"
-    tool_run Darwin 'source "$MARKSHARC_HOME/modules/brew/env.zsh"' || return 1
+    tool_run Darwin '_ms_test_render_module brew' || return 1
     local -a got=( "${(@f)$(<"$TEST_ROOT/out")}" )
     # /opt/homebrew is in the brew tier (first on macOS); Linuxbrew stays in local.
     [[ $got[1] == /opt/homebrew/bin && $got[2] == /opt/homebrew/sbin ]] || { show $got; return 2; }
     [[ $got[3] == /usr/local/bin && $got[4] == /home/linuxbrew/.linuxbrew/bin ]] || { show $got; return 3; }
-    tool_run Linux '_ms_opt_brew_linuxbrew_tier=brew; source "$MARKSHARC_HOME/modules/brew/env.zsh"' || return 4
+    tool_run Linux 'mkdir -p "$XDG_CONFIG_HOME/marksharc"; print "set brew.linuxbrew_tier brew" > "$XDG_CONFIG_HOME/marksharc/config.conf"; _ms_test_render_module brew' || return 4
     got=( "${(@f)$(<"$TEST_ROOT/out")}" )
     [[ $got[1] == /opt/homebrew/bin && $got[3] == /home/linuxbrew/.linuxbrew/bin ]] || { show $got; return 5; }
   }
@@ -56,7 +56,7 @@ DATA
     tool_layout
     mkdir -p "$HOME/.bun/bin" "$HOME/Library/pnpm" "$HOME/.local/share/pnpm"
     print '#compdef bun' > "$HOME/.bun/_bun"
-    tool_run Darwin 'source "$MARKSHARC_HOME/modules/bun/env.zsh"; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"; print -r -- "BUN=$BUN_INSTALL PNPM=$PNPM_HOME" >&2' || return 1
+    tool_run Darwin '_ms_test_render_module bun; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"; print -r -- "BUN=$BUN_INSTALL PNPM=$PNPM_HOME" >&2' || return 1
     local -a got=( "${(@f)$(<"$TEST_ROOT/out")}" )
     [[ $(<"$TEST_ROOT/err") == "BUN=$HOME/.bun PNPM=$HOME/Library/pnpm" ]] || { cat "$TEST_ROOT/err"; return 2; }
     (( ${got[(Ie)$HOME/.bun/bin]} > 0 && ${got[(Ie)$HOME/Library/pnpm]} > 0 )) || { show $got; return 3; }
@@ -68,7 +68,7 @@ DATA
     [[ $(<"$TEST_ROOT/out") == "$HOME/.bun" ]] || return 7
     # No bun, no pnpm: nothing exported, nothing added.
     rm -rf "$HOME/.bun" "$HOME/Library/pnpm" "$HOME/.local/share/pnpm"
-    tool_run Darwin 'source "$MARKSHARC_HOME/modules/bun/env.zsh"; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"' || return 8
+    tool_run Darwin '_ms_test_render_module bun; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"' || return 8
     [[ $(<"$TEST_ROOT/out") != *bun* && $(<"$TEST_ROOT/out") != *pnpm* ]]
   }
   It 'exports BUN_INSTALL and PNPM_HOME and adds their directories only when installed'
@@ -79,12 +79,12 @@ DATA
     emulate -L zsh
     tool_layout
     mkdir -p "$HOME/.lmstudio/bin"
-    tool_run Darwin 'source "$MARKSHARC_HOME/modules/lmstudio/env.zsh"' || return 1
+    tool_run Darwin '_ms_test_render_module lmstudio' || return 1
     local -a got=( "${(@f)$(<"$TEST_ROOT/out")}" )
     # local tier: before the system directories on macOS, as today.
     (( ${got[(Ie)$HOME/.lmstudio/bin]} > 0 && ${got[(Ie)$HOME/.lmstudio/bin]} < ${got[(Ie)/bin]} )) || { show $got; return 2; }
     # On Linux it follows the user tier (app), as the old apath did.
-    tool_run Linux 'source "$MARKSHARC_HOME/modules/lmstudio/env.zsh"' || return 3
+    tool_run Linux '_ms_test_render_module lmstudio' || return 3
     got=( "${(@f)$(<"$TEST_ROOT/out")}" )
     (( ${got[(Ie)$HOME/.lmstudio/bin]} > ${got[(Ie)/bin]} )) || { show $got; return 4; }
   }
@@ -98,10 +98,10 @@ DATA
     mkdir -p "$TEST_ROOT/root/usr/local/cuda/bin"
     # lspci must never run: the old rule forked it on every Linux start.
     printf '#!/bin/sh\necho FORBIDDEN lspci >> "$OPLOG"\nexit 99\n' > "$TEST_ROOT/bin/lspci"; chmod +x "$TEST_ROOT/bin/lspci"
-    tool_run Linux 'source "$MARKSHARC_HOME/modules/cuda/env.zsh"; print -r -- "MPS=${CUDA_MPS_PIPE_DIRECTORY-unset}" >&2' || return 1
+    tool_run Linux '_ms_test_render_module cuda; print -r -- "MPS=${CUDA_MPS_PIPE_DIRECTORY-unset}" >&2' || return 1
     [[ $(<"$TEST_ROOT/err") == MPS=unset && $(<"$TEST_ROOT/out") != */cuda/bin* ]] || { cat "$TEST_ROOT/err"; return 2; }
     : > "$TEST_ROOT/root/dev/nvidiactl"
-    tool_run Linux 'source "$MARKSHARC_HOME/modules/cuda/env.zsh"; print -r -- "MPS=$CUDA_MPS_PIPE_DIRECTORY LOG=$CUDA_MPS_LOG_DIRECTORY" >&2' || return 3
+    tool_run Linux '_ms_test_render_module cuda; print -r -- "MPS=$CUDA_MPS_PIPE_DIRECTORY LOG=$CUDA_MPS_LOG_DIRECTORY" >&2' || return 3
     [[ $(<"$TEST_ROOT/err") == "MPS=/tmp/nvidia-mps LOG=$HOME/tmp/nvidia-mps" && $(<"$TEST_ROOT/out") == */usr/local/cuda/bin* ]] || { cat "$TEST_ROOT/err"; return 4; }
     [[ ! -s $OPLOG ]] || return 5
     # The module is Linux only: the loader skips it on macOS.
@@ -117,18 +117,16 @@ Describe 'interactive tool modules (init phase)'
   stub_tool() { printf '#!/bin/sh\nprintf "print %%s >> \\"\\$OPLOG\\"\\n" "$(basename "$0")"\n' > "$TEST_ROOT/bin/$1"; chmod +x "$TEST_ROOT/bin/$1"; }
   ls_case() {
     emulate -L zsh
-    local ostype=Linux
-    have_command() { [[ $1 == eza ]]; }
-    alias ls='ls -x'
-    source "$MARKSHARC_ROOT/modules/ls/init.zsh" || return 1
-    [[ $aliases[ll] == 'eza -lA' && $aliases[la] == 'eza -a' && $aliases[dir] == 'eza -l' && $aliases[lf] == 'eza -FA' && $aliases[lsf] == 'eza -F' ]] || return 2
-    (( ${+aliases[ls]} == 0 )) || return 3
-    have_command() { return 1; }
-    source "$MARKSHARC_ROOT/modules/ls/init.zsh" || return 4
-    [[ $aliases[ls] == 'ls --color=auto' && $aliases[ll] == 'ls -lA' && $aliases[la] == 'ls -a' && $aliases[dir] == 'ls -l' && $aliases[lf] == 'ls -FA' && $aliases[lsf] == 'ls -F' ]] || return 5
-    ostype=Darwin
-    source "$MARKSHARC_ROOT/modules/ls/init.zsh" || return 6
-    [[ $aliases[ls] == 'ls -G' ]] || return 7
+    stub_command eza 'exit 0'
+    ms_unit 'MARKSHARC_SESSION=interactive; alias ls="ls -x"; source "$MARKSHARC_HOME/modules/ls/init.zsh"; _ms_test_render_module ls
+      print -r -- "${aliases[ll]}|${aliases[la]}|${aliases[dir]}|${aliases[lf]}|${aliases[lsf]}|${+aliases[ls]}"' || return 1
+    [[ $(<"$TEST_ROOT/out") == 'eza -lA|eza -a|eza -l|eza -FA|eza -F|0' ]] || { cat "$TEST_ROOT/out"; return 2; }
+    rm "$TEST_ROOT/bin/eza"
+    ms_unit 'MARKSHARC_SESSION=interactive; source "$MARKSHARC_HOME/modules/ls/init.zsh"; _ms_test_render_module ls
+      print -r -- "${aliases[ls]}|${aliases[ll]}|${aliases[la]}|${aliases[dir]}|${aliases[lf]}|${aliases[lsf]}"' || return 3
+    [[ $(<"$TEST_ROOT/out") == 'ls --color=auto|ls -lA|ls -a|ls -l|ls -FA|ls -F' ]] || { cat "$TEST_ROOT/out"; return 4; }
+    ms_unit 'MARKSHARC_OS=darwin; source "$MARKSHARC_HOME/modules/ls/init.zsh"; print -r -- "${aliases[ls]}"' || return 5
+    [[ $(<"$TEST_ROOT/out") == 'ls -G' ]] || return 6
     # No other module defines the family again (the old file defined ll twice).
     ! grep -rE "alias +(ll|la|dir|lf|lsf)=" "$MARKSHARC_ROOT/modules" --include='*.zsh' --exclude-dir=ls
   }
@@ -173,7 +171,7 @@ Describe 'interactive tool modules (init phase)'
     emulate -L zsh
     # Ported from mark-desktop-files' pruning spec: the kept modules load on
     # FreeBSD with no FreeBSD-only CLICOLOR export or startx alias.
-    local ostype=FreeBSD
+    local MARKSHARC_OS=freebsd
     have_command() { return 1; }
     unset CLICOLOR
     local module
@@ -193,7 +191,9 @@ Describe 'interactive tool modules (init phase)'
     TERM=xterm PS1=x; export PS1
     source "$MARKSHARC_ROOT/modules/zsh-options/init.zsh" || return 1
     [[ $TERM == xterm-256color && $LANG == en_US.UTF-8 && $BLOCKSIZE == 1K && ${(t)PS1} != *export* ]] || return 2
-    [[ ! -o bgnice && -o globdots && -o extendedglob && -o menucomplete && $aliases[j] == 'jobs -l' ]] || return 3
+    [[ ! -o bgnice && -o globdots && -o extendedglob && -o menucomplete ]] || return 3
+    ms_unit 'MARKSHARC_SESSION=interactive; _ms_test_render_module zsh-options; print -r -- "${aliases[j]}"' || return 4
+    [[ $(<"$TEST_ROOT/out") == 'jobs -l' ]] || return 5
     # Directory-stack options belong to nav.
     unsetopt autocd pushdsilent
     source "$MARKSHARC_ROOT/modules/nav/init.zsh" || return 4

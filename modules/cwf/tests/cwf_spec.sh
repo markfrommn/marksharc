@@ -94,17 +94,17 @@ DATA
     # No tooling checkout known: nothing is sourced, the registries still exist.
     module_run cwf "$base" || return 1
     [[ $(<"$TEST_ROOT/out") == 'hooks=1 exclude=1' && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out"; return 2; }
-    # Known checkout: cwf shell zsh output is sourced once; a reload skips it.
+    # A known tooling checkout does not run a generator in the init phase; render owns it.
     module_run cwf "export COMMON_DEV_TOOLS=$HOME/tools; $base" || return 3
-    [[ $(<"$OPLOG") == SOURCED && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 4; }
-    : > "$OPLOG"
+    [[ ! -s $OPLOG && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 4; }
+    # Reload is likewise silent.
     module_run cwf "export COMMON_DEV_TOOLS=$HOME/tools; _ms_reloading=1; $base" || return 5
     [[ ! -s $OPLOG && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 6; }
     # A dangling COMMON_DEV_TOOLS is ignored.
     module_run cwf "export COMMON_DEV_TOOLS=$HOME/missing; $base" || return 7
     [[ ! -s $OPLOG && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 8; }
   }
-  It 'sources cwf shell zsh once per shell when the tooling checkout is known'
+  It 'leaves cwf shell generation to render in every init mode'
     When run init_case
     The status should be success
   End

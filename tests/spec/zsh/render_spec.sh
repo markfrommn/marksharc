@@ -220,3 +220,38 @@ DATA
     The status should be success
   End
 End
+
+Describe 'public module directive conversion'
+  conversion_case() {
+    emulate -L zsh
+    local module
+    for module in brew bun cuda lmstudio; do
+      [[ ! -e $MARKSHARC_ROOT/modules/$module/env.zsh ]] || { print "$module keeps a native env file"; return 1; }
+    done
+    grep -q '^path brew /opt/homebrew/bin$' "$MARKSHARC_ROOT/modules/brew/module.conf" || return 2
+    grep -q '^env BUN_INSTALL ~/.bun' "$MARKSHARC_ROOT/modules/bun/module.conf" || return 3
+    grep -q '^env CUDA_MPS_PIPE_DIRECTORY /tmp/nvidia-mps' "$MARKSHARC_ROOT/modules/cuda/module.conf" || return 4
+    grep -q '^path local ~/.lmstudio/bin when os darwin' "$MARKSHARC_ROOT/modules/lmstudio/module.conf" || return 5
+    grep -q '^alias ll "eza -lA" when command eza' "$MARKSHARC_ROOT/modules/ls/module.conf" || return 6
+    grep -q '^alias j "jobs -l"' "$MARKSHARC_ROOT/modules/zsh-options/module.conf" || return 7
+    grep -q '^completion herdr herdr completion zsh' "$MARKSHARC_ROOT/modules/herdr/module.conf" || return 8
+    grep -q '^completion cwf cwf shell zsh' "$MARKSHARC_ROOT/modules/cwf/module.conf" || return 9
+  }
+  It 'moves directive-expressible public env aliases and completions into module.conf'
+    When run conversion_case
+    The status should be success
+  End
+End
+
+Describe 'modern host facts'
+  compatibility_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_run -c 'print -r -- "${+ostype}|${+hwtype}|${+shorthost}|${+distro}|${+dname}"' || return 1
+    [[ $(<"$TEST_ROOT/out") == '0|0|0|0|0' ]]
+  }
+  It 'does not create compatibility host-fact names'
+    When run compatibility_case
+    The status should be success
+  End
+End

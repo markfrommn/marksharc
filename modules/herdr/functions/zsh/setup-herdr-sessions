@@ -28,8 +28,4 @@ for row in "${(@f)rows}"; do
         _ms_session_functions+=( "$name" )
     fi
 done
-# Cached completion output, sourced once per shell (not on reload).
-if (( ! ${_ms_reloading:-0} )); then
-    _ms_init_cached herdr herdr completion zsh || return $?
-fi
 return 0

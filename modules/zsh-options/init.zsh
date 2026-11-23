@@ -35,5 +35,4 @@ LC_CTYPE=C
 export LANG
 export BLOCKSIZE=1K
 
-alias j='jobs -l'
 true
