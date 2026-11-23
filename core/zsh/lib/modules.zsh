@@ -26,6 +26,31 @@ _ms_words() {
 # backticks and every other metacharacter remain data and are never evaluated.
 _ms_word() {
     emulate -L zsh
+    local raw=$1 value out rest
+    # Most directive words are unquoted or double-quoted. Keep the original regex
+    # path for them; the character parser is only needed to preserve the context of
+    # single quotes and backslashes.
+    if [[ $raw != *\'* && $raw != *\\* ]]; then
+        value=${(Q)raw}
+        if [[ $raw == '~' || $raw == '~/'* ]]; then value=$HOME${value#\~}; fi
+        out=
+        rest=$value
+        while [[ $rest =~ '\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?' ]]; do
+            out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
+            rest=${rest[MEND+1,-1]}
+        done
+        REPLY=$out$rest
+        return 0
+    fi
+    if (( ${#raw} >= 2 )) && [[ $raw == \'*\' ]]; then
+        REPLY=${(Q)raw}
+        return 0
+    fi
+    _ms_word_quoted "$raw"
+}
+
+_ms_word_quoted() {
+    emulate -L zsh
     local raw=$1 state=plain ch rest name
     integer i len=${#raw}
     REPLY=
@@ -133,6 +158,11 @@ _ms_modules_discover() {
         _ms_mod_dir[$name]=$dir
         order=50
         while IFS= read -r line || [[ -n $line ]]; do
+            # Rendered directives are read by render.zsh only. Warm startup discovers
+            # metadata here and must not tokenize the cached vocabulary a second time.
+            case $line in
+                env\ *|path\ *|alias\ *|completion\ *) continue ;;
+            esac
             _ms_words "$line" || continue
             case ${reply[1]} in
                 describe) _ms_mod_describe[$name]=${reply[2]-} ;;
@@ -173,7 +203,7 @@ _ms_module_options() {
 _ms_modules_plan() {
     emulate -L zsh
     local phase=$1 name cmd ok
-    [[ $phase == env ]] && _ms_modules_discover
+    [[ $phase == env && ${_ms_render_metadata_loaded:-0} != 1 ]] && _ms_modules_discover
     typeset -ga _ms_plan=()
     for name in $_ms_mod_names; do
         ok=1

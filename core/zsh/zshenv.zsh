@@ -23,7 +23,7 @@ typeset -g _ms_starting=1 _ms_verbose=0
 typeset -gi _ms_reloading=${_ms_reloading:-0}
 [[ -n ${MARKSHARC_VERBOSE-} && $MARKSHARC_VERBOSE != 0 ]] && _ms_verbose=1
 
-for _ms_lib in util session facts zdot envid modules render cache; do
+for _ms_lib in util session facts zdot envid modules rendered cache; do
     [[ -r $MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh ]] && source "$MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh"
 done
 unset _ms_lib
