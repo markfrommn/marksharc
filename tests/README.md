@@ -80,9 +80,9 @@ this table to cover every module.
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
 | mux | fix-tmux re-imports the tmux client environment (ssh-agent fix) | `spec/zsh/modules/mux/mux_spec.sh` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
-| herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/shims_spec.sh` |
+| herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
-| cc-providers | Data-only provider files, secret-free executable shims, bash invocation and private cache | `spec/zsh/modules/cc-providers/providers_spec.sh`, `spec/zsh/shims_spec.sh` |
+| cc-providers | Data-only provider files, secret-free executable shims, bash invocation and private cache | `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
 | cwf | cwf-new executable creation checks, unmanaged copies, executable post-create hooks and copy-exclude; render generates zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
 | Commands | Encoded caller-state directives, hostile values, state wrappers and private staged shims | `spec/zsh/directives_spec.sh`, `spec/zsh/render_spec.sh` |
