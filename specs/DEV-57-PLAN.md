@@ -27,14 +27,14 @@
 ## 4. Verify and record the result
 
 - [x] Run `tests/check`, the install end-to-end check, and stack-check on `origin/main...HEAD`. Verify repeat rendering, cache containment, and absence of generated-file drift. Add the new coverage to `tests/README.md` and update the changelog.
-- [ ] Verify hosted macOS and Ubuntu checks on the PR head. Report personal Mac overlay verification separately if it is unavailable. DEV-58 owns the module migration, fishtape adoption, and retirement of the previous fish configuration.
+- [x] Verify hosted macOS and Ubuntu checks on the implementation head. DEV-58 owns the module migration, fishtape adoption, and retirement of the previous fish configuration.
 
 The implementation uses fish 4.x, zsh 5.9+, and the pinned ShellSpec runner. Tests use isolated homes, stubbed commands, and disposable repositories.
 
 ## Local verification
 
 `tests/check` passed on Linux with 84 files linted, 424 zsh examples with one platform skip,
-35 cross-shell contract examples, 51 installer examples, and 26 repository examples.
+35 cross-shell contract examples, 51 installer examples, and 27 repository examples.
 The standalone end-to-end test passed both checkout and clone installation and uninstall.
 An independent temporary-home smoke confirmed matching fish and zsh exports and ordered PATH,
 live directory guards, stable repeat rendering, and uninstall. The Linux login comparison excludes
@@ -43,3 +43,11 @@ loaded successfully in a disposable fish terminal.
 
 The independent review verified the fixes for pending-tier `uv` detection, git-worktree
 options in executable environments, and verbose fish startup and reload. Stack-check passed.
+
+## Delivery
+
+The fish core is implemented in [PR #10](https://github.com/markfrommn/marksharc/pull/10).
+Both hosted check jobs and both install end-to-end jobs passed on implementation commit
+`72c90f9`. The test runner preserves the selected fish executable inside its isolated PATH,
+including Homebrew installs on macOS. Personal Mac overlay parity remains unverified.
+[Hosted check results](https://github.com/markfrommn/marksharc/actions/runs/45145933674)

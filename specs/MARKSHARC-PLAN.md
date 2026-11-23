@@ -865,6 +865,10 @@ contracts remain unverified beyond stubs and disposable repositories.
 
 - A fish session on the Mac has the same PATH and env as zsh.
 
+**Outcome:** Implemented in [PR #10](https://github.com/markfrommn/marksharc/pull/10).
+The hosted macOS and Ubuntu checks pass the shared environment and startup contracts.
+Native fish module migration and legacy config retirement remain in P4.2.
+
 #### P4.2 — Fish modules and retirement of the old fish config (DEV-58)
 
 - **Repo:** marksharc
