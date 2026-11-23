@@ -6,7 +6,7 @@ lives here.
 
 | Path | Purpose |
 | --- | --- |
-| `config.conf` | Module selection (`module <name> [off]`) and options (`set <module>.<key> <value>`) |
+| `config.conf` | Module selection and options plus declarative `env`, `path`, `alias` and `tiers` lines |
 | `hosts/<short-host-name>.conf` | Per-host additions and overrides, read after `config.conf` |
 | `modules/<name>/` | Private modules, same contract as the public ones |
 | `local/post.zsh` | Native zsh run at the end of interactive startup |
@@ -16,6 +16,7 @@ Useful commands:
 ```sh
 marksharc module list              # which modules are enabled, disabled or skipped
 marksharc module disable <name>    # edits config.conf
+marksharc render                   # refresh cached env and generated completions
 marksharc reload                   # apply changes in the current shell
 ```
 

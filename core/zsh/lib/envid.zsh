@@ -1,8 +1,7 @@
 # -*- mode: shell-script; sh-shell: zsh -*-
-# MARKSHARC_ENV id (spec 6.6). Pre-renderer, the id is derived cheaply from the
-# env inputs: the mtime and size of every core, module and
-# config file, plus $HOME, folded with shell arithmetic. No forks. An empty id
-# (zsh/stat unavailable) means "always rebuild".
+# MARKSHARC_ENV id (spec 6.6). The id is derived cheaply from the render inputs:
+# the mtime and size of every core, module and config file, plus $HOME, folded with
+# shell arithmetic. No forks. An empty id (zsh/stat unavailable) means "always rebuild".
 
 _ms_env_id() {
     emulate -L zsh

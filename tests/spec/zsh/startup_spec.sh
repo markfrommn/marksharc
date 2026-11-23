@@ -98,7 +98,7 @@ DATA
       script+='; (( ${+functions[starship_precmd]} == 1 )) || exit 27'
       script+='; [[ $MARKSHARC_SESSION == interactive ]] || exit 28'
     fi
-    # The cwf module runs cwf shell zsh once per shell when the tooling checkout
+    # The renderer generates cwf shell zsh output once when the tooling checkout
     # is known; the fixture synthesizes one (COMMON_DEV_TOOLS is the documented,
     # portable contract — the private overlay's discovery of it stays behind).
     local -a extra=( FPATH="$TEST_ROOT/fpath:$FPATH" COMMON_DEV_TOOLS="$TEST_ROOT/cdt" )
