@@ -845,6 +845,7 @@ contracts remain unverified beyond stubs and disposable repositories.
 - **Repo:** marksharc
 - **Estimate:** 5
 - **Depends on:** P3.1 (DEV-49)
+- **Task plan:** [DEV-57-PLAN.md](DEV-57-PLAN.md)
 
 **Goal:** Give fish the same foundation as zsh.
 

@@ -5,7 +5,7 @@
 | Tool | Version | Used for |
 | --- | --- | --- |
 | zsh | 5.9+ | Core and CLI; the zsh suite |
-| fish | 4.x | Fish lint now; the fish phase later |
+| fish | 4.x | Fish loader and cross-shell contracts, `fish --no-execute` and `fish_indent --check` |
 | bash | 5.x | Environment parity later |
 | ShellSpec | 0.28.1, pinned in `tests/shellspec.pin` | All specs |
 | shellcheck | current | Lint for `sh` and `bash` files |
@@ -70,7 +70,7 @@ settings file and everything it renders stay local; none of it is committed.
        plan_docs: specs/*-PLAN*.md
        authority_docs: specs/MARKSHARC-SPEC.md
        verify: "tests/check (lint, zsh suite, repository suite); CI runs the same on macOS and Ubuntu"
-       test_stack: "ShellSpec 0.28.1 via tests/run-tests; tests/lint for zsh -n, shellcheck and fish --no-execute"
+       test_stack: "ShellSpec 0.28.1 via tests/run-tests; tests/lint for zsh -n, shellcheck, fish --no-execute and fish_indent --check"
        ports: "n/a (shell framework, no server)"
        github_org: <github-org>
        linear_workspace: <linear-workspace-url>
