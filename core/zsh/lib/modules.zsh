@@ -240,7 +240,9 @@ _ms_module_requires_command() {
 
 # Bracket the sourcing of one module phase file: trace and per-module timing.
 _ms_module_begin() {
-    [[ -r ${_ms_mod_dir[$2]}/$1.zsh || ( $1 == env && ${_ms_rendered_modules[$2]-0} == 1 ) ]] || return 1
+    if [[ ! -r ${_ms_mod_dir[$2]}/$1.zsh ]]; then
+        [[ $1 == env ]] && (( $+functions[_ms_rendered_env] )) && [[ ${_ms_rendered_modules[$2]-0} == 1 ]] || return 1
+    fi
     if (( _ms_verbose )); then _ms_now; _ms_mod_t0=$REPLY; fi
     _ms_trace "module $2: $1.zsh"
     return 0

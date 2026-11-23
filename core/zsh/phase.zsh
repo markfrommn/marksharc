@@ -12,7 +12,9 @@
 #  - agent and batch shells silence the module's own stderr; interactive shells
 #    show it. MARKSHARC_VERBOSE reports every skip.
 for _ms_cur in "${_ms_plan[@]}"; do
-    [[ -r ${_ms_mod_dir[$_ms_cur]}/$_ms_phase.zsh || ( $_ms_phase == env && ${_ms_rendered_modules[$_ms_cur]-0} == 1 ) ]] || continue
+    if [[ ! -r ${_ms_mod_dir[$_ms_cur]}/$_ms_phase.zsh ]]; then
+        [[ $_ms_phase == env ]] && (( $+functions[_ms_rendered_env] )) && [[ ${_ms_rendered_modules[$_ms_cur]-0} == 1 ]] || continue
+    fi
     if [[ $_ms_phase == env ]] && ! _ms_module_requires_command "$_ms_cur"; then continue; fi
     _ms_module_begin "$_ms_phase" "$_ms_cur" || continue
     _ms_file=${_ms_mod_dir[$_ms_cur]}/$_ms_phase.zsh
@@ -29,7 +31,7 @@ for _ms_cur in "${_ms_plan[@]}"; do
         fi
         (( _ms_rc == 0 )) || _ms_trace "module $_ms_cur: $_ms_phase.zsh returned $_ms_rc"
     fi
-    if [[ $_ms_phase == env && ${_ms_rendered_modules[$_ms_cur]-0} == 1 ]]; then
+    if [[ $_ms_phase == env ]] && (( $+functions[_ms_rendered_env] )) && [[ ${_ms_rendered_modules[$_ms_cur]-0} == 1 ]]; then
         _ms_rendered_env "$_ms_cur"
     fi
     _ms_module_end "$_ms_phase" "$_ms_cur"
