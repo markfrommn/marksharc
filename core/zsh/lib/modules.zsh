@@ -251,7 +251,7 @@ _ms_render_file() {
     else
         REPLY=$1
     fi
-    [[ -f $REPLY ]]
+    [[ -e $REPLY ]]
 }
 
 # Env phase: the "requires command" check of one module, made when its turn comes,

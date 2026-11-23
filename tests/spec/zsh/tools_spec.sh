@@ -100,7 +100,7 @@ DATA
     printf '#!/bin/sh\necho FORBIDDEN lspci >> "$OPLOG"\nexit 99\n' > "$TEST_ROOT/bin/lspci"; chmod +x "$TEST_ROOT/bin/lspci"
     tool_run Linux '_ms_test_render_module cuda; print -r -- "MPS=${CUDA_MPS_PIPE_DIRECTORY-unset}" >&2' || return 1
     [[ $(<"$TEST_ROOT/err") == MPS=unset && $(<"$TEST_ROOT/out") != */cuda/bin* ]] || { cat "$TEST_ROOT/err"; return 2; }
-    : > "$TEST_ROOT/root/dev/nvidiactl"
+    ln -s /dev/null "$TEST_ROOT/root/dev/nvidiactl"
     tool_run Linux '_ms_test_render_module cuda; print -r -- "MPS=$CUDA_MPS_PIPE_DIRECTORY LOG=$CUDA_MPS_LOG_DIRECTORY" >&2' || return 3
     [[ $(<"$TEST_ROOT/err") == "MPS=/tmp/nvidia-mps LOG=$HOME/tmp/nvidia-mps" && $(<"$TEST_ROOT/out") == */usr/local/cuda/bin* ]] || { cat "$TEST_ROOT/err"; return 4; }
     [[ ! -s $OPLOG ]] || return 5
