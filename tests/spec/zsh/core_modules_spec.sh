@@ -257,12 +257,13 @@ DATA
     local id=$(<"$TEST_ROOT/out") memo=$(<"$TEST_ROOT/err")
     [[ -n $memo ]] || return 2
     [[ $(grep -c '^a:env$' "$OPLOG") == 2 ]] || { cat "$OPLOG"; return 3; }
-    # An inheriting child has a different key (no rebuild): one validation, then it is memoised too.
+    # The inherited cache is still missing and unwritable, so recovery rebuilds with the
+    # same guard key: the memo suppresses a second validation and only the real run remains.
     : > "$OPLOG"
     ms_run "${base[@]}" MARKSHARC_ENV=$id MARKSHARC_GUARD_MEMO="$memo" -c 'print -r -- "$MARKSHARC_GUARD_MEMO" >&2' || return 4
     memo=$(<"$TEST_ROOT/err")
-    [[ $(grep -c '^a:env$' "$OPLOG") == 2 ]] || { cat "$OPLOG"; return 5; }
-    # Grandchild: warm. The module runs for real only, with no validation pass.
+    [[ $(grep -c '^a:env$' "$OPLOG") == 1 ]] || { cat "$OPLOG"; return 5; }
+    # A later recovery attempt is memoised too.
     : > "$OPLOG"
     ms_run "${base[@]}" MARKSHARC_ENV=$id MARKSHARC_GUARD_MEMO="$memo" -c ':' || return 6
     [[ $(<"$OPLOG") == a:env && ! -s $TEST_ROOT/err ]] || { cat "$OPLOG" "$TEST_ROOT/err"; return 7; }

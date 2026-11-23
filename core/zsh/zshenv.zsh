@@ -76,7 +76,7 @@ fi
 
 typeset -gU path
 typeset -ga _ms_path_asserted=( "${path[@]}" )
-if (( _ms_env_rebuild && ! _ms_render_refresh_failed )) && [[ -n $_ms_env_id_value ]]; then export MARKSHARC_ENV=$_ms_env_id_value; fi
+if (( _ms_env_rebuild )) && [[ -n $_ms_env_id_value ]] && { (( ! _ms_render_refresh_failed )) || [[ -z ${MARKSHARC_ENV-} ]] }; then export MARKSHARC_ENV=$_ms_env_id_value; fi
 _ms_trace "env phase: done"
 unset _ms_starting
 # The stub tests this file's status (source ... && ok): never end on a conditional.
