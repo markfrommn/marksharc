@@ -19,6 +19,18 @@ Describe 'bootstrap, update and installers'
     The status should be success
   End
 
+  render_list_case() {
+    day2_fixture
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --list > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/out") == *render* ]] || return 2
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --only render > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 3
+    [[ $(<"$TEST_ROOT/out") == *'render: ok'* ]]
+  }
+  It 'lists and selects the render step'
+    When run render_list_case
+    The status should be success
+  End
+
   missing_requirement_case() {
     day2_fixture
     ms_mod sample module.conf $'requires command marksharc-missing-fixture\npackage brew fixture'

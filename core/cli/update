@@ -42,7 +42,7 @@ validating=0
 _day2_step sync env MARKSHARC_SYNC_PART=repositories zsh -f "$MARKSHARC_HOME/core/cli/sync"
 _day2_step pins env MARKSHARC_SYNC_PART=pins zsh -f "$MARKSHARC_HOME/core/cli/sync"
 _day2_collect || exit 1
-if [[ -z $only && $mode == run ]]; then _day2_step render zsh -f "$MARKSHARC_HOME/core/cli/render"; fi
+_day2_step render zsh -f "$MARKSHARC_HOME/core/cli/render"
 if [[ $mode == run ]]; then print -r -l -- "${results[@]}"; fi
 (( selected )) || { print -ru2 -- "update: unknown step: $only"; exit 1; }
 exit $failed
