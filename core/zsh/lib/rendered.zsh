@@ -2,6 +2,23 @@
 # Warm-start rendered-environment loading. Generator code stays in render.zsh and
 # is parsed only when an input fingerprint is stale.
 
+# Validate artifacts needed by an inheriting shell. Missing env or an explicitly
+# rendered completion set requires recovery; an env-only render has no completion
+# id and correctly imposes no generator work on the child.
+_ms_render_cache_valid() {
+    emulate -L zsh
+    local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
+    local current= completed=
+    [[ -r $cache/render-id && -r $cache/env.zsh ]] || return 1
+    current=$(<"$cache/render-id")
+    [[ $current == "$_ms_env_id_value" ]] || return 1
+    if [[ -r $cache/completion-id ]]; then
+        completed=$(<"$cache/completion-id")
+        [[ $completed == "$_ms_env_id_value" && -d $cache/completions/zsh ]] || return 1
+    fi
+    return 0
+}
+
 # Refresh stale rendered inputs. The ordinary startup path (full=0) never runs a
 # completion generator; install, explicit render, update and reload use full=1.
 _ms_render_refresh() {

@@ -364,6 +364,15 @@ path user "$HOME/custom"'
 End
 
 Describe 'renderer reload recovery'
+  render_cli() {
+    env -i HOME="$HOME" PATH="$PATH" TERM=dumb MARKSHARC_HOME="$MS_HOME" \
+      MARKSHARC_CONFIG="${MARKSHARC_CONFIG:-$XDG_CONFIG_HOME/marksharc}" \
+      XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" HOST=testhost \
+      /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+  }
+
   failed_reload_case() {
     emulate -L zsh
     ms_fixture
@@ -419,6 +428,36 @@ env GUARDED_VALUE guarded when file "$HOME/allow"'
   }
   It 'clears renderer-owned exports when removed or guarded off and preserves unmanaged state'
     When run stale_exports_case
+    The status should be success
+  End
+
+  deleted_cache_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_mod recover module.conf 'describe "recover"
+env RECOVERED_VALUE yes
+alias recover-alias "print recovered"
+completion recover recover-gen'
+    cat > "$TEST_ROOT/bin/recover-gen" <<'DATA'
+#!/bin/sh
+printf 'GENERATED\n' >> "$OPLOG"
+printf '#compdef recover\n'
+DATA
+    chmod +x "$TEST_ROOT/bin/recover-gen"
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    ms_run HOST=testhost -c 'print -r -- "$MARKSHARC_ENV"' || return 2
+    local id=$(<"$TEST_ROOT/out") cache="$XDG_CACHE_HOME/marksharc/testhost"
+    : > "$OPLOG"
+    rm -rf "$cache"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'print -r -- "$RECOVERED_VALUE|$_ms_env_rebuild|${+functions[_ms_rendered_env]}"' || { print -r -- "OUT=$(<$TEST_ROOT/out) ERR=$(<$TEST_ROOT/err)"; return 3; }
+    [[ -r $cache/completions/zsh/_recover ]] || { print -r -- "missing completion OUT=$(<$TEST_ROOT/out) OPLOG=$(<$OPLOG) FILES=$(find "$cache" -type f -print 2>/dev/null)"; return 4; }
+    [[ $(<"$TEST_ROOT/out") == 'yes|1|1' && $(<"$cache/completions/zsh/_recover") == '#compdef recover' && $(<"$OPLOG") == GENERATED ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 5; }
+    : > "$OPLOG"
+    ms_pty HOST=testhost MARKSHARC_ENV="$id" -dic 'print -r -- "alias=${aliases[recover-alias]} rebuild=$_ms_env_rebuild"; exit' || { cat "$TEST_ROOT/out"; return 5; }
+    [[ $(<"$TEST_ROOT/out") == *'alias=print recovered rebuild=0'* && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 6; }
+  }
+  It 'recovers deleted cached env and completions before inherit-skip without warm generator repeats'
+    When run deleted_cache_case
     The status should be success
   End
 End

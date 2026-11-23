@@ -39,9 +39,13 @@ if [[ -o login || -o interactive ]]; then _ms_zdot_ensure; fi
 # Inherit-skip: a child shell whose MARKSHARC_ENV matches the current inputs only
 # recomputes shell-local facts. Login shells and reloads always rebuild.
 _ms_env_id
-_ms_env_rebuild=1
+typeset -gi _ms_env_rebuild=1 _ms_render_recover=0
 if [[ -z ${_ms_force_rebuild-} && ! -o login && -n $_ms_env_id_value && ${MARKSHARC_ENV-} == $_ms_env_id_value ]]; then
     _ms_env_rebuild=0
+    if ! _ms_render_cache_valid; then
+        _ms_env_rebuild=1
+        _ms_render_recover=1
+    fi
 fi
 _ms_trace "env id=${_ms_env_id_value:-none} rebuild=$_ms_env_rebuild"
 
@@ -50,7 +54,7 @@ _ms_trace "env id=${_ms_env_id_value:-none} rebuild=$_ms_env_rebuild"
 typeset -gi _ms_render_refresh_failed=0
 if (( _ms_env_rebuild )); then
     _ms_render_reset
-    if _ms_render_refresh "${_ms_reloading:-0}"; then
+    if _ms_render_refresh $(( ${_ms_reloading:-0} || ${_ms_render_recover:-0} )); then
         _ms_render_activate
     else
         _ms_render_refresh_failed=1
