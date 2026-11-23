@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/bin/zsh -f
 emulate -L zsh
 fpath=( "${0:A:h:h}/functions/zsh" $fpath )
 autoload -Uz _ms_repo_sync_one

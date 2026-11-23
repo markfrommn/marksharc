@@ -1,4 +1,16 @@
 Describe 'repo-sync policy'
+  installed_override_case() {
+    emulate -L zsh
+    ms_fixture_full
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/repositories"
+    print -rl -- 'module path' 'module git-worktree' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    ms_run -c 'export _ms_opt_git_worktree_roots="$HOME/repositories"; command repo-sync' || { cat "$TEST_ROOT/err"; return 1; }
+    [[ ! -s $TEST_ROOT/out && ! -s $TEST_ROOT/err ]]
+  }
+  It 'preserves an exported native roots override through the installed loader'
+    When run installed_override_case
+    The status should be success
+  End
   executable_case() {
     emulate -L zsh
     _ms_opt_git_worktree_roots='' bash -c '"$MARKSHARC_ROOT/modules/git-worktree/bin/repo-sync"' > "$TEST_ROOT/out" 2>&1
