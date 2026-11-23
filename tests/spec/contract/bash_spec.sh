@@ -34,6 +34,31 @@ Describe 'cross-shell contract: bash core'
     The status should be success
   End
 
+  login_case() {
+    # Capture the system profile's PATH before installing either user stub.
+    env -i HOME="$HOME" PATH="$PATH" TERM=dumb /bin/bash -lc \
+      '[ "$HOME" = "$1" ] || exit 9; printf "%s\n" "$PATH"' bash "$HOME" \
+      >"$TEST_ROOT/login-path" 2>"$TEST_ROOT/err" || return 1
+    [ ! -s "$TEST_ROOT/err" ] || return 2
+    login_path=$(cat "$TEST_ROOT/login-path")
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    printf '%s\n' 'env LOGIN_TEST "shell parity"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    inst --home "$MARKSHARC_ROOT" --no-plugins || { cat "$TEST_ROOT/err"; return 3; }
+    env -i HOME="$HOME" PATH="$login_path" TERM=dumb XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+      XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
+      zsh -lc 'printf "%s\n%s\n" "$PATH" "$LOGIN_TEST"' >"$TEST_ROOT/zsh" 2>"$TEST_ROOT/err" || return 4
+    [ ! -s "$TEST_ROOT/err" ] || return 5
+    env -i HOME="$HOME" PATH="$login_path" TERM=dumb XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+      XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" \
+      /bin/bash -lc 'printf "%s\n%s\n" "$PATH" "$LOGIN_TEST"' >"$TEST_ROOT/bash" 2>"$TEST_ROOT/err" || return 6
+    [ ! -s "$TEST_ROOT/err" ] || return 7
+    cmp -s "$TEST_ROOT/zsh" "$TEST_ROOT/bash" || { cat "$TEST_ROOT/zsh" "$TEST_ROOT/bash"; return 8; }
+  }
+  It 'matches zsh PATH and exports through the installed Bash login profile'
+    When run login_case
+    The status should be success
+  End
+
   custom_tier_case() {
     mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/custom-tier"
     printf '%s\n' 'tiers "user custom"' 'path custom ~/custom-tier' > "$XDG_CONFIG_HOME/marksharc/config.conf"

@@ -15,7 +15,12 @@ Describe 'install.sh re-runs and environment'
     saved=$(find "$XDG_STATE_HOME/marksharc/replaced" -type f -name 'bashrc.*' -print)
     [ -n "$saved" ] && grep -q 'custom bash setting' "$saved" || return 3
     uninstall --purge --yes || return 4
-    saved=$(find "$HOME" -maxdepth 1 -name '.bashrc.marksharc-replaced.*' -print)
+    saved=
+    for copy in "$HOME"/.bashrc.marksharc-replaced.*; do
+      [ -f "$copy" ] || continue
+      saved=$copy
+      break
+    done
     [ -n "$saved" ] && grep -q 'custom bash setting' "$saved"
   }
   It 'keeps edits to Bash stubs through reinstall and purge'
