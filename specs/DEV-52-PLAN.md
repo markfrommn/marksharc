@@ -16,7 +16,7 @@ Authority: MARKSHARC-SPEC sections 6.3–6.5, 6.15 and 7–10; MARKSHARC-PLAN P3
 - [x] Update runs sync, plugin pins and module steps in order, supports list, only and dry-run, continues on errors and summarizes results.
 - [x] Registered krew, gvm, WezTerm terminfo, pyenv and nvm installers replace legacy install functions.
 - [x] Golden Brewfile, runner and registry tests plus startup and install regression checks pass locally.
-- [ ] Companion personal package/update migration is prepared and coordinated separately; real host replacement is verified or explicitly reported as unverified.
+- [x] The companion overlay migration is published separately and the live cutover status is recorded.
 
 ## Validation and boundary
 
@@ -27,9 +27,10 @@ step including daemon restart, and the Go tools installer from an unrelated work
 directory. The WezTerm installer was exercised using the current upstream terminfo
 source as a local curl fixture and real `tic` in a disposable home.
 
-Companion publication is pending its own authorization. Real package installation,
-remote installer execution, fresh physical macOS/Ubuntu host setup, and replacement
-of the legacy updater on the Mac and sol remain unverified.
+Merge and deploy the framework before applying the companion overlay. Live package
+installation, end-to-end upstream installer execution, clean-host provisioning, and
+replacement of the legacy updater on the Mac and sol remain unverified.
+[Companion overlay PR #19](https://github.com/markfrommn/mark-desktop-files/pull/19)
 
 Update captures and validates all registered argv before sync. Registration changes
 fetched by sync take effect on the next invocation, so the commands executed match
