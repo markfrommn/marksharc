@@ -360,3 +360,41 @@ path user "$HOME/custom"'
     The status should be success
   End
 End
+
+Describe 'renderer reload recovery'
+  failed_reload_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module path
+    mkdir -p "$HOME/oldbin" "$HOME/newbin"
+    ms_mod stable module.conf 'describe "stable"
+env STABLE_VALUE old
+path user "$HOME/oldbin"
+alias stable-alias "print old"
+completion stable stable-gen'
+    cat > "$TEST_ROOT/bin/stable-gen" <<'DATA'
+#!/bin/sh
+printf '#compdef stable\n'
+DATA
+    chmod +x "$TEST_ROOT/bin/stable-gen"
+    ms_pty HOST=testhost -dic '
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" || exit 11
+      old_id=$MARKSHARC_ENV
+      print "env STABLE_VALUE new" > "$MARKSHARC_HOME/modules/stable/module.conf"
+      print "path user \"$HOME/newbin\"" >> "$MARKSHARC_HOME/modules/stable/module.conf"
+      print "alias stable-alias \"print new\"" >> "$MARKSHARC_HOME/modules/stable/module.conf"
+      print "completion stable stable-gen" >> "$MARKSHARC_HOME/modules/stable/module.conf"
+      print "#!/bin/sh\nexit 23" > "$TEST_ROOT/bin/stable-gen"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh"
+      rc=$?
+      cache=$XDG_CACHE_HOME/marksharc/$MARKSHARC_HOST
+      print -r -- "rc=$rc value=$STABLE_VALUE alias=${aliases[stable-alias]-gone} old=${path[(Ie)$HOME/oldbin]} new=${path[(Ie)$HOME/newbin]} idmatch=$([[ $MARKSHARC_ENV == $old_id && $(<$cache/render-id) == $old_id ]] && print yes || print no) completion=$(<$cache/completions/zsh/_stable)"
+      exit' || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") == *'rc=1 value=old alias=print old old='*' new=0 idmatch=yes completion=#compdef stable'* ]] || { cat "$TEST_ROOT/out"; return 2; }
+    [[ $(<"$TEST_ROOT/out") != *'alias=print old old=0'* ]]
+  }
+  It 'keeps the last good rendered configuration and fails when a reload generator fails'
+    When run failed_reload_case
+    The status should be success
+  End
+End

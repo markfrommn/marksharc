@@ -19,6 +19,9 @@ source "$MARKSHARC_HOME/core/zsh/zshrc.zsh"
 if (( _ms_reload_had_verbose )); then MARKSHARC_VERBOSE=$_ms_reload_old_verbose; else unset MARKSHARC_VERBOSE; fi
 _ms_verbose=0
 [[ -n ${MARKSHARC_VERBOSE-} && $MARKSHARC_VERBOSE != 0 ]] && _ms_verbose=1
-unset _ms_force_rebuild _ms_reload_had_verbose _ms_reload_old_verbose _ms_reload_login _ms_reload_quiet
+_ms_reload_failed=${_ms_render_refresh_failed:-0}
+unset _ms_force_rebuild _ms_reload_had_verbose _ms_reload_old_verbose _ms_reload_login _ms_reload_quiet _ms_render_refresh_failed
 _ms_reloading=0
+if (( _ms_reload_failed )); then unset _ms_reload_failed; return 1; fi
+unset _ms_reload_failed
 true

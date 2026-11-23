@@ -47,9 +47,16 @@ _ms_trace "env id=${_ms_env_id_value:-none} rebuild=$_ms_env_rebuild"
 
 # A normal stale-input refresh writes only native env: completion generators run
 # during install, explicit render/update, or reload, never as a batch/agent side effect.
+typeset -gi _ms_render_refresh_failed=0
 if (( _ms_env_rebuild )); then
     _ms_render_reset
-    if ! _ms_render_refresh "${_ms_reloading:-0}"; then _ms_trace "render: failed"; fi
+    if _ms_render_refresh "${_ms_reloading:-0}"; then
+        _ms_render_activate
+    else
+        _ms_render_refresh_failed=1
+        _ms_render_restore
+        _ms_trace "render: failed"
+    fi
 fi
 _ms_render_load
 
@@ -65,7 +72,7 @@ fi
 
 typeset -gU path
 typeset -ga _ms_path_asserted=( "${path[@]}" )
-if (( _ms_env_rebuild )) && [[ -n $_ms_env_id_value ]]; then export MARKSHARC_ENV=$_ms_env_id_value; fi
+if (( _ms_env_rebuild && ! _ms_render_refresh_failed )) && [[ -n $_ms_env_id_value ]]; then export MARKSHARC_ENV=$_ms_env_id_value; fi
 _ms_trace "env phase: done"
 unset _ms_starting
 # The stub tests this file's status (source ... && ok): never end on a conditional.

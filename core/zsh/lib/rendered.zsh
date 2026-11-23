@@ -20,14 +20,67 @@ _ms_render_refresh() {
     _ms_render $generate
 }
 
-# Remove aliases owned by the previous render before a reload applies a new plan.
+# Snapshot the active plan before a render. Activation is transactional: the old
+# rendered function and aliases stay live until a replacement render succeeds.
 _ms_render_reset() {
+    emulate -L zsh
+    if (( ${+_ms_mod_names} )); then typeset -ga _ms_render_saved_mod_names=( "${_ms_mod_names[@]}" ); else typeset -ga _ms_render_saved_mod_names=(); fi
+    if (( ${+_ms_mod_dir} )); then typeset -gA _ms_render_saved_mod_dir=( "${(@kv)_ms_mod_dir}" ); else typeset -gA _ms_render_saved_mod_dir=(); fi
+    if (( ${+_ms_mod_describe} )); then typeset -gA _ms_render_saved_mod_describe=( "${(@kv)_ms_mod_describe}" ); else typeset -gA _ms_render_saved_mod_describe=(); fi
+    if (( ${+_ms_mod_order} )); then typeset -gA _ms_render_saved_mod_order=( "${(@kv)_ms_mod_order}" ); else typeset -gA _ms_render_saved_mod_order=(); fi
+    if (( ${+_ms_mod_req_cmd} )); then typeset -gA _ms_render_saved_mod_req_cmd=( "${(@kv)_ms_mod_req_cmd}" ); else typeset -gA _ms_render_saved_mod_req_cmd=(); fi
+    if (( ${+_ms_mod_req_os} )); then typeset -gA _ms_render_saved_mod_req_os=( "${(@kv)_ms_mod_req_os}" ); else typeset -gA _ms_render_saved_mod_req_os=(); fi
+    if (( ${+_ms_mod_options} )); then typeset -gA _ms_render_saved_mod_options=( "${(@kv)_ms_mod_options}" ); else typeset -gA _ms_render_saved_mod_options=(); fi
+    if (( ${+_ms_mod_optdef} )); then typeset -gA _ms_render_saved_mod_optdef=( "${(@kv)_ms_mod_optdef}" ); else typeset -gA _ms_render_saved_mod_optdef=(); fi
+    if (( ${+_ms_mod_enabled} )); then typeset -gA _ms_render_saved_mod_enabled=( "${(@kv)_ms_mod_enabled}" ); else typeset -gA _ms_render_saved_mod_enabled=(); fi
+    if (( ${+_ms_cfg_set} )); then typeset -gA _ms_render_saved_cfg_set=( "${(@kv)_ms_cfg_set}" ); else typeset -gA _ms_render_saved_cfg_set=(); fi
+    if (( ${+_ms_cfg_enabled} )); then typeset -gA _ms_render_saved_cfg_enabled=( "${(@kv)_ms_cfg_enabled}" ); else typeset -gA _ms_render_saved_cfg_enabled=(); fi
+    typeset -g _ms_render_saved_cfg_explicit=${_ms_cfg_explicit:-0}
+    typeset -g _ms_render_saved_core_dot=${_ms_opt_core_dot_in_path-off}
+    typeset -g _ms_render_saved_metadata_loaded=${_ms_render_metadata_loaded:-0}
+    typeset -g _ms_render_metadata_loaded=0
+    return 0
+}
+
+# Discard the snapshot after a successful render, then retire the old owned state
+# before _ms_render_load activates the new artifact.
+_ms_render_activate() {
     emulate -L zsh
     local name
     for name in "${_ms_rendered_aliases[@]}"; do unalias "$name" 2>/dev/null; done
     unfunction _ms_rendered_env 2>/dev/null
     unset _ms_rendered_modules _ms_rendered_aliases
-    typeset -g _ms_render_metadata_loaded=0
+    unset _ms_render_saved_mod_names _ms_render_saved_mod_dir _ms_render_saved_mod_describe
+    unset _ms_render_saved_mod_order _ms_render_saved_mod_req_cmd _ms_render_saved_mod_req_os
+    unset _ms_render_saved_mod_options _ms_render_saved_mod_optdef _ms_render_saved_mod_enabled
+    unset _ms_render_saved_cfg_set _ms_render_saved_cfg_enabled _ms_render_saved_cfg_explicit
+    unset _ms_render_saved_core_dot _ms_render_saved_metadata_loaded
+    return 0
+}
+
+# Restore the last good active plan after a failed render. Its env.zsh was not
+# replaced, so the still-live rendered function matches these tables again.
+_ms_render_restore() {
+    emulate -L zsh
+    typeset -ga _ms_mod_names=( "${_ms_render_saved_mod_names[@]}" )
+    typeset -gA _ms_mod_dir=( "${(@kv)_ms_render_saved_mod_dir}" )
+    typeset -gA _ms_mod_describe=( "${(@kv)_ms_render_saved_mod_describe}" )
+    typeset -gA _ms_mod_order=( "${(@kv)_ms_render_saved_mod_order}" )
+    typeset -gA _ms_mod_req_cmd=( "${(@kv)_ms_render_saved_mod_req_cmd}" )
+    typeset -gA _ms_mod_req_os=( "${(@kv)_ms_render_saved_mod_req_os}" )
+    typeset -gA _ms_mod_options=( "${(@kv)_ms_render_saved_mod_options}" )
+    typeset -gA _ms_mod_optdef=( "${(@kv)_ms_render_saved_mod_optdef}" )
+    typeset -gA _ms_mod_enabled=( "${(@kv)_ms_render_saved_mod_enabled}" )
+    typeset -gA _ms_cfg_set=( "${(@kv)_ms_render_saved_cfg_set}" )
+    typeset -gA _ms_cfg_enabled=( "${(@kv)_ms_render_saved_cfg_enabled}" )
+    typeset -g _ms_cfg_explicit=$_ms_render_saved_cfg_explicit
+    typeset -g _ms_opt_core_dot_in_path=$_ms_render_saved_core_dot
+    typeset -g _ms_render_metadata_loaded=$_ms_render_saved_metadata_loaded
+    unset _ms_render_saved_mod_names _ms_render_saved_mod_dir _ms_render_saved_mod_describe
+    unset _ms_render_saved_mod_order _ms_render_saved_mod_req_cmd _ms_render_saved_mod_req_os
+    unset _ms_render_saved_mod_options _ms_render_saved_mod_optdef _ms_render_saved_mod_enabled
+    unset _ms_render_saved_cfg_set _ms_render_saved_cfg_enabled _ms_render_saved_cfg_explicit
+    unset _ms_render_saved_core_dot _ms_render_saved_metadata_loaded
     return 0
 }
 
