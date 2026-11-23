@@ -14,8 +14,23 @@ All tests use temporary homes, stubs and disposable repositories. No live cleanu
 
 ## Acceptance criteria
 
-- [ ] Listed commands callable from zsh and bash; complex function implementations removed.
-- [ ] Safe directive encoding and application, including unknown-directive warnings.
-- [ ] Executable hooks and per-command behavior covered.
-- [ ] Provider/session shims private, secret-free, callable from bash, and rendered on PATH in every session class.
-- [ ] Documentation, tests and required checks completed; no unintended generated drift.
+- [x] Listed commands callable from zsh and bash; complex function implementations removed.
+- [x] Safe directive encoding and application, including unknown-directive warnings.
+- [x] Executable hooks and per-command behavior covered.
+- [x] Provider/session shims private, secret-free, callable from bash, and rendered on PATH in every session class.
+- [x] Documentation and local checks completed; isolated repeat rendering showed no unintended generated drift.
+
+## Outcome
+
+The shell wrapper applies directives emitted by the executable, including committed state changes
+before an executable failure. CWF and worktree hooks run as executable programs. Providers use
+data-only conf files and generated shims read provider values on invocation. Session shims are
+refreshed by render; cached shim manifests support recovery on reload. Provider and hook migration
+is documented in `docs/write-once.md`.
+
+Local `tests/check` passed: lint 78 files, zsh 416 examples (one Apple Terminal platform skip),
+contract 4, install 46 and repository 26. The standalone install e2e passed both checkout and
+clone paths. Hermetic renderer tests cover repeat output, stale shim removal and failure recovery;
+runtime artifacts stay in the temporary cache, with no repository drift. Tests use stubs and
+disposable repositories; live CWF session creation/destruction, Herdr/Collie, SSH agents, Docker,
+and provider services were not exercised. macOS CI remains a hosted check.

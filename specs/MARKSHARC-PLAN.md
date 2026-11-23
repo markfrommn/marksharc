@@ -700,6 +700,11 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 - Every listed command works from zsh and from `bash -c`.
 - The old functions are removed.
 
+**Outcome:** DEV-51 implements the write-once command and shim protocol, executable hooks and
+data-only provider files; [the task plan](DEV-51-PLAN.md) records the local checks and migration
+details. Live service contracts and hosted macOS CI remain unverified by the local fixture suite.
+PR link is added at closeout.
+
 #### P3.4 — Bootstrap, unified update, and explicit installers (DEV-52)
 
 - **Repo:** marksharc
