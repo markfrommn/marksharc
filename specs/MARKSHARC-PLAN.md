@@ -674,11 +674,15 @@ The operator approved skipping live `herdr completion zsh` verification.
 
 - Claude Code and Codex started with `SHELL=/bin/bash` see the same PATH and tool env as zsh.
 
-**Delivery:** The Bash emitter and loaders share the renderer's module and overlay
+**Outcome:** Implemented in [PR #9](https://github.com/markfrommn/marksharc/pull/9).
+The Bash emitter and loaders share the renderer's module and overlay
 inputs with zsh. The installer records and restores both Bash startup files, including
 when upgrading a zsh-only install. `agent.bash_env` enables the noninteractive hook.
 The cross-shell contract exercises the installed Bash profile, the hook and inherited
-startup. Agent launches are represented by child-shell stubs.
+startup. Agent launches are represented by child-shell stubs. The independent review
+and stack-check pass. Local checks cover 422 zsh examples with one platform skip,
+30 contract, 52 install and 26 repository examples. The [implementation CI run](https://github.com/markfrommn/marksharc/actions/runs/45140522192)
+passed the full suites and install e2e on macOS and Ubuntu.
 
 #### P3.3 — Write-once commands and shims (DEV-51)
 

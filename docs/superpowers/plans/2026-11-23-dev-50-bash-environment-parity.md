@@ -45,4 +45,5 @@ Touch `install.sh`, `core/cli/uninstall`, `tests/spec/install/installer_spec.sh`
 - [x] Update the user, developer, overlay and test documentation and the changelog. Document opt-in, agent commands, reinstall and rollback.
 - [x] Run `tests/check`, the install e2e and `git diff --check`. Verify repeated isolated renders produce identical Bash output only in the cache.
 - [x] Exercise both real shell binaries through the installed stubs and through agent child-shell stubs. Live Claude Code and Codex launches remain unverified.
-- [ ] Complete quality review, stack-check, configured reviews, and exact-head macOS and Ubuntu CI through the phase runbook. Record the delivered outcome and gaps against P3.2 before handoff.
+- [x] Complete independent quality review and stack-check. The fixes preserve worktree settings in child processes, clear the managed hook on opt-out, and keep activated environments ahead of managers.
+- [x] Verify the implementation on hosted macOS and Ubuntu. The four jobs pass on `e15f80f` in the [implementation CI run](https://github.com/markfrommn/marksharc/actions/runs/45140522192). The [delivery PR](https://github.com/markfrommn/marksharc/pull/9) records the local review disposition and remaining live-agent verification gap.
