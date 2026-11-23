@@ -1,6 +1,7 @@
 Describe 'bootstrap, update and installers'
   day2_fixture() {
     ms_fixture
+    cd "$TEST_ROOT" || return 1
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
     mkdir -p "$XDG_CONFIG_HOME/marksharc"
     ms_env
