@@ -15,28 +15,79 @@ _ms_words() {
     raw=( ${(Z:C:)1} ) 2>/dev/null || return 1
     (( $#raw )) || return 1
     for tok in $raw; do
-        if [[ $tok == [\'\"]* ]] && [[ ${#tok} -lt 2 || ${tok[1]} != ${tok[-1]} ]]; then reply=(); return 1; fi
-        _ms_word "$tok"
+        _ms_word "$tok" || { reply=(); return 1; }
         reply+=( "$REPLY" )
     done
     return 0
 }
 
 # Unquote one word into REPLY. A leading ~ or ~/ and $NAME / ${NAME} references
-# expand (single-quoted words stay literal); $(...) and backticks never run.
+# expand outside single quotes; backslash quotes a reference. Command substitutions,
+# backticks and every other metacharacter remain data and are never evaluated.
 _ms_word() {
     emulate -L zsh
     local raw=$1 value out rest
-    if [[ $raw == \'* ]]; then REPLY=${(Q)raw}; return 0; fi
-    value=${(Q)raw}
-    if [[ $raw == '~' || $raw == '~/'* ]]; then value=$HOME${value#\~}; fi
-    out=
-    rest=$value
-    while [[ $rest =~ '\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?' ]]; do
-        out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
-        rest=${rest[MEND+1,-1]}
+    # Most directive words are unquoted or double-quoted. Keep the original regex
+    # path for them; the character parser is only needed to preserve the context of
+    # single quotes and backslashes.
+    if [[ $raw != *\'* && $raw != *\\* ]]; then
+        value=${(Q)raw}
+        if [[ $raw == '~' || $raw == '~/'* ]]; then value=$HOME${value#\~}; fi
+        out=
+        rest=$value
+        while [[ $rest =~ '\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?' ]]; do
+            out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
+            rest=${rest[MEND+1,-1]}
+        done
+        REPLY=$out$rest
+        return 0
+    fi
+    if (( ${#raw} >= 2 )) && [[ $raw == \'*\' ]]; then
+        REPLY=${(Q)raw}
+        return 0
+    fi
+    _ms_word_quoted "$raw"
+}
+
+_ms_word_quoted() {
+    emulate -L zsh
+    local raw=$1 state=plain ch rest name
+    integer i len=${#raw}
+    REPLY=
+    for (( i = 1; i <= len; i++ )); do
+        ch=$raw[i]
+        if [[ $state == single ]]; then
+            if [[ $ch == \' ]]; then state=plain; else REPLY+=$ch; fi
+            continue
+        fi
+        if [[ $state == double && $ch == \" ]]; then state=plain; continue; fi
+        if [[ $state == plain && $ch == \' ]]; then state=single; continue; fi
+        if [[ $state == plain && $ch == \" ]]; then state=double; continue; fi
+        if [[ $ch == \\ ]]; then
+            if (( i == len )); then REPLY+='\'; continue; fi
+            if [[ $state == plain || $raw[i+1] == \" || $raw[i+1] == '$' || $raw[i+1] == '`' || $raw[i+1] == \\ ]]; then
+                (( i++ )); REPLY+=$raw[i]
+            else
+                REPLY+='\'
+            fi
+            continue
+        fi
+        if [[ $state == plain && $ch == '~' && $i == 1 && ( $len == 1 || $raw[2] == / ) ]]; then
+            REPLY+=$HOME
+            continue
+        fi
+        if [[ $ch == '$' ]]; then
+            rest=$raw[i,-1]
+            if [[ $rest =~ '^\$\{([A-Za-z_][A-Za-z0-9_]*)\}' || $rest =~ '^\$([A-Za-z_][A-Za-z0-9_]*)' ]]; then
+                name=$match[1]
+                REPLY+=${(P)name-}
+                (( i += MEND - 1 ))
+                continue
+            fi
+        fi
+        REPLY+=$ch
     done
-    REPLY=$out$rest
+    [[ $state == plain ]]
 }
 
 # config.conf: `module <name> [off]` and `set <module>.<key> <value>` lines. The
@@ -63,6 +114,9 @@ _ms_config_load() {
                 ;;
             set)
                 if [[ ${reply[2]-} == *.* && $#reply -ge 3 ]]; then _ms_cfg_set[${reply[2]}]=${(j: :)reply[3,-1]}; fi
+                ;;
+            tiers)
+                (( $#reply >= 2 )) && _ms_cfg_set[path.tiers]=${(j: :)reply[2,-1]}
                 ;;
         esac
     done < "$file"
@@ -104,6 +158,11 @@ _ms_modules_discover() {
         _ms_mod_dir[$name]=$dir
         order=50
         while IFS= read -r line || [[ -n $line ]]; do
+            # Rendered directives are read by render.zsh only. Warm startup discovers
+            # metadata here and must not tokenize the cached vocabulary a second time.
+            case $line in
+                env\ *|path\ *|alias\ *|completion\ *) continue ;;
+            esac
             _ms_words "$line" || continue
             case ${reply[1]} in
                 describe) _ms_mod_describe[$name]=${reply[2]-} ;;
@@ -144,7 +203,7 @@ _ms_module_options() {
 _ms_modules_plan() {
     emulate -L zsh
     local phase=$1 name cmd ok
-    [[ $phase == env ]] && _ms_modules_discover
+    [[ $phase == env && ${_ms_render_metadata_loaded:-0} != 1 ]] && _ms_modules_discover
     typeset -ga _ms_plan=()
     for name in $_ms_mod_names; do
         ok=1
@@ -178,6 +237,23 @@ _ms_command_available() {
     (( $+functions[_ms_command_pending] )) && _ms_command_pending "$1"
 }
 
+# Runtime guards left in rendered env.zsh. Use the path module's filesystem seam
+# when it is loaded; the fallback keeps directive-only fixtures independent of it.
+_ms_render_dir() {
+    if (( $+functions[_ms_isdir] )); then _ms_isdir "$1"; else [[ -d $1 ]]; fi
+}
+_ms_render_file() {
+    local REPLY
+    if (( $+functions[_ms_fs_path] )); then
+        _ms_fs_path "$1"
+    elif [[ -n ${_ms_fs_root-} && $1 != "$HOME" && $1 != "$HOME"/* ]]; then
+        REPLY=${_ms_fs_root}$1
+    else
+        REPLY=$1
+    fi
+    [[ -e $REPLY ]]
+}
+
 # Env phase: the "requires command" check of one module, made when its turn comes,
 # after the modules before it (brew at 10-19) have contributed their directories.
 _ms_module_requires_command() {
@@ -194,7 +270,9 @@ _ms_module_requires_command() {
 
 # Bracket the sourcing of one module phase file: trace and per-module timing.
 _ms_module_begin() {
-    [[ -r ${_ms_mod_dir[$2]}/$1.zsh ]] || return 1
+    if [[ ! -r ${_ms_mod_dir[$2]}/$1.zsh ]]; then
+        [[ $1 == env ]] && (( $+functions[_ms_rendered_env] )) && [[ ${_ms_rendered_modules[$2]-0} == 1 ]] || return 1
+    fi
     if (( _ms_verbose )); then _ms_now; _ms_mod_t0=$REPLY; fi
     _ms_trace "module $2: $1.zsh"
     return 0
@@ -222,6 +300,11 @@ _ms_modules_setup_paths() {
     typeset -ga _ms_module_fpaths=()
     typeset -gA _ms_module_function_sources=()
     typeset -gU fpath
+    local generated=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/completions/zsh
+    if [[ -d $generated ]]; then
+        fpath=( "$generated" $fpath )
+        _ms_module_fpaths+=( "$generated" )
+    fi
     for name in $_ms_plan; do
         dir=${_ms_mod_dir[$name]}
         if [[ -d $dir/functions/zsh ]]; then

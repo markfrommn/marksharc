@@ -134,8 +134,9 @@ Describe 'marksharc sync'
     print -r -- $'#!/usr/bin/env zsh\nprint -r -- sync-ran' > "$MS_HOME/core/cli/sync"
     chmod +x "$MS_HOME/core/cli/sync"
     ms_env
-    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    env -i "${MS_ENV[@]}" MARKSHARC_HOME="$MS_HOME" /bin/zsh -f "$MS_HOME/core/cli/update" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
     [[ $(<"$TEST_ROOT/out") == sync-ran ]]
+    [[ -s $XDG_CACHE_HOME/marksharc/${HOST%%.*}/render-id ]]
   }
   It 'runs the sync and pin updater through the minimal update command'
     When run update_case

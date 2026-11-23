@@ -31,7 +31,7 @@ Describe 'marksharc CLI'
     local args
     for args in '' help --help -h; do
       cli ${=args} || return 1
-      [[ $(<"$TEST_ROOT/out") == *Usage:* && $(<"$TEST_ROOT/out") == *reload* && $(<"$TEST_ROOT/out") == *'module list'* && $(<"$TEST_ROOT/out") == *uninstall* && $(<"$TEST_ROOT/out") == *version* ]] || { cat "$TEST_ROOT/out"; return 2; }
+      [[ $(<"$TEST_ROOT/out") == *Usage:* && $(<"$TEST_ROOT/out") == *reload* && $(<"$TEST_ROOT/out") == *render* && $(<"$TEST_ROOT/out") == *'module list'* && $(<"$TEST_ROOT/out") == *uninstall* && $(<"$TEST_ROOT/out") == *version* ]] || { cat "$TEST_ROOT/out"; return 2; }
     done
     cli bogus; [[ $? == 2 && ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/err") == *"unknown command: bogus"* ]] || { cat "$TEST_ROOT/err"; return 4; }
     cli ../core/zsh/zshenv; [[ $? == 2 ]] || return 5
@@ -73,6 +73,21 @@ Describe 'marksharc CLI'
   }
   It 'explains that reload runs inside a marksharc shell when run as a program'
     When run reload_direct_case
+    The status should be success
+  End
+
+  render_case() {
+    emulate -L zsh
+    cli_fw
+    ms_mod alpha module.conf 'describe "Alpha"
+env RENDERED_VALUE yes'
+    cli render || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/${HOST%%.*}"
+    [[ -r $cache/render-id && $(<"$cache/env.zsh") == *"export RENDERED_VALUE='yes'"* ]] || return 2
+    cli render unexpected; [[ $? == 2 ]] || return 3
+  }
+  It 'renders through the public command and rejects extra arguments'
+    When run render_case
     The status should be success
   End
 

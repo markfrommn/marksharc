@@ -23,7 +23,7 @@ typeset -g _ms_starting=1 _ms_verbose=0
 typeset -gi _ms_reloading=${_ms_reloading:-0}
 [[ -n ${MARKSHARC_VERBOSE-} && $MARKSHARC_VERBOSE != 0 ]] && _ms_verbose=1
 
-for _ms_lib in util session facts zdot envid modules cache; do
+for _ms_lib in util session facts zdot envid modules rendered cache; do
     [[ -r $MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh ]] && source "$MARKSHARC_HOME/core/zsh/lib/$_ms_lib.zsh"
 done
 unset _ms_lib
@@ -39,11 +39,30 @@ if [[ -o login || -o interactive ]]; then _ms_zdot_ensure; fi
 # Inherit-skip: a child shell whose MARKSHARC_ENV matches the current inputs only
 # recomputes shell-local facts. Login shells and reloads always rebuild.
 _ms_env_id
-_ms_env_rebuild=1
+typeset -gi _ms_env_rebuild=1 _ms_render_recover=0
 if [[ -z ${_ms_force_rebuild-} && ! -o login && -n $_ms_env_id_value && ${MARKSHARC_ENV-} == $_ms_env_id_value ]]; then
     _ms_env_rebuild=0
+    if ! _ms_render_cache_valid; then
+        _ms_env_rebuild=1
+        _ms_render_recover=1
+    fi
 fi
 _ms_trace "env id=${_ms_env_id_value:-none} rebuild=$_ms_env_rebuild"
+
+# A normal stale-input refresh writes only native env: completion generators run
+# during install, explicit render/update, or reload, never as a batch/agent side effect.
+typeset -gi _ms_render_refresh_failed=0
+if (( _ms_env_rebuild )); then
+    _ms_render_reset
+    if _ms_render_refresh $(( ${_ms_reloading:-0} || ${_ms_render_recover:-0} )); then
+        _ms_render_activate
+    else
+        _ms_render_refresh_failed=1
+        _ms_render_restore
+        _ms_trace "render: failed"
+    fi
+fi
+_ms_render_load
 
 # Modules that must see every other module's contribution (the path builder) register
 # a function here during the env phase; the finalizers run once, after the last module.
@@ -57,7 +76,7 @@ fi
 
 typeset -gU path
 typeset -ga _ms_path_asserted=( "${path[@]}" )
-if (( _ms_env_rebuild )) && [[ -n $_ms_env_id_value ]]; then export MARKSHARC_ENV=$_ms_env_id_value; fi
+if (( _ms_env_rebuild )) && [[ -n $_ms_env_id_value ]] && { (( ! _ms_render_refresh_failed )) || [[ -z ${MARKSHARC_ENV-} ]] }; then export MARKSHARC_ENV=$_ms_env_id_value; fi
 _ms_trace "env phase: done"
 unset _ms_starting
 # The stub tests this file's status (source ... && ok): never end on a conditional.

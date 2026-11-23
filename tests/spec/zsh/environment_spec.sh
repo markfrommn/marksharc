@@ -12,7 +12,7 @@ Describe 'environment discovery and PATH contracts'
     print fixture.invalid > "$fake/proc/sys/kernel/domainname"
     source "$MARKSHARC_ROOT/core/zsh/lib/facts.zsh"
     _ms_facts
-    [[ $dname == fixture.invalid ]]
+    [[ ${+dname} == 0 ]]
   }
   host_fact_case() {
     emulate -L zsh
@@ -22,7 +22,7 @@ Describe 'environment discovery and PATH contracts'
     print fixture.invalid > "$fake/proc/sys/kernel/domainname"
     source "$MARKSHARC_ROOT/core/zsh/lib/facts.zsh"
     _ms_facts
-    [[ $ostype == Solaris && $hwtype == sparc && $idcmd == /usr/bin/id && $dname == fixture.invalid && $MARKSHARC_OS == solaris ]]
+    [[ $MARKSHARC_ARCH == sparc && $idcmd == /usr/bin/id && ${+dname} == 0 && ${+ostype} == 0 && $MARKSHARC_OS == solaris ]]
   }
   brew_case() {
     emulate -L zsh
@@ -77,11 +77,11 @@ DATA
     When run helper_case
     The status should be success
   End
-  It 'reads the NIS domain name from the proc file without forking'
+  It 'ignores the old NIS domain fact'
     When run domain_case
     The status should be success
   End
-  It 'keeps generic host facts and domain discovery without legacy normalization'
+  It 'keeps generic modern host facts without legacy normalization'
     When run host_fact_case
     The status should be success
   End

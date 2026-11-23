@@ -22,33 +22,31 @@ DATA
   }
   completion_case() {
     emulate -L zsh
-    load_mfn herdr
-    source "$MARKSHARC_ROOT/core/zsh/lib/util.zsh"
-    source "$MARKSHARC_ROOT/core/zsh/lib/cache.zsh"
-    have_command() { [[ $1 == herdr ]]; }
+    ms_fixture
+    ms_copy_module herdr
     cat > "$TEST_ROOT/bin/herdr" <<'DATA'
 #!/bin/sh
 case "$*" in
   'session list') echo 'NAME STATE PID SOCKET';;
-  'completion zsh') [ -e "$TEST_ROOT/herdr-ok" ] && echo 'print COMPLETED >> "$OPLOG"' || exit 3;;
+  'completion zsh') [ -e "$TEST_ROOT/herdr-ok" ] && echo '#compdef herdr' || exit 3;;
 esac
 DATA
     chmod +x "$TEST_ROOT/bin/herdr"
-    setup-herdr-sessions > "$TEST_ROOT/out" 2>&1
-    [[ $? == 3 ]] || return 1
-    local -a cached=( "$XDG_CACHE_HOME"/marksharc/*/init/*(N) )
-    (( $#cached == 0 )) || return 2
+    render() {
+      env -i HOME="$HOME" PATH="$PATH" MARKSHARC_HOME="$MS_HOME" HOST=testhost \
+        XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+        XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+        OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    }
+    render && return 1
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ ! -e $cache/completions/zsh/_herdr && ! -e $cache/completion-id ]] || return 2
     : > "$TEST_ROOT/herdr-ok"
-    setup-herdr-sessions > "$TEST_ROOT/out" 2>&1 || return 3
-    [[ $(<"$OPLOG") == COMPLETED ]] || return 4
-    cached=( "$XDG_CACHE_HOME"/marksharc/*/init/*(N) )
-    (( $#cached == 1 )) || return 5
-    # A reload keeps the once-per-shell completion.
-    : > "$OPLOG"
-    _ms_reloading=1 setup-herdr-sessions > "$TEST_ROOT/out" 2>&1 || return 6
-    [[ ! -s $OPLOG ]]
+    render || { cat "$TEST_ROOT/err"; return 3; }
+    [[ $(<"$cache/completions/zsh/_herdr") == '#compdef herdr' && ! -s $OPLOG ]] || return 4
+    [[ $(<"$cache/completion-id") == $(<"$cache/render-id") ]]
   }
-  It 'propagates completion failure without caching it and skips completion on reload'
+  It 'renders completion without sourcing it and preserves no artifact after generator failure'
     When run completion_case
     The status should be success
   End

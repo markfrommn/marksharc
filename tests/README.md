@@ -60,7 +60,8 @@ this table to cover every module.
 | Core | Module discovery, order, requires, options, fpath, idempotency, failure containment, guard cache | `spec/zsh/core_modules_spec.sh` |
 | Core | Cached tool init: hit/miss keys, symlink resolution, missing/failing tools, unwritable cache, empty output, fixed PATH | `spec/zsh/core_cache_spec.sh` |
 | Core | `cs`/`li` reload: rebuild, trace, session kept, edit pickup | `spec/zsh/core_reload_spec.sh` |
-| Core | Host facts, dname, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
+| Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
+| Core | Modern host facts, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
 | Core | Agent/batch quiet on the full tree; gvm selection without forks | `spec/zsh/core_agent_spec.sh` |
 | Startup | Mode matrix quiet/reload; greeting opt-in; offline pinned plugin and cached completion; cached init reuse; installer failure propagation | `spec/zsh/startup_spec.sh` |
 | path | Tier order goldens (macOS/Linux/modules), placement, reload, dot rule, spaces, tiers option, pending commands, env finalizers, requires-after-brew | `spec/zsh/path_spec.sh` |
@@ -79,15 +80,15 @@ this table to cover every module.
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
 | mux | fix-tmux re-imports the tmux client environment (ssh-agent fix) | `spec/zsh/modules/mux/mux_spec.sh` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
-| herdr | Session wrappers from herdr session list, collie detection, cached completion | `spec/zsh/modules/herdr/herdr_spec.sh` |
+| herdr | Session wrappers from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
 | cc-providers | Provider files linked from the option/overlay directory | `spec/zsh/modules/cc-providers/providers_spec.sh` |
 | git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
-| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; init sources cwf shell zsh once per shell | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; render generates real zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
 | cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |
-| Installer | Fresh install from a checkout: stub, template overlay, manifest; paths with spaces, quotes and dollars survive; non-default MARKSHARC_CONFIG named in the stub | `spec/install/installer_spec.sh` |
+| Installer | Fresh install from a checkout: stub, template overlay, manifest, first declarative render; paths with spaces, quotes and dollars survive; non-default MARKSHARC_CONFIG named in the stub | `spec/install/installer_spec.sh` |
 | Installer | Existing zsh dotfiles (regular files, symlinks, a foreign `~/.zshenv`) backed up privately and recorded; idempotent re-run keeps the original backup | `spec/install/installer_spec.sh` |
 | Installer | `--dry-run` prints every action and writes nothing; framework from `--home`, own checkout or a clone (reused, never pulled); `--overlay` path, URL, conflict and existing overlay; zsh, git and zsh version checked before any write; chsh hint only; runs under dash | `spec/install/installer_spec.sh` |
 | Installer | A re-run that finds recorded backups but no stub of ours stops before any write (deleted or replaced stub), naming the backup; a hand-edited stub is copied to the state dir before it is rewritten (and next to the restored file on uninstall); MARKSHARC_CONFIG judged against ~/.config with XDG defaults, unset or non-default, and warnings for the other XDG variables; trailing slashes stripped; a checkout's bin/marksharc acts on its own framework | `spec/install/rerun_spec.sh` |

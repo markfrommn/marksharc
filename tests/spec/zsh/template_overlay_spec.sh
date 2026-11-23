@@ -42,6 +42,10 @@ Describe 'template overlay'
       grep -Eq "^option[[:space:]]+${opt}[[:space:]]" "$MARKSHARC_ROOT/modules/$mod/module.conf" 2>/dev/null || { print -r -- "unknown option $mod.$opt"; return 1; }
     done < "$template/config.conf"
     (( n >= 2 )) || { print -r -- "only $n set examples"; return 2; }
+    grep -q '^# path user ~/bin$' "$template/config.conf" || return 3
+    grep -q '^# env EDITOR "emacs -nw"$' "$template/config.conf" || return 4
+    grep -q '^# alias ll "ls -lA"$' "$template/config.conf" || return 5
+    grep -q '^# tiers "manager brew system user app local"$' "$template/config.conf" || return 6
   }
   It 'only suggests set examples for options that exist'
     When run examples_case

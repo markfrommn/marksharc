@@ -57,6 +57,16 @@ ms_unit() {
   local pre='MARKSHARC_HOME="$MARKSHARC_ROOT"; _ms_verbose=0; MARKSHARC_SESSION=${MARKSHARC_SESSION:-batch}
 for _l in util session facts cache modules; do source "$MARKSHARC_HOME/core/zsh/lib/$_l.zsh"; done
 _ms_facts; _ms_env_rebuild=1; typeset -ga _ms_env_finalizers=()
+_ms_test_render_module() {
+  local _dot=${_ms_opt_core_dot_in_path-} _cache
+  source "$MARKSHARC_HOME/core/zsh/lib/render.zsh"
+  _ms_env_id_value=test
+  _ms_render 0 || return
+  [[ -n $_dot ]] && _ms_opt_core_dot_in_path=$_dot
+  _cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/$MARKSHARC_HOST
+  source "$_cache/env.zsh" || return
+  _ms_rendered_env "$1"
+}
 '
   env -i "${MS_ENV[@]}" MARKSHARC_ROOT="$MARKSHARC_ROOT" "${extra[@]}" /bin/zsh -f -c "$pre$1" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null
 }

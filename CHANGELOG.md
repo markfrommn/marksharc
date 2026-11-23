@@ -31,6 +31,11 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- `marksharc render`: declarative module and overlay `env`, `path`, `alias` and
+  `completion` directives, with `when` guards, per-host cached `env.zsh`, generated
+  completions, render ids and stale-input reload. Overlay `tiers` lines customize
+  PATH order. The directive-expressible public environment and aliases now render
+  from `module.conf`, and the old compatibility host-fact names are gone.
 - `marksharc sync`, `update`, and `doctor`: fast-forward safe checkouts, refresh
   plugin pins, report health, and notify interactively after a throttled detached fetch.
 - Installer and command: `install.sh` (`--home`, `--overlay`, `--dry-run`; backs up

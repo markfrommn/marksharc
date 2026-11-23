@@ -131,6 +131,14 @@ Describe 'private overlay loader'
   disabled_hook_case() {
     emulate -L zsh
     ms_fixture_full
+    cat > "$TEST_ROOT/bin/herdr" <<'DATA'
+#!/bin/sh
+case "$*" in
+  'session list') printf 'NAME STATE PID SOCKET\n' ;;
+  'completion zsh') printf '#compdef herdr\n' ;;
+esac
+DATA
+    chmod +x "$TEST_ROOT/bin/herdr"
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks"
     print 'describe "demo hooks"' > "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks/module.conf"
     cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-hooks/init.zsh" <<'DATA'

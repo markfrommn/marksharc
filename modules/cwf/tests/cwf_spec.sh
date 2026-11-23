@@ -79,33 +79,90 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
     The status should be success
   End
 End
-Describe 'cwf module init'
-  init_case() {
-    emulate -L zsh
-    mkdir -p "$HOME/tools"
+Describe 'cwf cached zsh integration'
+  integration_fixture() {
+    ms_fixture
+    ms_copy_module cwf
+    mkdir -p "$HOME/tools" "$HOME/initial-tools"
     cat > "$TEST_ROOT/bin/cwf" <<'DATA'
 #!/bin/sh
-[ "$1 $2" = 'shell zsh' ] && printf 'print -r -- SOURCED >> "$OPLOG"\ntypeset -ga cwf_marker=( loaded )\n'
+if [ "$1 $2" = 'shell zsh' ]; then
+  printf 'GENERATED\n' >> "$OPLOG"
+  printf 'export COMMON_DEV_TOOLS="%s"\n' "$HOME/tools"
+  printf 'alias cwf-claude="cwf fixture"\n'
+  printf 'typeset -ga cwf_marker=( loaded )\n'
+  printf 'print -r -- SOURCED >> "$OPLOG"\n'
+fi
 DATA
     chmod +x "$TEST_ROOT/bin/cwf"
-    # _ms_trace is a core helper; the child has no core, so give it a no-op and assert clean output.
-    local base='_ms_trace() { :; }; source "$MOD_INIT"; print -r -- "hooks=${+cwf_new_post_create_hooks} exclude=${+cwf_new_copy_exclude}"'
-    local clean='hooks=1 exclude=1'
-    # No tooling checkout known: nothing is sourced, the registries still exist.
-    module_run cwf "$base" || return 1
-    [[ $(<"$TEST_ROOT/out") == 'hooks=1 exclude=1' && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out"; return 2; }
-    # Known checkout: cwf shell zsh output is sourced once; a reload skips it.
-    module_run cwf "export COMMON_DEV_TOOLS=$HOME/tools; $base" || return 3
-    [[ $(<"$OPLOG") == SOURCED && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 4; }
     : > "$OPLOG"
-    module_run cwf "export COMMON_DEV_TOOLS=$HOME/tools; _ms_reloading=1; $base" || return 5
-    [[ ! -s $OPLOG && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 6; }
-    # A dangling COMMON_DEV_TOOLS is ignored.
-    module_run cwf "export COMMON_DEV_TOOLS=$HOME/missing; $base" || return 7
-    [[ ! -s $OPLOG && $(<"$TEST_ROOT/out") == $clean ]] || { cat "$TEST_ROOT/out"; return 8; }
   }
-  It 'sources cwf shell zsh once per shell when the tooling checkout is known'
+  render_cwf() {
+    env -i HOME="$HOME" PATH="$PATH" TERM=dumb MARKSHARC_HOME="$MS_HOME" \
+      COMMON_DEV_TOOLS="$HOME/initial-tools" HOST="$HOST" \
+      XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" \
+      /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+  }
+  cwf_cache() { print -r -- "$XDG_CACHE_HOME/marksharc/${HOST%%.*}"; }
+
+  render_case() {
+    emulate -L zsh
+    integration_fixture
+    render_cwf || { cat "$TEST_ROOT/err"; return 1; }
+    local cache=$(cwf_cache)
+    [[ $(<"$OPLOG") == GENERATED && -r $cache/completions/zsh/_cwf ]] || { cat "$OPLOG"; return 2; }
+    [[ $(<"$cache/completions/zsh/_cwf") == *'alias cwf-claude'* && $(<"$cache/completions/zsh/_cwf") != *compdef* ]] || return 3
+  }
+  It 'generates shell integration without evaluating it and without requiring compdef'
+    When run render_case
+    The status should be success
+  End
+
+  init_case() {
+    emulate -L zsh
+    integration_fixture
+    render_cwf || { cat "$TEST_ROOT/err"; return 1; }
+    ms_pty COMMON_DEV_TOOLS="$HOME/initial-tools" -dic '
+      print -r -- "first=${aliases[cwf-claude]}|$COMMON_DEV_TOOLS|${(j:,:)cwf_marker}"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" || exit 11
+      print -r -- "second=${aliases[cwf-claude]}|$COMMON_DEV_TOOLS|${(j:,:)cwf_marker}"
+      exit' || { cat "$TEST_ROOT/out"; return 2; }
+    [[ $(<"$TEST_ROOT/out") == *"first=cwf fixture|$HOME/tools|loaded"* && $(<"$TEST_ROOT/out") == *"second=cwf fixture|$HOME/tools|loaded"* ]] || { cat "$TEST_ROOT/out"; return 3; }
+    [[ $(grep -c '^GENERATED$' "$OPLOG") == 1 && $(grep -c '^SOURCED$' "$OPLOG") == 2 ]] || { cat "$OPLOG"; return 4; }
+  }
+  It 'sources the cached integration interactively and again on reload without regenerating'
     When run init_case
+    The status should be success
+  End
+
+  optional_case() {
+    emulate -L zsh
+    integration_fixture
+    ms_pty COMMON_DEV_TOOLS="$HOME/initial-tools" -dic 'print -r -- "missing=${+aliases[cwf-claude]}|${+cwf_marker}"; exit' || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") == *'missing=0|0'* && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 2; }
+    render_cwf || return 3
+    ms_pty COMMON_DEV_TOOLS="$HOME/missing" -dic 'print -r -- "dangling=${+aliases[cwf-claude]}|${+cwf_marker}"; exit' || { cat "$TEST_ROOT/out"; return 4; }
+    [[ $(<"$TEST_ROOT/out") == *'dangling=0|0'* && $(<"$OPLOG") == GENERATED ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 5; }
+  }
+  It 'stays quiet and optional when the cache or tooling checkout is absent'
+    When run optional_case
+    The status should be success
+  End
+
+  batch_agent_case() {
+    emulate -L zsh
+    integration_fixture
+    render_cwf || { cat "$TEST_ROOT/err"; return 1; }
+    : > "$OPLOG"
+    ms_run COMMON_DEV_TOOLS="$HOME/initial-tools" -c 'print -r -- "${+aliases[cwf-claude]}|${+cwf_marker}|$COMMON_DEV_TOOLS"' || { cat "$TEST_ROOT/err"; return 2; }
+    [[ $(<"$TEST_ROOT/out") == "0|0|$HOME/initial-tools" && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 3; }
+    ms_run COMMON_DEV_TOOLS="$HOME/initial-tools" CLAUDECODE=1 -ic 'print -r -- "${+aliases[cwf-claude]}|${+cwf_marker}|$COMMON_DEV_TOOLS"' || { cat "$TEST_ROOT/err"; return 4; }
+    [[ $(<"$TEST_ROOT/out") == "0|0|$HOME/initial-tools" && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 5; }
+  }
+  It 'does not generate or source the integration in batch or agent shells'
+    When run batch_agent_case
     The status should be success
   End
 End

@@ -1,6 +1,6 @@
 # The cache file for this host, in REPLY. Creates the state directory and migrates the old file.
 emulate -L zsh
 _ms_agent_state_dir || return 1
-REPLY=$REPLY/agent.${MARKSHARC_HOST:-${shorthost:-${HOST%%.*}}}.sh
+REPLY=$REPLY/agent.${MARKSHARC_HOST:-${HOST%%.*}}.sh
 _ms_agent_migrate "$REPLY"
 return 0

@@ -428,6 +428,22 @@ else
   fi
 fi
 
+# 6. first declarative render. Older minimal fixtures may not carry the renderer;
+# a real checkout always does. A failed generator leaves a usable install and is
+# retried by "marksharc render" or reload.
+if [ "$DRY" -eq 1 ] && [ -r "$FW/core/zsh/lib/render.zsh" ]; then
+  say "would render the declarative environment and completions"
+elif [ "$DRY" -eq 0 ] && [ -r "$FW/core/zsh/lib/render.zsh" ]; then
+  if HOME="$HOME" MARKSHARC_HOME="$FW" MARKSHARC_CONFIG="$CONFIG_DIR" \
+    XDG_CONFIG_HOME="$CONFIG_BASE" XDG_CACHE_HOME="$CACHE_BASE" \
+    XDG_DATA_HOME="$DATA_BASE" XDG_STATE_HOME="$STATE_BASE" \
+    zsh -f "$FW/core/cli/render"; then
+    say "rendered the declarative environment and completions"
+  else
+    say "warning: could not render declarative completions; retry with: marksharc render"
+  fi
+fi
+
 # --- done -------------------------------------------------------------------
 if [ "$DRY" -eq 1 ]; then
   say "dry run complete"

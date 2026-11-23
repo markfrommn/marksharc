@@ -67,9 +67,10 @@ Day 1:
 marksharc module list              # enabled, disabled and skipped modules
 marksharc module disable <name>    # edits config.conf in your overlay
 marksharc reload                   # apply it in this shell (--verbose to trace)
+marksharc render                   # refresh cached env and generated completions
 marksharc sync                     # fast-forward safe checkouts and refresh pins
 marksharc doctor                   # report local health
-marksharc update                   # MVP: sync and plugin pins
+marksharc update                   # sync, plugin pins and declarative render
 marksharc version
 marksharc uninstall                # restore the backed-up dotfiles, remove the stub
 ```
@@ -97,6 +98,22 @@ or `hosts/<host>.conf`);
 a module enabled by default skips itself when its command is absent.
 
 An assignment in `hosts/<hostname>.conf` replaces the global `sync.repos` list.
+
+The same module and host conf files accept declarative environment lines. Values use shell-word
+quoting; `~` and `$NAME` are references, never command substitution. `when command`, `dir` and
+`file` guards run in the next shell, while `os` and `host` guards are settled by `render`.
+
+```text
+path user ~/bin
+env EDITOR "emacs -nw"
+alias ll "ls -lA" when command ls
+tiers "manager brew system user app local"
+```
+
+`marksharc render` writes the per-host cached `env.zsh` and generated completions. Startup refreshes
+stale env without running generators; install, update and explicit reload also refresh completions.
+The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
+its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
 An eligible interactive shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a
