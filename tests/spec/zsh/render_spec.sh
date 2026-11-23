@@ -182,6 +182,29 @@ DATA
     When run real_shim_render_case
     The status should be success
   End
+  shim_recovery_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module cc-providers
+    local config=$XDG_CONFIG_HOME/marksharc cache=$XDG_CACHE_HOME/marksharc/testhost id
+    mkdir -p "$config/providers"
+    print 'module cc-providers' > "$config/config.conf"
+    print 'env TEST value' > "$config/providers/a.conf"
+    render_cli || return 1
+    id=$(<"$cache/render-id")
+    rm "$cache/bin/claudea"
+    ms_run HOST=testhost -c 'true' || return 2
+    [[ ! -e $cache/bin/claudea ]] || return 3
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 4
+    [[ -x $cache/bin/claudea ]] || return 5
+    rm -rf "$cache/bin"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 6
+    [[ -x $cache/bin/claudea && $(file_mode "$cache/bin") == 700 ]]
+  }
+  It 'recovers deleted shim files and directories on reload without cold-start generation'
+    When run shim_recovery_case
+    The status should be success
+  End
 
   completion_case() {
     emulate -L zsh

@@ -21,6 +21,14 @@ _ms_render_cache_valid() {
             [[ -z $file || -r $cache/completions/zsh/$file ]] || return 1
         done
     fi
+    (( require_completions )) && [[ ! -r $cache/shim-id ]] && return 1
+    if [[ -r $cache/shim-id ]]; then
+        completed=$(<"$cache/shim-id")
+        [[ $completed == "$_ms_env_id_value" && -d $cache/bin && -r $cache/shim-files ]] || return 1
+        for file in "${(@f)$(<"$cache/shim-files")}"; do
+            [[ -z $file || -x $cache/bin/$file ]] || return 1
+        done
+    fi
     return 0
 }
 
