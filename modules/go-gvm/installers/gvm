@@ -7,7 +7,7 @@ main() {
     tempfile=$(mktemp) || return 1
     {
         curl --fail --silent --show-error --location https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer -o "$tempfile" || return $?
-        bash "$tempfile"
+        GVM_NO_UPDATE_PROFILE=1 bash "$tempfile"
     } always {
         result=$?
         rm -f -- "$tempfile"

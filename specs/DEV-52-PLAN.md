@@ -30,3 +30,7 @@ source as a local curl fixture and real `tic` in a disposable home.
 Companion publication is pending its own authorization. Real package installation,
 remote installer execution, fresh physical macOS/Ubuntu host setup, and replacement
 of the legacy updater on the Mac and sol remain unverified.
+
+Update captures and validates all registered argv before sync. Registration changes
+fetched by sync take effect on the next invocation, so the commands executed match
+the validated snapshot.

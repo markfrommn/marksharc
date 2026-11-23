@@ -31,6 +31,59 @@ Describe 'bootstrap, update and installers'
     The status should be success
   End
 
+  empty_selector_case() {
+    day2_fixture
+    ms_mod sample module.conf 'update test touch "$TEST_ROOT/ran"'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --only '' --dry-run > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? != 0 && ! -e $TEST_ROOT/ran && ! -s $TEST_ROOT/out ]]
+  }
+  It 'rejects an empty update selector without executing or listing steps'
+    When run empty_selector_case
+    The status should be success
+  End
+
+  update_snapshot_case() {
+    day2_fixture
+    print -r -- 'update safe touch "$TEST_ROOT/original"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    print -r -- $'#!/usr/bin/env zsh\nif [[ $MARKSHARC_SYNC_PART == repositories ]]; then\n  print -r -- \'update duplicate touch "$TEST_ROOT/bad-one"\' \'update duplicate touch "$TEST_ROOT/bad-two"\' > "$XDG_CONFIG_HOME/marksharc/config.conf"\nfi' > "$MS_HOME/core/cli/sync"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ -e $TEST_ROOT/original && ! -e $TEST_ROOT/bad-one && ! -e $TEST_ROOT/bad-two && $(<"$TEST_ROOT/out") == *'safe: ok'* ]]
+  }
+  It 'runs only the validated update snapshot when sync changes configuration'
+    When run update_snapshot_case
+    The status should be success
+  End
+
+  update_literal_case() {
+    day2_fixture
+    ms_mod sample module.conf $'update literal update-fixture "a b" "" \'$(touch never)\''
+    stub_command update-fixture 'printf "<%s>\n" "$@" > "$TEST_ROOT/args"'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --only literal > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/args") == $'<a b>\n<>\n<$(touch never)>' && ! -e never ]]
+  }
+  It 'preserves spaces, empty arguments and literal metacharacters in the snapshot'
+    When run update_literal_case
+    The status should be success
+  End
+
+  installer_environment_case() {
+    ms_fixture_full
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    print -r -- $'#!/bin/bash\nprintf "%s|%s|%s|%s" "$GVM_NO_UPDATE_PROFILE" "$PROFILE" "$NVM_DIR" "$(test -d "$NVM_DIR" && echo exists)" > "$TEST_ROOT/installer-env"' > "$TEST_ROOT/payload"
+    stub_command curl 'while [ "$1" != -o ]; do shift; done; cp "$TEST_ROOT/payload" "$2"'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" install gvm > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/installer-env") == '1|'* ]] || return 2
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" install nvm > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 3
+    [[ $(<"$TEST_ROOT/installer-env") == "|/dev/null|$HOME/.nvm|exists" ]] || return 4
+    env -i "${MS_ENV[@]}" NVM_DIR="$TEST_ROOT/custom nvm" "$MS_HOME/bin/marksharc" install nvm > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 5
+    [[ $(<"$TEST_ROOT/installer-env") == "|/dev/null|$TEST_ROOT/custom nvm|exists" ]]
+  }
+  It 'keeps profiles untouched and passes the default or custom nvm directory to installers'
+    When run installer_environment_case
+    The status should be success
+  End
+
   missing_requirement_case() {
     day2_fixture
     ms_mod sample module.conf $'requires command marksharc-missing-fixture\npackage brew fixture'
@@ -101,12 +154,15 @@ Describe 'bootstrap, update and installers'
 
   ordered_case() {
     day2_fixture
-    print -r -- $'#!/usr/bin/env zsh\nprint -r -- "$MARKSHARC_SYNC_PART" >> "$TEST_ROOT/order"' > "$MS_HOME/core/cli/sync"
-    ms_mod sample module.conf 'update example touch "$TEST_ROOT/module-ran"'
+    print -r -- $'#!/usr/bin/env zsh\nprint -r -- "$MARKSHARC_SYNC_PART" >> "$OPLOG"' > "$MS_HOME/core/cli/sync"
+    print -r -- $'#!/usr/bin/env zsh\nprint -r -- render >> "$OPLOG"' > "$MS_HOME/core/cli/render"
+    stub_command update-fixture 'printf "%s\n" "$1" >> "$OPLOG"'
+    ms_mod sample module.conf 'update example update-fixture module'
+    print -r -- 'update overlay update-fixture overlay' > "$XDG_CONFIG_HOME/marksharc/config.conf"
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
-    [[ $(<"$TEST_ROOT/order") == $'repositories\npins' && -e $TEST_ROOT/module-ran ]]
+    [[ $(<"$OPLOG") == $'repositories\npins\nmodule\noverlay\nrender' ]]
   }
-  It 'runs checkout sync then plugin pins before module steps'
+  It 'runs checkout sync, pins, module and overlay steps, then render in order'
     When run ordered_case
     The status should be success
   End
