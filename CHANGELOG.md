@@ -10,6 +10,8 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
+- `doctor` recognizes unchanged installer-managed Bash startup files, reports
+  modified or missing files, and identifies provider configuration that needs migration.
 - Interactive zsh startup on the Mac drops from about 5 s to under 1 s: `node-nvm`
   and `go-gvm` load nvm and gvm on first use instead of at startup. The env phase
   already puts the default node and Go on PATH, and `go-gvm` sets `GOPATH` and

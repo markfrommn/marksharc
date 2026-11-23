@@ -903,6 +903,10 @@ Native fish module migration and legacy config retirement remain in P4.2.
 - Call write-once commands through applier wrappers.
 - Add completions.
 - Replace `test_parity.py` with fishtape units.
+- Preserve doctor detection of foreign `config.fish` while recognizing only the
+  installer-owned `conf.d/00-marksharc.fish` stub by its manifest checksum. Add
+  fixtures for unchanged, modified, missing, and foreign fish files when changing
+  fish installation or retirement behavior.
 - Publish a parity table in the docs.
 - Remove the fisher dependency.
 

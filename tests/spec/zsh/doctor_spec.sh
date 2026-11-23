@@ -75,10 +75,90 @@ Describe 'marksharc doctor'
     env -i "${MS_ENV[@]}" sh "$MARKSHARC_ROOT/install.sh" --home "$TEST_ROOT/framework-link" > "$TEST_ROOT/install-out" 2> "$TEST_ROOT/install-err" || return 1
     env -i "${MS_ENV[@]}" zsh -lc exit > /dev/null 2>&1 || return 4
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 2
-    [[ $(<"$TEST_ROOT/out") != *'modified stub'* && $(<"$TEST_ROOT/out") != *'stale environment ID'* && $(<"$TEST_ROOT/out") != *'stale generated stub'* ]] || { cat "$TEST_ROOT/out"; return 3; }
+    [[ $(<"$TEST_ROOT/out") != *'modified stub'* && $(<"$TEST_ROOT/out") != *'stale environment ID'* && $(<"$TEST_ROOT/out") != *'stale generated stub'* && $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bash_profile"* && $(<"$TEST_ROOT/out") != *"missing or unmanaged bash stub: $HOME/"* ]] || { cat "$TEST_ROOT/out"; return 3; }
   }
   It 'accepts the installer stub and environment from a valid fresh install'
     When run installed_case
+    The status should be success
+  End
+  bash_stub_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_STATE_HOME/marksharc"
+    print -r -- '# marksharc: managed stub' > "$HOME/.bashrc"
+    cp "$HOME/.bashrc" "$HOME/.bash_profile"
+    print -r -- "bash_stub_sum=$(cksum < "$HOME/.bashrc")" > "$XDG_STATE_HOME/marksharc/install.manifest"
+    print -r -- changed >> "$HOME/.bash_profile"
+    stub_command cksum '/usr/bin/cksum "$@" | sed "s/ /   /g"'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"missing or unmanaged bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") == *"modified bash stub: $HOME/.bash_profile"* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'accepts an unchanged Bash stub and identifies a modified Bash profile'
+    When run bash_stub_case
+    The status should be success
+  End
+  missing_provider_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module cc-providers
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/providers"
+    print -r -- 'legacy fixture' > "$XDG_CONFIG_HOME/marksharc/providers/a.provider"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *'cc-providers'*'no .conf provider files'* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'diagnoses a default-enabled provider module with legacy files only'
+    When run missing_provider_case
+    The status should be success
+  End
+  optional_provider_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module cc-providers
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/providers"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'no .conf provider files'* ]] || return 1
+    print -r -- 'module cc-providers off' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    print -r -- legacy > "$XDG_CONFIG_HOME/marksharc/providers/a.provider"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'no .conf provider files'* ]]
+  }
+  It 'keeps an unused or disabled provider module quiet'
+    When run optional_provider_case
+    The status should be success
+  End
+  configured_provider_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module cc-providers
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$TEST_ROOT/providers"
+    print -rl -- 'module cc-providers' "set cc-providers.dir '$TEST_ROOT/providers'" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *'no .conf provider files'* ]] || return 1
+    print -r -- 'env TEST fixture' > "$TEST_ROOT/providers/a.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'cc-providers:'* ]]
+  }
+  It 'checks the configured provider directory and accepts a migrated definition'
+    When run configured_provider_case
+    The status should be success
+  End
+  bash_missing_symlink_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_STATE_HOME/marksharc"
+    print -r -- 'bash_stub_sum=1 1' > "$XDG_STATE_HOME/marksharc/install.manifest"
+    print -r -- foreign > "$TEST_ROOT/bash-target"
+    ln -s "$TEST_ROOT/bash-target" "$HOME/.bashrc"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *"missing or unmanaged bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") == *"missing or unmanaged bash stub: $HOME/.bash_profile"* && $(<"$TEST_ROOT/out") == *'1: foreign'* ]]
+  }
+  It 'reports a missing Bash profile and a symlinked Bash rc'
+    When run bash_missing_symlink_case
     The status should be success
   End
   foreign_case() {

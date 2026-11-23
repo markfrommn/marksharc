@@ -342,6 +342,9 @@ The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global 
 The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a matching value skips the export and PATH work and only recomputes shell-local facts. Login shells and explicit reloads always rebuild.
 
 `ZDOTDIR` takeover is deliberate: it keeps installer edits to `~/.zshrc` from changing the shell silently. `marksharc doctor` lists foreign lines found in `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, and `~/.config/fish/config.fish` so each can become a module or an overlay line.
+An installer-managed Bash stub whose checksum matches the install manifest is
+accepted. A missing, symlinked, or modified recorded Bash stub is reported.
+The fish `config.fish` remains separate from the managed `conf.d` stub.
 
 ### 6.7 PATH composition
 
@@ -447,6 +450,10 @@ A host has two checkouts: the framework and the overlay (plus any private module
 | `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
+
+Doctor reports legacy `.provider` files for an enabled `cc-providers` module
+and reports an empty provider directory when the module or directory is
+explicitly configured. An unused default provider directory stays optional.
 
 The update runner validates its step labels and arguments once before execution. Configuration
 changes fetched by sync apply to the next invocation.
