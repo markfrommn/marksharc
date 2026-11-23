@@ -94,7 +94,7 @@ _ms_render_conf() {
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
                 print -r -- "            $guard && export $name=${(qq)value}"
                 print -r -- "            $guard && _ms_rendered_exports+=( ${(q)name} )"
-                print -r -- "            (( \${_ms_env_rebuild:-1} )) || { ${REPLY:+$REPLY && }[[ \${$name+x} && \${$name-} == ${(qq)value} ]] && _ms_rendered_exports+=( ${(q)name} ); }"
+                print -r -- "            (( \${_ms_env_rebuild:-1} )) || { [[ \${$name+x} && \${$name-} == ${(qq)value} ]] && _ms_rendered_exports+=( ${(q)name} ); }"
                 ;;
             path)
                 name=${reply[2]-} value=${reply[3]-}

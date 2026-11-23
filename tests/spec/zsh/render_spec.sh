@@ -570,4 +570,26 @@ env TRANSITION managed when command flip-tool'
     When run collision_case
     The status should be success
   End
+
+  inherited_transition_case() {
+    emulate -L zsh
+    ms_fixture
+    printf '#!/bin/sh\n' > "$TEST_ROOT/bin/flip-tool"
+    chmod +x "$TEST_ROOT/bin/flip-tool"
+    ms_mod transition module.conf 'describe "inherited transition"
+env TRANSITION managed when command flip-tool'
+    ms_run HOST=testhost -c 'print -r -- "$MARKSHARC_ENV"' || { cat "$TEST_ROOT/err"; return 1; }
+    local id=$(<"$TEST_ROOT/out")
+    rm "$TEST_ROOT/bin/flip-tool"
+    ms_pty HOST=testhost MARKSHARC_ENV="$id" TRANSITION=managed -dic '
+      print -r -- "before-owned=${_ms_rendered_exports[*]}"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" || exit 11
+      print -r -- "after=${TRANSITION-unset} after-owned=${_ms_rendered_exports[*]}"
+      exit' || { cat "$TEST_ROOT/out"; return 2; }
+    [[ $(<"$TEST_ROOT/out") == *'before-owned=TRANSITION'* && $(<"$TEST_ROOT/out") == *'after=unset after-owned='* ]] || { cat "$TEST_ROOT/out"; return 3; }
+  }
+  It 'recognizes a renderer-owned inherited value even when its guard is already false'
+    When run inherited_transition_case
+    The status should be success
+  End
 End
