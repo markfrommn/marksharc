@@ -157,6 +157,31 @@ DATA
     When run shim_stage_case
     The status should be success
   End
+  real_shim_render_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module cc-providers
+    local config=$XDG_CONFIG_HOME/marksharc cache=$XDG_CACHE_HOME/marksharc/testhost
+    mkdir -p "$config/providers"
+    print 'module cc-providers' > "$config/config.conf"
+    print "env ANTHROPIC_AUTH_TOKEN 'private fixture value'" > "$config/providers/a.conf"
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    [[ -x $cache/bin/claudea && -x $cache/bin/modelsa && $(file_mode "$cache/bin") == 700 ]] || return 2
+    ! grep -q 'private fixture value' "$cache/bin/claudea" || return 3
+    local before=$(<"$cache/bin/claudea") id=$(<"$cache/render-id")
+    render_cli || return 4
+    [[ $(<"$cache/bin/claudea") == "$before" && $(<"$cache/render-id") == "$id" ]] || return 5
+    mv "$config/providers/a.conf" "$config/providers/b.conf"
+    render_cli || return 6
+    [[ ! -e $cache/bin/claudea && -x $cache/bin/claudeb ]] || return 7
+    print 'env BAD-NAME invalid' > "$config/providers/b.conf"
+    render_cli && return 8
+    [[ -x $cache/bin/claudeb && ! -e $cache/bin/claudea ]]
+  }
+  It 'renders real provider shims reproducibly, removes stale names, and retains the last good bin on failure'
+    When run real_shim_render_case
+    The status should be success
+  End
 
   completion_case() {
     emulate -L zsh

@@ -67,7 +67,7 @@ Day 1:
 marksharc module list              # enabled, disabled and skipped modules
 marksharc module disable <name>    # edits config.conf in your overlay
 marksharc reload                   # apply it in this shell (--verbose to trace)
-marksharc render                   # refresh cached env and generated completions
+marksharc render                   # refresh cached env, completions and command shims
 marksharc sync                     # fast-forward safe checkouts and refresh pins
 marksharc doctor                   # report local health
 marksharc update                   # sync, plugin pins and declarative render
@@ -110,10 +110,16 @@ alias ll "ls -lA" when command ls
 tiers "manager brew system user app local"
 ```
 
-`marksharc render` writes the per-host cached `env.zsh` and generated completions. Startup refreshes
-stale env without running generators; install, update and explicit reload also refresh completions.
+`marksharc render` writes the per-host cached `env.zsh`, generated completions and command shims.
+Startup refreshes stale env without running generators; install, update and explicit reload refresh
+the generated artifacts. Render again after adding or removing a provider or Herdr session.
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
 its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
+
+Module commands and generated provider and session shims are on PATH in zsh sessions and inherited
+by child processes, including `bash -c`. Commands that change the caller's directory or environment
+use a zsh wrapper; direct executable calls cannot change their parent shell. See the
+[write-once command and provider migration guide](docs/write-once.md) for configuration and hooks.
 
 An eligible interactive shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a

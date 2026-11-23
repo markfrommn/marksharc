@@ -17,7 +17,11 @@ Describe 'SSH agent state and cleanup'
 #!/bin/sh
 exit 0
 DATA
-    chmod +x "$TEST_ROOT/bin/ssh-add"
+    cat > "$TEST_ROOT/bin/ps" <<'DATA'
+#!/bin/sh
+exit 1
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ps"
     local directives="$TEST_ROOT/directives"
     : > "$directives"
     SSH_AUTH_SOCK="$HOME/agent % space" SSH_AGENT_PID=999999999 MARKSHARC_HOST=fixture \

@@ -1,3 +1,4 @@
+#!/usr/bin/env zsh
 emulate -L zsh
 local socket=/var/run/docker.sock
 [[ -S $socket ]] || { print -ru2 'Docker socket missing'; return 1; }
