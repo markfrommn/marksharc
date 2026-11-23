@@ -22,6 +22,8 @@ All tests use temporary homes, stubs and disposable repositories. No live cleanu
 
 ## Outcome
 
+Implemented in [PR #8](https://github.com/markfrommn/marksharc/pull/8), awaiting human merge.
+
 The shell wrapper applies directives emitted by the executable, including committed state changes
 before an executable failure. CWF and worktree hooks run as executable programs. Providers use
 data-only conf files and generated shims read provider values on invocation. Session shims are
@@ -33,4 +35,7 @@ contract 4, install 46 and repository 26. The standalone install e2e passed both
 clone paths. Hermetic renderer tests cover repeat output, stale shim removal and failure recovery;
 runtime artifacts stay in the temporary cache, with no repository drift. Tests use stubs and
 disposable repositories; live CWF session creation/destruction, Herdr/Collie, SSH agents, Docker,
-and provider services were not exercised. macOS CI remains a hosted check.
+and provider services were not exercised. Hosted macOS and Ubuntu checks and install e2e passed on
+the implementation head. Independent quality review is READY after all five findings were fixed
+and re-reviewed; stack-check passes. No vendor review provider is configured, so local review is
+`skipped:not-configured`; secondary review is off by default.

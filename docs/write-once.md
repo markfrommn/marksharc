@@ -11,7 +11,7 @@ env MODELS_URL https://example.invalid/v1/models
 ```
 
 Values use the configuration word syntax: quote spaces, use single quotes for
-literal dollar signs, and use `$NAME` or `${NAME}` to read an environment
+literal dollar signs, and use `$NAME` or `${NAME}` to read an exported environment
 variable. Provider files are parsed as data, never sourced. Run `marksharc
 render` after adding, removing, or renaming a provider. The resulting `claude`
 and `models` commands read the file on each invocation, so value changes need
@@ -26,3 +26,9 @@ functions. The zsh arrays `gwt_clean_pre_remove_hooks` and
 executable calls, set `MARKSHARC_GWT_CLEAN_HOOKS` or
 `MARKSHARC_CWF_NEW_HOOKS` to newline-separated executable names or paths.
 Hooks run in separate processes and cannot modify the caller's shell state.
+
+Zsh wrappers apply caller-state directives after the command exits, including completed changes
+before a later command failure. The command's failure status is preserved. Environment directives
+accept writable scalar targets, including `PATH`; numeric, array and readonly targets are rejected
+before assignment so directive data cannot be evaluated as arithmetic. Bash invokes the same
+executables directly; applying directives to the calling bash shell remains later work.
