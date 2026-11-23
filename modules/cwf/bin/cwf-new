@@ -22,7 +22,7 @@ for line in "${(@f)output}"; do
             if [[ $workdir == \'*\' || $workdir == \"*\" ]]; then workdir=${workdir[2,-2]}; fi;;
         'export '*)
             exports+="$line"$'\n'
-            words=( "${(z)line}" )
+            words=( "${(z)${line%;}}" )
             (( $#words == 2 )) && [[ $words[2] == *=* ]] || { print -ru2 'Invalid CWF export hint; created session retained'; return 1; }
             pair=${(Q)words[2]}; name=${pair%%=*}; value=${pair#*=}
             [[ $name =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || { print -ru2 'Invalid CWF export hint; created session retained'; return 1; }

@@ -45,7 +45,7 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
 #!/bin/sh
 if [ "$1 $2" = 'session new' ]; then
   printf "  cd '%s'\n" "$FIXTURE_WORKDIR"
-  if [ "$FIXTURE_MODE" = malformed ]; then printf '%s\n' 'export COMMON_SESSION_ID=bad'; else printf '%s\n' '  export COMMON_SESSION_ID=12'; fi
+  if [ "$FIXTURE_MODE" = malformed ]; then printf '%s\n' 'export COMMON_SESSION_ID=bad'; elif [ "$FIXTURE_MODE" = semicolon ]; then printf '%s\n' 'export COMMON_SESSION_ID=12;'; else printf '%s\n' '  export COMMON_SESSION_ID=12'; fi
   [ "$FIXTURE_MODE" != creation-fail ]
 fi
 DATA
@@ -104,7 +104,7 @@ DATA
         fi;;
     esac
   }
-  Parameters:value success creation-fail malformed copy-fail hook-ok hook-fail hook-missing exclude no-git-worktree
+  Parameters:value success semicolon creation-fail malformed copy-fail hook-ok hook-fail hook-missing exclude no-git-worktree
   It "handles $1 with spaced output as data"
     When run cwf_case "$1"
     The status should be success
