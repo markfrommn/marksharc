@@ -6,6 +6,65 @@ Describe 'install.sh re-runs and environment'
       "$FW/bin/marksharc" uninstall "$@" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" < /dev/null
   }
 
+  edited_bash_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    inst --home "$FW" || { cat "$TEST_ROOT/err"; return 1; }
+    printf 'custom bash setting\n' >> "$HOME/.bashrc"
+    inst --home "$FW" || return 2
+    saved=$(find "$XDG_STATE_HOME/marksharc/replaced" -type f -name 'bashrc.*' -print)
+    [ -n "$saved" ] && grep -q 'custom bash setting' "$saved" || return 3
+    uninstall --purge --yes || return 4
+    saved=$(find "$HOME" -maxdepth 1 -name '.bashrc.marksharc-replaced.*' -print)
+    [ -n "$saved" ] && grep -q 'custom bash setting' "$saved"
+  }
+  It 'keeps edits to Bash stubs through reinstall and purge'
+    When run edited_bash_case
+    The status should be success
+  End
+
+  interrupted_bash_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    mkdir "$HOME/target-dir"
+    ln -s target-dir "$HOME/.bash_profile"
+    printf 'original bash rc\n' > "$HOME/.bashrc"
+    inst --home "$FW" || return 1
+    [ -f "$HOME/.bash_profile" ] && [ ! -L "$HOME/.bash_profile" ] || return 2
+    rm "$HOME/.bashrc" "$HOME/.bash_profile"
+    cp "$(backup_dir)/.bashrc" "$HOME/.bashrc"
+    ln -s target-dir "$HOME/.bash_profile"
+    inst --home "$FW" || { cat "$TEST_ROOT/err"; return 3; }
+    [ -f "$HOME/.bash_profile" ] && [ ! -L "$HOME/.bash_profile" ] || return 4
+    rm "$HOME/.bashrc"
+    printf 'unrelated new file\n' > "$HOME/.bashrc"
+    inst --home "$FW" && return 5
+    [ "$(cat "$HOME/.bashrc")" = 'unrelated new file' ]
+  }
+  It 'retries an interrupted Bash upgrade without replacing unrelated files'
+    When run interrupted_bash_case
+    The status should be success
+  End
+
+  backup_collision_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    printf 'original zsh\n' > "$HOME/.zshrc"
+    inst --home "$FW" || return 1
+    backup=$(backup_dir)
+    sed '/^bash_stubs=/d; /^bash_stub_sum=/d' "$XDG_STATE_HOME/marksharc/install.manifest" > "$TEST_ROOT/legacy"
+    cp "$TEST_ROOT/legacy" "$XDG_STATE_HOME/marksharc/install.manifest"
+    rm "$HOME/.bashrc" "$HOME/.bash_profile"
+    printf 'new original\n' > "$HOME/.bashrc"
+    printf 'existing backup\n' > "$backup/.bashrc"
+    inst --home "$FW" && return 2
+    [ "$(cat "$backup/.bashrc")" = 'existing backup' ] && [ "$(cat "$HOME/.bashrc")" = 'new original' ]
+  }
+  It 'refuses to overwrite a conflicting Bash backup during upgrade'
+    When run backup_collision_case
+    The status should be success
+  End
+
   # A re-run that finds backups in the manifest but no stub of ours must not rebuild the manifest.
   stale_case() {
     # $1 is a command that damages the stub: delete or replace

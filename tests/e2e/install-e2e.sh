@@ -57,6 +57,7 @@ exercise() {
       ;;
   esac
   [ -f "$home/.zshenv" ] || fail "the stub was not written"
+  [ -f "$home/.bashrc" ] && [ -f "$home/.bash_profile" ] || fail "the Bash stubs were not written"
   head -n 1 "$home/.zshenv" | grep -q 'marksharc: managed stub' || fail "the stub has no marksharc header"
   [ -f "$home/.local/state/marksharc/install.manifest" ] || fail "no install manifest"
   [ -f "$home/.config/marksharc/config.conf" ] || fail "the template overlay was not installed"
@@ -69,6 +70,12 @@ exercise() {
   [ "${session#*|}" = "$fw" ] || fail "login shell: MARKSHARC_HOME is '${session#*|}', expected $fw"
   [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "login shell: marksharc resolves to '$(sed -n 2p "$out")'"
   [ -d "$home/.local/state/marksharc/zdot" ] || fail "login shell did not generate the ZDOTDIR"
+
+  step "noninteractive Bash hook comes up working"
+  # shellcheck disable=SC2016
+  silent "Bash hook" env BASH_ENV="$fw/core/bash/env.bash" /bin/bash -c 'printf "%s\n" "$MARKSHARC_HOME"; command -v marksharc'
+  [ "$(sed -n 1p "$out")" = "$fw" ] || fail "Bash hook did not locate the framework"
+  [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "Bash hook did not add marksharc to PATH"
 
   step "interactive shell (no terminal) comes up working"
   # shellcheck disable=SC2016
@@ -109,6 +116,7 @@ exercise() {
     [ -d "$fw" ] || fail "uninstall removed the checkout"
   fi
   [ ! -e "$home/.zshenv" ] || fail "the stub is still there after uninstall"
+  [ ! -e "$home/.bashrc" ] && [ ! -e "$home/.bash_profile" ] || fail "Bash stubs remain after uninstall"
   [ ! -e "$home/.local/state/marksharc/zdot" ] || fail "the generated ZDOTDIR is still there after uninstall"
   [ -f "$home/.config/marksharc/config.conf" ] || fail "uninstall removed the overlay"
   # shellcheck disable=SC2016

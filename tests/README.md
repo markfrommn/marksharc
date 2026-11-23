@@ -39,7 +39,7 @@ checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
 | `e2e/install-e2e.sh` | Reusable end-to-end check: install a checkout into a fresh HOME, start login and interactive zsh shells, uninstall; needs only sh, zsh and git (python3 adds a terminal step); also run by CI on macOS and Ubuntu |
 | `spec/zsh/` | Specs run with `--shell zsh` |
 | `spec/install/` | Specs run with `--shell sh`: `install.sh`, `marksharc uninstall`, the end-to-end script and lint coverage, in a temporary HOME with local bare repositories |
-| `spec/contract/` | Contract suite run with `--shell sh`: launches the real zsh core (bash and fish join in their phases) and proves quiet startup, environment availability, idempotent re-source and writes confined to cache/state |
+| `spec/contract/` | Contract suite run with `--shell sh`: launches the zsh and Bash cores and checks quiet startup, environment availability, cache recovery and inheritance |
 | `spec/repo/` | Specs run with `--shell sh`: the harness itself and repository rules |
 
 ## Contract inventory
@@ -61,6 +61,7 @@ this table to cover every module.
 | Core | Cached tool init: hit/miss keys, symlink resolution, missing/failing tools, unwritable cache, empty output, fixed PATH | `spec/zsh/core_cache_spec.sh` |
 | Core | `cs`/`li` reload: rebuild, trace, session kept, edit pickup | `spec/zsh/core_reload_spec.sh` |
 | Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
+| Bash environment | Rendered Bash syntax, PATH and export parity, late guards, manager paths, agent markers, inheritance and cache recovery | `spec/contract/bash_spec.sh` |
 | Core | Modern host facts, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
 | Core | Agent/batch quiet on the full tree; gvm selection without forks | `spec/zsh/core_agent_spec.sh` |
 | Startup | Mode matrix quiet/reload; greeting opt-in; offline pinned plugin and cached completion; cached init reuse; installer failure propagation | `spec/zsh/startup_spec.sh` |
@@ -91,6 +92,7 @@ this table to cover every module.
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |
 | Installer | Fresh install from a checkout: stub, template overlay, manifest, first declarative render; paths with spaces, quotes and dollars survive; non-default MARKSHARC_CONFIG named in the stub | `spec/install/installer_spec.sh` |
 | Installer | Existing zsh dotfiles (regular files, symlinks, a foreign `~/.zshenv`) backed up privately and recorded; idempotent re-run keeps the original backup | `spec/install/installer_spec.sh` |
+| Bash installer | Fresh and upgraded installs preserve regular and symlinked startup files, edited stubs and interrupted retries | `spec/install/installer_spec.sh`, `spec/install/rerun_spec.sh`, `spec/install/uninstall_spec.sh` |
 | Installer | `--dry-run` prints every action and writes nothing; framework from `--home`, own checkout or a clone (reused, never pulled); `--overlay` path, URL, conflict and existing overlay; zsh, git and zsh version checked before any write; chsh hint only; runs under dash | `spec/install/installer_spec.sh` |
 | Installer | A re-run that finds recorded backups but no stub of ours stops before any write (deleted or replaced stub), naming the backup; a hand-edited stub is copied to the state dir before it is rewritten (and next to the restored file on uninstall); MARKSHARC_CONFIG judged against ~/.config with XDG defaults, unset or non-default, and warnings for the other XDG variables; trailing slashes stripped; a checkout's bin/marksharc acts on its own framework | `spec/install/rerun_spec.sh` |
 | Installer | Plugin pins cloned into the cache at the pinned commit; `--no-plugins` skips and names `marksharc update`; dry run only reports; an unreachable pin warns and the install completes | `spec/install/plugins_spec.sh` |

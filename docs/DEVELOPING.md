@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | zsh | 5.9+ | Core and CLI; the zsh suite |
 | fish | 4.x | Fish lint now; the fish phase later |
-| bash | 5.x | Environment parity later |
+| bash | 5.x | Environment parity and contract suite |
 | ShellSpec | 0.28.1, pinned in `tests/shellspec.pin` | All specs |
 | shellcheck | current | Lint for `sh` and `bash` files |
 | git, python3 | any recent | Fixtures |
