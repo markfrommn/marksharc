@@ -448,6 +448,9 @@ A host has two checkouts: the framework and the overlay (plus any private module
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
 
+The update runner validates its step labels and arguments once before execution. Configuration
+changes fetched by sync apply to the next invocation.
+
 ## 7. Module catalog
 
 "Phase" is when the module first exists in the new structure. MVP modules are native zsh; fish support for each arrives in the Fish phase.

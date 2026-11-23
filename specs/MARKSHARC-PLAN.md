@@ -749,6 +749,10 @@ The [task plan](DEV-52-PLAN.md) records the framework and overlay verification. 
 bundles and legacy entry points live in `mark-desktop-files`. The overlay cutover follows the
 framework delivery, and DEV-59 removes the retired script paths.
 
+**Outcome:** The framework is implemented in [PR #11](https://github.com/markfrommn/marksharc/pull/11).
+Hosted macOS and Ubuntu checks passed. The tested companion overlay patch awaits authorization to
+publish. Live package provisioning and the updater cutover on the Mac and sol remain unverified.
+
 #### P3.5 — Multiplexer adapters and mux-aware X11 (DEV-53)
 
 - **Repo:** marksharc
