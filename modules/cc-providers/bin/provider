@@ -1,0 +1,18 @@
+#!/bin/zsh -f
+emulate -L zsh
+home=$1 file=$2 mode=$3
+shift 3
+source "$home/core/zsh/lib/modules.zsh" || exit 1
+source "$home/core/zsh/lib/shims.zsh" || exit 1
+_ms_provider_read "$file" || exit 1
+for key value in "${(@kv)_ms_provider_values}"; do
+    export "$key=$value"
+done
+case $mode in
+    claude*) exec claude "$@" ;;
+    models*)
+        [[ -n ${_ms_provider_values[MODELS_URL]-} ]] || { print -ru2 'Provider has no MODELS_URL'; exit 1; }
+        setopt pipefail
+        command curl --fail --silent --show-error "${_ms_provider_values[MODELS_URL]}" -H "Authorization: Bearer ${_ms_provider_values[ANTHROPIC_AUTH_TOKEN]-}" | command jq '.data[] .id'
+        ;;
+esac
