@@ -84,7 +84,7 @@ this table to cover every module.
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
 | cc-providers | Provider files linked from the option/overlay directory | `spec/zsh/modules/cc-providers/providers_spec.sh` |
 | git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
-| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; init never runs the render-owned cwf shell generator | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; render generates real zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
 | cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |

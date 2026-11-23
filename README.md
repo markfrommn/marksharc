@@ -112,6 +112,8 @@ tiers "manager brew system user app local"
 
 `marksharc render` writes the per-host cached `env.zsh` and generated completions. Startup refreshes
 stale env without running generators; install, update and explicit reload also refresh completions.
+The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
+its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
 An eligible interactive shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a

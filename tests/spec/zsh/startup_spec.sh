@@ -98,9 +98,9 @@ DATA
       script+='; (( ${+functions[starship_precmd]} == 1 )) || exit 27'
       script+='; [[ $MARKSHARC_SESSION == interactive ]] || exit 28'
     fi
-    # The renderer generates cwf shell zsh output once when the tooling checkout
-    # is known; the fixture synthesizes one (COMMON_DEV_TOOLS is the documented,
-    # portable contract — the private overlay's discovery of it stays behind).
+    # The renderer caches cwf's zsh integration once when the tooling checkout
+    # is known; interactive init sources it. The fixture synthesizes one
+    # (COMMON_DEV_TOOLS is the documented portable contract; the private overlay's discovery stays behind).
     local -a extra=( FPATH="$TEST_ROOT/fpath:$FPATH" COMMON_DEV_TOOLS="$TEST_ROOT/cdt" )
     case $fixture_mode in
       command-tty) ms_pty "${extra[@]}" -dlc "$script" ;;
