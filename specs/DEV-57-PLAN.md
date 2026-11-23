@@ -34,9 +34,12 @@ The implementation uses fish 4.x, zsh 5.9+, and the pinned ShellSpec runner. Tes
 ## Local verification
 
 `tests/check` passed on Linux with 84 files linted, 424 zsh examples with one platform skip,
-32 cross-shell contract examples, 51 installer examples, and 26 repository examples.
+35 cross-shell contract examples, 51 installer examples, and 26 repository examples.
 The standalone end-to-end test passed both checkout and clone installation and uninstall.
 An independent temporary-home smoke confirmed matching fish and zsh exports and ordered PATH,
 live directory guards, stable repeat rendering, and uninstall. The Linux login comparison excludes
 distribution-provided fish vendor snippets so it measures the framework. Both upstream plugin pins
 loaded successfully in a disposable fish terminal.
+
+The independent review verified the fixes for pending-tier `uv` detection, git-worktree
+options in executable environments, and verbose fish startup and reload. Stack-check passed.
