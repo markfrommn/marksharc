@@ -14,6 +14,11 @@ fixture_setup() {
   export XDG_CONFIG_HOME="$HOME/config" XDG_CACHE_HOME="$HOME/cache" XDG_DATA_HOME="$HOME/data" XDG_STATE_HOME="$HOME/state"
   mkdir -p "$HOME" "$ZDOTDIR" "$TEST_ROOT/bin"
   : > "$OPLOG"
+  if [ -n "${REAL_FISH:-}" ]; then
+    fish_quoted=$(printf '%s' "$REAL_FISH" | sed "s/'/'\\\\''/g")
+    printf '#!/bin/sh\nexec '\''%s'\'' "$@"\n' "$fish_quoted" > "$TEST_ROOT/bin/fish"
+    chmod +x "$TEST_ROOT/bin/fish"
+  fi
   # Only explicit fixture executables precede the basic OS command set.
   PATH="$TEST_ROOT/bin:/usr/bin:/bin:/usr/sbin:/sbin"; export PATH
   # Commands that reach the network, other hosts or real services fail loudly.

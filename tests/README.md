@@ -9,7 +9,7 @@ HOME, or call real services.
 
 ```sh
 tests/check                                   # everything CI runs
-tests/lint                                    # zsh -n, shellcheck, fish --no-execute
+tests/lint                                    # zsh -n, shellcheck, fish syntax and indentation
 tests/run-tests --shell zsh spec/zsh          # zsh units
 tests/run-tests --shell sh spec/contract      # cross-shell startup contract
 tests/run-tests --shell sh spec/install       # install.sh, uninstall and the end-to-end install
@@ -23,7 +23,9 @@ SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 commit, then put it on PATH or set `SHELLSPEC_BIN`. The wrapper finds the
 runner before it replaces HOME, then starts it with an explicit environment:
 `PATH`, a throwaway `HOME` and XDG directories, `MARKSHARC_ROOT` (this
-checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
+checkout), `REAL_GIT`, `REAL_FISH`, `PYTHON` and `TERM=dumb`. Fixtures create
+a private launcher for the selected fish executable so it remains available
+after PATH is restricted.
 
 ## Layout
 
@@ -108,3 +110,4 @@ this table to cover every module.
 | Function-safe modules | File-scope declarations in module env/init files, core files and overlay hooks say -g (`tests/support/function-safe-check.py`; fixture covers function, anonymous-function, `function name()`, here-string, case-arm and `builtin`/`command` forms); the env phase ends with `true`; `marksharc reload` and `cs` leave the same globals, PS1 and history settings, and after markers are planted in module scratch variables (and PS1 exported) no reload path leaves a marker or an exported PS1 (this spec fails against the pre-`-g` modules) | `spec/zsh/function_safe_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |
+| Fish contract | Shared environment and PATH, session classification, inherited render ID, reload, native modules and plugin loading, safe caller-state directives | `spec/contract/fish_render_spec.sh`, `spec/contract/fish_plugin_spec.sh`, `spec/contract/fish_directives_spec.sh` |

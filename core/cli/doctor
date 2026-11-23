@@ -28,6 +28,26 @@ else
         fi
     fi
 fi
+manifest=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/install.manifest
+fish_stub= fish_sum=
+if [[ -r $manifest ]]; then
+    while IFS= read -r line; do
+        case $line in
+            fish_stub=*) fish_stub=${line#fish_stub=} ;;
+            fish_stub_sum=*) fish_sum=${line#fish_stub_sum=} ;;
+        esac
+    done < "$manifest"
+fi
+if [[ -n $fish_stub ]]; then
+    fish_config=${${XDG_CONFIG_HOME:-$HOME/.config}%/}
+    if [[ $fish_stub != "$fish_config/fish/conf.d/00-marksharc.fish" || ! -f $fish_stub || -L $fish_stub ]]; then
+        print -r -- "doctor: missing or unmanaged fish stub: $fish_stub"
+        (( ++issues ))
+    elif [[ -n $fish_sum && $(command cksum < "$fish_stub") != "$fish_sum" ]]; then
+        print -r -- "doctor: modified fish stub: $fish_stub"
+        (( ++issues ))
+    fi
+fi
 if [[ -L $config && ! -e $config ]]; then
     print -r -- "doctor: broken link: $config"
     (( ++issues ))
@@ -138,9 +158,9 @@ for name in "${_ms_mod_names[@]}"; do
             fi
         done
     fi
-    registry=${_ms_mod_dir[$name]}/zsh.plugins
-    [[ -r $registry ]] || continue
-    while IFS= read -r line || [[ -n $line ]]; do
+    for registry in "${_ms_mod_dir[$name]}/zsh.plugins" "${_ms_mod_dir[$name]}/fish.plugins"; do
+      [[ -r $registry ]] || continue
+      while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
         [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
         plugin_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${reply[2]}@${reply[4]}
@@ -148,7 +168,8 @@ for name in "${_ms_mod_names[@]}"; do
             print -r -- "doctor: missing plugin or incorrect pin: ${reply[2]} (run marksharc update)"
             (( ++issues ))
         fi
-    done < "$registry"
+      done < "$registry"
+    done
 done
 budget=${_ms_cfg_set[doctor.startup_ms]-500}
 [[ $budget == <-> ]] || budget=500

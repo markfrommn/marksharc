@@ -17,6 +17,10 @@ if [ "$actual" != "$pinned" ]; then
   echo "ShellSpec $pinned required; $runner reports '${actual:-no version}'." >&2
   exit 127
 fi
+fish_bin=$(command -v fish || :)
+if [ -n "$fish_bin" ]; then
+  fish_bin=$(CDPATH='' cd -- "$(dirname -- "$fish_bin")" && pwd -P)/$(basename -- "$fish_bin")
+fi
 workspace=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-tests.XXXXXX")
 trap 'rm -rf -- "$workspace"' EXIT
 trap 'exit 130' HUP INT TERM
@@ -24,5 +28,5 @@ cd "$suite"
 env -i PATH="$PATH" HOME="$workspace" \
   XDG_CONFIG_HOME="$workspace/config" XDG_CACHE_HOME="$workspace/cache" \
   XDG_DATA_HOME="$workspace/data" XDG_STATE_HOME="$workspace/state" \
-  MARKSHARC_ROOT="$(CDPATH='' cd .. && pwd)" REAL_GIT="$(command -v git)" \
+  MARKSHARC_ROOT="$(CDPATH='' cd .. && pwd)" REAL_GIT="$(command -v git)" REAL_FISH="$fish_bin" \
   PYTHON="$(command -v python3 || :)" TERM=dumb "$runner" "$@"

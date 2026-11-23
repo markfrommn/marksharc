@@ -33,6 +33,38 @@ EOF
     The line 5 of output should equal 'home-exists'
     The line 1 of output should not equal "home=$HOME"
   End
+
+  selected_fish_case() {
+    fake_shellspec 0.28.1
+    selected_dir="$TEST_ROOT/external 'bin"
+    mkdir -p "$selected_dir"
+    printf '#!/bin/sh\nprintf "selected fish\\n"\n' > "$selected_dir/fish"
+    chmod +x "$selected_dir/fish"
+    cat > "$TEST_ROOT/fake/shellspec" <<'EOF'
+#!/bin/sh
+if [ "$1" = --version ]; then echo 0.28.1; exit 0; fi
+. ./spec/support/fixtures.sh
+fixture_setup
+[ -f "$TEST_ROOT/bin/fish" ] && [ ! -L "$TEST_ROOT/bin/fish" ] || exit 1
+fish || exit 3
+env -i PATH="$PATH" HOME="$HOME" fish || exit 4
+printf '#!/bin/sh\nprintf "fixture fish\\n"\n' > "$TEST_ROOT/bin/fish"
+"$REAL_FISH" || exit 5
+fish || exit 6
+fixture_teardown
+EOF
+    chmod +x "$TEST_ROOT/fake/shellspec"
+    PATH="$selected_dir:$PATH" run_tests
+  }
+  It 'preserves the selected fish executable in the hermetic fixture and a scrubbed child'
+    When run selected_fish_case
+    The status should be success
+    The output should equal "selected fish
+selected fish
+selected fish
+fixture fish"
+  End
+
   workspace_after_run() {
     fake_shellspec 0.28.1
     home=$(run_tests | sed -n 's/^home=//p')

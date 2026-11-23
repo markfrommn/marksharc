@@ -31,6 +31,18 @@ Describe 'install.sh plugin pins'
     The status should be success
   End
 
+  fish_fetch_case() {
+    plugin_fw "$TEST_ROOT/fw"
+    printf 'plugin fish-demo %s %s shell fish kind source\n' "$TEST_ROOT/plug" "$PLUG_SHA" > "$TEST_ROOT/fw/modules/demo/fish.plugins"
+    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
+    clone=$XDG_CACHE_HOME/marksharc/plugins/fish-demo@$PLUG_SHA
+    [ -d "$clone/.git" ] && [ "$("$REAL_GIT" -C "$clone" rev-parse HEAD)" = "$PLUG_SHA" ]
+  }
+  It 'fetches fish registry pins alongside zsh registry pins'
+    When run fish_fetch_case
+    The status should be success
+  End
+
   skip_case() {
     plugin_fw "$TEST_ROOT/fw"
     inst --home "$TEST_ROOT/fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }

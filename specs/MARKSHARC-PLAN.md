@@ -856,6 +856,7 @@ contracts remain unverified beyond stubs and disposable repositories.
 - **Repo:** marksharc
 - **Estimate:** 5
 - **Depends on:** P3.1 (DEV-49)
+- **Task plan:** [DEV-57-PLAN.md](DEV-57-PLAN.md)
 
 **Goal:** Give fish the same foundation as zsh.
 
@@ -874,6 +875,10 @@ contracts remain unverified beyond stubs and disposable repositories.
 **Done when**
 
 - A fish session on the Mac has the same PATH and env as zsh.
+
+**Outcome:** Implemented in [PR #10](https://github.com/markfrommn/marksharc/pull/10).
+The hosted macOS and Ubuntu checks pass the shared environment and startup contracts.
+Native fish module migration and legacy config retirement remain in P4.2.
 
 #### P4.2 — Fish modules and retirement of the old fish config (DEV-58)
 
