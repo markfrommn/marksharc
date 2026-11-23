@@ -106,4 +106,17 @@ DATA
     When run session_case
     The status should be success
   End
+  missing_case() {
+    emulate -L zsh
+    mkdir -p "$TEST_ROOT/stage" "$TEST_ROOT/empty"
+    source "$MARKSHARC_ROOT/core/zsh/lib/shims.zsh"
+    typeset -a _ms_plan=(herdr)
+    local PATH="$TEST_ROOT/empty"
+    _ms_shims_render "$TEST_ROOT/stage"
+  }
+  It 'succeeds quietly when herdr is absent'
+    When run missing_case
+    The status should be success
+    The output should equal ''
+  End
 End
