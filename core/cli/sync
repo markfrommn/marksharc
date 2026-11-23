@@ -84,7 +84,7 @@ if [[ ${MARKSHARC_SYNC_PART-} != repositories && -r $plugin_functions/zsh-plugin
         failed=1
     fi
 fi
-if (( ! failed )); then
+if (( ! failed )) && [[ ${MARKSHARC_SYNC_PART-} != pins ]]; then
     syncdir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/sync
     # These are derived files; they are rebuilt lazily on the next shell.
     command rm -f -- "$syncdir:h"/init/*(N-.) "$syncdir:h"/guard/*(N-.)

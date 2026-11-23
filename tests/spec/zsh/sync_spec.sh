@@ -104,6 +104,21 @@ Describe 'marksharc sync'
     When run plugin_case
     The status should be success
   End
+
+  pins_status_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    local syncdir=$XDG_CACHE_HOME/marksharc/${HOST%%.*}/sync
+    mkdir -p "$syncdir"
+    print -r -- behind > "$syncdir/status"
+    ms_env
+    env -i "${MS_ENV[@]}" MARKSHARC_SYNC_PART=pins "$MS_HOME/bin/marksharc" sync > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$syncdir/status") == behind ]]
+  }
+  It 'does not mark checkouts current when only refreshing plugin pins'
+    When run pins_status_case
+    The status should be success
+  End
   overlay_plugin_case() {
     emulate -L zsh
     ms_fixture
