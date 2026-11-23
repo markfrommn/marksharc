@@ -1,6 +1,6 @@
 #!/bin/sh
 # Static checks for every shell file in the repository:
-#   zsh -n for zsh, shellcheck for sh and bash, fish --no-execute for fish.
+#   zsh -n for zsh, shellcheck for sh and bash, fish syntax and indentation checks.
 # Files are classified by extension, then by shebang. ShellSpec files
 # (*_spec.sh) use the ShellSpec DSL; running the suite checks them.
 # Usage: tests/lint [repo-root]   (default: this checkout)
@@ -45,7 +45,10 @@ while IFS= read -r f; do
   case $kind in
     zsh) need zsh "$f" && { zsh -n "$f" < /dev/null || failed "$f" "zsh -n failed"; } ;;
     sh|bash) need shellcheck "$f" && { shellcheck -x -s "$kind" "$f" < /dev/null || failed "$f" "shellcheck failed"; } ;;
-    fish) need fish "$f" && { fish --no-execute "$f" < /dev/null || failed "$f" "fish --no-execute failed"; } ;;
+    fish)
+      need fish "$f" && { fish --no-execute "$f" < /dev/null || failed "$f" "fish --no-execute failed"; }
+      need fish_indent "$f" && { fish_indent --check "$f" < /dev/null || failed "$f" "fish_indent --check failed"; }
+      ;;
   esac
 done < "$files"
 if [ "$status" -eq 0 ]; then echo "lint: ok ($count files)"; fi

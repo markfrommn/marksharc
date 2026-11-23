@@ -8,8 +8,9 @@ Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer, Bash environment and the `marksharc` command are in place. Fish wiring
-> comes in a later release.
+> installer, Bash environment, and `marksharc` bootstrap, update, and install commands
+> are in place. The fish core loads the shared environment and native plugins.
+> The remaining fish modules come in later releases.
 
 ## Requirements
 
@@ -19,7 +20,8 @@ checkout stays read-only on every host.
 - bash 5.x (environment only)
 - git
 
-Day-to-day shell use needs only the native shell. The `marksharc` command needs zsh.
+The `marksharc` command uses zsh. Fish also uses it to refresh the environment
+cache after changes to the framework or overlay.
 
 ## Install
 
@@ -37,7 +39,7 @@ git clone https://github.com/markfrommn/marksharc.git
 sh marksharc/install.sh
 ```
 
-Then open a new terminal, or run `exec zsh -l`.
+Then open a new terminal, or run `exec zsh -l` or `exec fish -l`.
 
 What it does:
 
@@ -53,7 +55,9 @@ What it does:
   `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
   (symlinks are recorded by target), and writes zsh and Bash startup stubs. If the zsh core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
-- **Plugins.** Clones the pinned plugins (fzf-tab) into
+  The installer also manages `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`
+  and leaves the user's `config.fish` untouched.
+- **Plugins.** Clones pinned plugins (fzf-tab, nvm.fish and fzf.fish) into
   `${XDG_CACHE_HOME:-~/.cache}/marksharc/plugins/`. Shell startup never fetches them. A
   failed fetch, when offline for example, leaves the install in place with a warning;
   `marksharc update` fetches them later. `--no-plugins` skips this step.
@@ -77,7 +81,7 @@ marksharc update --list            # list available step labels
 marksharc update --only <label>    # run one step; --dry-run previews commands
 marksharc install <name>           # run a registered explicit installer
 marksharc version
-marksharc uninstall                # restore the backed-up dotfiles, remove the stub
+marksharc uninstall                # restore backed-up dotfiles and remove managed stubs
 ```
 
 `marksharc uninstall --purge` also deletes the cache, the state and a clone made by the
@@ -131,18 +135,19 @@ alias ll "ls -lA" when command ls
 tiers "manager brew system user app local"
 ```
 
-`marksharc render` writes per-host cached `env.zsh` and `env.bash`, generated completions and command shims.
+`marksharc render` writes per-host `env.zsh`, `env.bash` and `env.fish` in the cache,
+along with generated completions and command shims.
 Startup refreshes stale env without running generators; install, update and explicit reload refresh
 the generated artifacts. Render again after adding or removing a provider or Herdr session.
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
 its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
-Module commands and generated provider and session shims are on PATH in zsh sessions and inherited
-by child processes, including `bash -c`. Commands that change the caller's directory or environment
-use a zsh wrapper; direct executable calls cannot change their parent shell. See the
+Module commands and generated provider and session shims are on PATH in zsh and fish sessions and
+are inherited by child processes, including `bash -c`. Native wrappers apply caller-state changes
+for commands such as `cwf-new` in either shell. See the
 [write-once command and provider migration guide](docs/write-once.md) for configuration and hooks.
 
-### Bash and agents
+## Bash and agents
 
 Bash login and interactive shells load the MarkSharc environment from the installed stubs.
 For noninteractive Bash processes started by agents, opt in through the overlay:
@@ -164,7 +169,7 @@ already configured shell also inherits its environment. Re-run the
 installer to add the Bash stubs to an existing installation. `marksharc uninstall` restores
 the original startup files from the recorded backup.
 
-An eligible interactive shell starts a detached fetch when the last check is older
+An eligible interactive zsh shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a
 notice when the cached result is behind. The fetch does not merge or update plugins;
 set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a session.
