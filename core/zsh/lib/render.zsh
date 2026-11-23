@@ -70,6 +70,7 @@ _ms_render_conf() {
                 guard="(( \${_ms_env_rebuild:-1} ))"
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
                 print -r -- "            $guard && export $name=${(qq)value}"
+                print -r -- "            _ms_rendered_exports+=( ${(q)name} )"
                 ;;
             path)
                 name=${reply[2]-} value=${reply[3]-}
@@ -162,7 +163,7 @@ _ms_render() {
         print -r -- "typeset -gA _ms_mod_options=( ${(j: :)${(@qq)options}} )"
         print -r -- "typeset -gA _ms_mod_optdef=( ${(j: :)${(@qq)optdefs}} )"
         print -r -- 'typeset -g _ms_render_metadata_loaded=1'
-        print -r -- 'typeset -ga _ms_rendered_aliases=()'
+        print -r -- 'typeset -gaU _ms_rendered_aliases=() _ms_rendered_exports=()'
         print -r -- '_ms_rendered_env() {'
         print -r -- '    emulate -L zsh'
         print -r -- '    case $1 in'

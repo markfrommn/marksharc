@@ -32,18 +32,20 @@ typeset -gA _ms_mod_req_os=(  )
 typeset -gA _ms_mod_options=(  )
 typeset -gA _ms_mod_optdef=(  )
 typeset -g _ms_render_metadata_loaded=1
-typeset -ga _ms_rendered_aliases=()
+typeset -gaU _ms_rendered_aliases=() _ms_rendered_exports=()
 _ms_rendered_env() {
     emulate -L zsh
     case \$1 in
         alpha)
             (( \${_ms_env_rebuild:-1} )) && export GREETING='two words'
+            _ms_rendered_exports+=( GREETING )
             (( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} )) && _ms_path_add user '$HOME/my tools'
             [[ \$MARKSHARC_SESSION == interactive ]] && alias 'gs'='git status'
             [[ \$MARKSHARC_SESSION == interactive ]] && _ms_rendered_aliases+=( gs )
             ;;
         overlay)
             (( \${_ms_env_rebuild:-1} )) && export OVERLAY_VALUE='from overlay'
+            _ms_rendered_exports+=( OVERLAY_VALUE )
             ;;
     esac
 }"
@@ -395,6 +397,28 @@ DATA
   }
   It 'keeps the last good rendered configuration and fails when a reload generator fails'
     When run failed_reload_case
+    The status should be success
+  End
+
+  stale_exports_case() {
+    emulate -L zsh
+    ms_fixture
+    : > "$HOME/allow"
+    ms_mod exports module.conf 'describe "exports"
+env STALE_VALUE old
+env GUARDED_VALUE guarded when file "$HOME/allow"'
+    ms_pty HOST=testhost -dic '
+      export UNMANAGED_VALUE=keep
+      print "env NEW_VALUE new" > "$MARKSHARC_HOME/modules/exports/module.conf"
+      print "env GUARDED_VALUE guarded when file \"$HOME/allow\"" >> "$MARKSHARC_HOME/modules/exports/module.conf"
+      rm "$HOME/allow"
+      source "$MARKSHARC_HOME/core/zsh/reload.zsh" || exit 11
+      print -r -- "stale=${STALE_VALUE-unset} guarded=${GUARDED_VALUE-unset} new=$NEW_VALUE unmanaged=$UNMANAGED_VALUE"
+      exit' || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") == *'stale=unset guarded=unset new=new unmanaged=keep'* ]] || { cat "$TEST_ROOT/out"; return 2; }
+  }
+  It 'clears renderer-owned exports when removed or guarded off and preserves unmanaged state'
+    When run stale_exports_case
     The status should be success
   End
 End

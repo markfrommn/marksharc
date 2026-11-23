@@ -48,8 +48,9 @@ _ms_render_activate() {
     emulate -L zsh
     local name
     for name in "${_ms_rendered_aliases[@]}"; do unalias "$name" 2>/dev/null; done
+    for name in "${_ms_rendered_exports[@]}"; do [[ -n $name ]] && unset "$name"; done
     unfunction _ms_rendered_env 2>/dev/null
-    unset _ms_rendered_modules _ms_rendered_aliases
+    unset _ms_rendered_modules _ms_rendered_aliases _ms_rendered_exports
     unset _ms_render_saved_mod_names _ms_render_saved_mod_dir _ms_render_saved_mod_describe
     unset _ms_render_saved_mod_order _ms_render_saved_mod_req_cmd _ms_render_saved_mod_req_os
     unset _ms_render_saved_mod_options _ms_render_saved_mod_optdef _ms_render_saved_mod_enabled
