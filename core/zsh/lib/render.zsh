@@ -162,7 +162,7 @@ _ms_render() {
     emulate -L zsh
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
-    local tmp=$cache/env.zsh.tmp.$$ name old key file
+    local tmp=$cache/env.zsh.tmp.$$ bash_tmp=$cache/env.bash.tmp.$$ name old key file
     local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=() _ms_render_pending_paths=() _ms_render_completion_files=() _ms_render_shim_files=()
     local _ms_render_generate=${1:-1} _ms_render_stage=$cache/completions.tmp.$$ _ms_shims_stage=$cache/bin.tmp.$$
     integer _ms_render_failed=0
@@ -220,10 +220,15 @@ _ms_render() {
         print -r -- '    esac'
         print -r -- '}'
     } > "$tmp" || { command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
+    source "$MARKSHARC_HOME/core/zsh/lib/render-bash.zsh"
+    _ms_render_bash > "$bash_tmp" || { command rm -rf -- "$tmp" "$bash_tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
     if (( _ms_render_failed )); then
-        command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"
+        command rm -rf -- "$tmp" "$bash_tmp" "$_ms_render_stage" "$_ms_shims_stage"
         return 1
     fi
+    command mv -f -- "$bash_tmp" "$cache/env.bash" || { command rm -rf -- "$tmp" "$bash_tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
+    { printf '%s\n' "$HOME" "$MARKSHARC_HOME" "$config" "$_ms_env_id_value"; } > "$cache/bash-context.tmp.$$" && \
+        command mv -f -- "$cache/bash-context.tmp.$$" "$cache/bash-context" || return 1
     command mv -f -- "$tmp" "$cache/env.zsh" || { command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
     print -r -- "$_ms_env_id_value" > "$cache/render-id.tmp.$$" && \
         command mv -f -- "$cache/render-id.tmp.$$" "$cache/render-id" || {

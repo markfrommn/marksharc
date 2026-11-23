@@ -25,4 +25,8 @@ Native zsh in `local/post.zsh` and in private modules runs both at startup and i
 (`typeset -g name=value`); a bare `typeset` would be function-local on reload. Declarations
 inside your own functions are unaffected.
 
+Set `agent.bash_env` to `on` in `config.conf` to export the Bash startup hook to
+noninteractive child shells. Start a new zsh session or run `marksharc reload` after
+changing it.
+
 Keep this directory in your own git repository to sync it between hosts.

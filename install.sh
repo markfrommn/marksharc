@@ -21,7 +21,8 @@ DRY=0
 PLUGINS=1
 FW_ARG=
 OVERLAY_ARG=
-DOTFILES=".zshenv .zshrc .zprofile .zlogin .zlogout"
+DOTFILES=".zshenv .zshrc .zprofile .zlogin .zlogout .bashrc .bash_profile"
+BASH_DOTFILES=".bashrc .bash_profile"
 STUB_MARK='# marksharc: managed stub'
 NL='
 '
@@ -223,12 +224,24 @@ _ms_stub_ok=0
 unset _ms_stub_ok
 EOF
 }
+bash_stub_text() {
+  printf '%s\n' "$STUB_MARK (install.sh); do not edit. Remove with: marksharc uninstall"
+  printf 'MARKSHARC_HOME=%s\n' "$(shq "$FW")"
+  printf 'export MARKSHARC_HOME\n'
+  if [ "$CONFIG_DIR" != "$DEFAULT_CONFIG" ]; then
+    printf 'MARKSHARC_CONFIG=%s\n' "$(shq "$CONFIG_DIR")"
+    printf 'export MARKSHARC_CONFIG\n'
+  fi
+  # shellcheck disable=SC2016 # Expanded by the shell that reads the stub.
+  printf '%s\n' '[ ! -r "$MARKSHARC_HOME/core/bash/bashrc.bash" ] || . "$MARKSHARC_HOME/core/bash/bashrc.bash"'
+}
 # cksum_of: "crc size" of the data on stdin (the stub fingerprint kept in the manifest).
 cksum_of() { cksum | tr -s ' ' ' '; }
 stub_is_ours() {
-  [ -f "$STUB" ] && [ ! -L "$STUB" ] || return 1
+  stub_check=${1:-$STUB}
+  [ -f "$stub_check" ] && [ ! -L "$stub_check" ] || return 1
   first_line=
-  IFS= read -r first_line < "$STUB" || :
+  IFS= read -r first_line < "$stub_check" || :
   case $first_line in "$STUB_MARK"*) return 0 ;; esac
   return 1
 }
@@ -252,6 +265,53 @@ else
       die "$HOME/$n is neither a regular file nor a symlink; move it aside and re-run"
     fi
   done
+fi
+
+# A pre-Bash manifest retains its original backup and adds the two Bash files.
+bash_upgrade=0
+old_bash_sum=$(mf_get bash_stub_sum)
+if [ "$mode" = update ] && [ "$(mf_get bash_stubs)" != 1 ]; then
+  bash_upgrade=1
+  for n in $BASH_DOTFILES; do
+    if [ -L "$HOME/$n" ]; then
+      backup_links="$backup_links $n"
+    elif [ -f "$HOME/$n" ]; then
+      backup_files="$backup_files $n"
+    elif [ -e "$HOME/$n" ]; then
+      die "$HOME/$n is neither a regular file nor a symlink; move it aside and re-run"
+    fi
+  done
+fi
+if [ "$mode" = update ] && [ "$bash_upgrade" = 0 ]; then
+  for n in $BASH_DOTFILES; do
+    if dest_present "$HOME/$n" && ! stub_is_ours "$HOME/$n"; then
+      original_backup=$(mf_get backup)
+      if [ -f "$HOME/$n" ] && [ ! -L "$HOME/$n" ] &&
+        grep -Fxq "file=$n" "$MANIFEST" && [ -f "$original_backup/$n" ] &&
+        cmp -s "$HOME/$n" "$original_backup/$n"; then
+        continue
+      fi
+      if [ -L "$HOME/$n" ] && grep -Fxq "link=$n=$(readlink "$HOME/$n")" "$MANIFEST"; then
+        continue
+      fi
+      die "$HOME/$n is no longer the managed stub; move it aside before reinstalling"
+    fi
+  done
+fi
+if [ "$bash_upgrade" = 1 ]; then
+  original_backup=$(mf_get backup)
+  if [ -n "$original_backup" ]; then
+    for n in $backup_files $backup_links; do
+      if dest_present "$original_backup/$n"; then
+        if [ -f "$HOME/$n" ] && [ ! -L "$HOME/$n" ] &&
+          [ -f "$original_backup/$n" ] && [ ! -L "$original_backup/$n" ] &&
+          cmp -s "$HOME/$n" "$original_backup/$n"; then
+          continue
+        fi
+        die "backup already exists for $HOME/$n at $original_backup/$n; reconcile it before upgrading"
+      fi
+    done
+  fi
 fi
 
 # --- act --------------------------------------------------------------------
@@ -308,17 +368,20 @@ esac
 
 # 3. backup (fresh installs only; a re-run never makes a new backup)
 backup=
-if [ "$mode" = fresh ]; then
+if [ "$mode" = fresh ] || [ "$bash_upgrade" = 1 ]; then
   if [ -n "$backup_files$backup_links" ]; then
-    stamp=$(date +%Y%m%dT%H%M%S)
-    backup=$STATE_DIR/backup/$stamp
-    [ ! -e "$backup" ] || backup=$backup-$$
+    if [ "$bash_upgrade" = 1 ]; then backup=$(mf_get backup); fi
+    if [ -z "$backup" ]; then
+      stamp=$(date +%Y%m%dT%H%M%S)
+      backup=$STATE_DIR/backup/$stamp
+      [ ! -e "$backup" ] || backup=$backup-$$
+    fi
     if [ "$DRY" -eq 1 ]; then
       say "would back up$backup_files$backup_links from $HOME into $backup"
     else
       mkdir -p -- "$STATE_DIR/backup"
       chmod 700 "$STATE_DIR" "$STATE_DIR/backup"
-      mkdir -m 700 -- "$backup"
+      [ -d "$backup" ] || mkdir -m 700 -- "$backup"
       for n in $backup_files; do cp -p -- "$HOME/$n" "$backup/$n"; done
       say "backed up$backup_files$backup_links into $backup"
     fi
@@ -341,16 +404,31 @@ write_manifest() {
   printf 'state=%s\n' "$STATE_DIR"
   printf 'cache=%s\n' "$CACHE_DIR"
   printf 'stub_sum=%s\n' "$new_sum"
+  printf 'bash_stubs=1\n'
+  printf 'bash_stub_sum=%s\n' "$bash_sum"
   if [ "$mode" = fresh ]; then
     [ -z "$backup" ] || printf 'backup=%s\n' "$backup"
     for n in $backup_files; do printf 'file=%s\n' "$n"; done
     for n in $backup_links; do printf 'link=%s=%s\n' "$n" "$(readlink "$HOME/$n")"; done
   elif [ -f "$MANIFEST" ]; then
     grep -E '^(backup|file|link)=' "$MANIFEST" || :
+    if [ "$bash_upgrade" = 1 ]; then
+      [ -z "$backup" ] || [ -n "$(mf_get backup)" ] || printf 'backup=%s\n' "$backup"
+      for n in $backup_files; do printf 'file=%s\n' "$n"; done
+      for n in $backup_links; do printf 'link=%s=%s\n' "$n" "$(readlink "$HOME/$n")"; done
+    fi
   fi
 }
 new_stub=$(stub_text; printf x); new_stub=${new_stub%x}
 new_sum=$(printf '%s' "$new_stub" | cksum_of)
+bash_stub=$(bash_stub_text; printf x); bash_stub=${bash_stub%x}
+bash_sum=$(printf '%s' "$bash_stub" | cksum_of)
+bash_current=1
+for n in $BASH_DOTFILES; do
+  if ! stub_is_ours "$HOME/$n" || [ "$(cat "$HOME/$n"; printf x)" != "$bash_stub"x ]; then
+    bash_current=0
+  fi
+done
 stub_current=0
 stub_edited=0
 if [ "$mode" = update ]; then
@@ -373,6 +451,7 @@ if [ -f "$MANIFEST" ] && [ "$(cat "$MANIFEST"; printf x)" = "$new_manifest"x ]; 
 if [ "$DRY" -eq 1 ]; then
   if [ "$stub_edited" -eq 1 ]; then say "would keep a copy of the edited stub in $replaced_copy"; fi
   if [ "$stub_current" -eq 1 ]; then say "the stub $STUB is up to date"; else say "would write the stub $STUB"; fi
+  if [ "$bash_current" -eq 0 ]; then say "would write the Bash startup stubs in $HOME"; fi
   if [ "$manifest_current" -eq 0 ]; then say "would write the manifest $MANIFEST"; fi
   for n in $backup_files $backup_links; do
     [ "$n" = .zshenv ] || say "would remove $HOME/$n (kept in the backup)"
@@ -402,7 +481,24 @@ else
   fi
   # The stub is in place and everything it replaces is backed up: clear the rest.
   for n in $backup_files $backup_links; do
-    [ "$n" = .zshenv ] || rm -f -- "$HOME/$n"
+    case $n in .zshenv|.bashrc|.bash_profile) ;; *) rm -f -- "$HOME/$n" ;; esac
+  done
+  for n in $BASH_DOTFILES; do
+    if stub_is_ours "$HOME/$n"; then
+      current_sum=$(cksum_of < "$HOME/$n")
+      if [ "$current_sum" = "$bash_sum" ]; then continue; fi
+      if [ -n "$old_bash_sum" ] && [ "$current_sum" != "$old_bash_sum" ]; then
+        mkdir -p -- "$STATE_DIR/replaced"
+        chmod 700 "$STATE_DIR/replaced"
+        cp -p -- "$HOME/$n" "$STATE_DIR/replaced/${n#.}.$stamp_now.$$"
+        say "the stub had been edited by hand; your copy is kept in $STATE_DIR/replaced/${n#.}.$stamp_now.$$"
+      fi
+    fi
+    [ ! -L "$HOME/$n" ] || rm -f -- "$HOME/$n"
+    TMP_STUB=$HOME/$n.marksharc.$$
+    printf '%s' "$bash_stub" > "$TMP_STUB"
+    mv -f -- "$TMP_STUB" "$HOME/$n"
+    TMP_STUB=
   done
 fi
 
@@ -447,7 +543,7 @@ fi
 # --- done -------------------------------------------------------------------
 if [ "$DRY" -eq 1 ]; then
   say "dry run complete"
-elif [ "$mode" = update ] && [ "$stub_current" -eq 1 ] && [ "$manifest_current" -eq 1 ]; then
+elif [ "$mode" = update ] && [ "$stub_current" -eq 1 ] && [ "$bash_current" -eq 1 ] && [ "$manifest_current" -eq 1 ]; then
   say "already installed; nothing to change"
 else
   say "installed. Open a new terminal, or run: exec zsh -l"
