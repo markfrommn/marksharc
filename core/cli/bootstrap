@@ -3,6 +3,7 @@ emulate -L zsh
 (( $# == 0 )) || { print -ru2 -- 'Usage: marksharc bootstrap'; exit 2; }
 source "$MARKSHARC_HOME/core/cli/day2-lib.zsh"
 typeset -a brew_lines=() apt_packages=() dnf_packages=()
+_day2_allow_missing=1
 _day2_directive() {
     [[ $1 == package ]] || return 0
     (( $# == 3 )) || { print -ru2 -- 'bootstrap: invalid package directive'; return 1; }

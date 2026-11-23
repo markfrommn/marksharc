@@ -11,14 +11,35 @@ Describe 'bootstrap, update and installers'
     ms_mod sample module.conf $'package brew alpha\npackage cask "App Name"'
     stub_command brew 'cat "$3" > "$TEST_ROOT/brewfile"'
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" bootstrap > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
-    if [[ $OSTYPE == darwin* ]]; then
-      [[ $(<"$TEST_ROOT/brewfile") == $'brew "alpha"\ncask "App Name"' ]]
-    else
-      [[ $(<"$TEST_ROOT/brewfile") == 'brew "alpha"' ]]
-    fi
+    if [[ $OSTYPE == darwin* ]]; then platform=darwin; else platform=linux; fi
+    cmp "$TEST_ROOT/brewfile" "$MARKSHARC_ROOT/tests/fixtures/day2/Brewfile.$platform"
   }
   It 'generates and runs a Brewfile from enabled package declarations'
     When run brew_case
+    The status should be success
+  End
+
+  missing_requirement_case() {
+    day2_fixture
+    ms_mod sample module.conf $'requires command marksharc-missing-fixture\npackage brew fixture'
+    stub_command brew 'cat "$3" > "$TEST_ROOT/brewfile"'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" bootstrap > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/brewfile") == 'brew "fixture"' ]]
+  }
+  It 'can bootstrap the package of an enabled module whose required command is missing'
+    When run missing_requirement_case
+    The status should be success
+  End
+
+  ruby_interpolation_case() {
+    day2_fixture
+    ms_mod sample module.conf 'package brew "literal#{danger}"'
+    stub_command brew 'cat "$3" > "$TEST_ROOT/brewfile"'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" bootstrap > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/brewfile") == 'brew "literal\#{danger}"' ]]
+  }
+  It 'escapes Ruby interpolation in generated Brewfiles'
+    When run ruby_interpolation_case
     The status should be success
   End
 

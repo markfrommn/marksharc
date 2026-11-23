@@ -11,9 +11,22 @@ Authority: MARKSHARC-SPEC sections 6.3–6.5, 6.15 and 7–10; MARKSHARC-PLAN P3
 
 ## Acceptance criteria
 
-- [ ] Enabled module and overlay `package`, `update` and `installer` directives work safely as data.
-- [ ] Bootstrap creates a Brewfile and runs Homebrew; apt/dnf commands are printed and confirmed.
-- [ ] Update runs sync, plugin pins and module steps in order, supports list, only and dry-run, continues on errors and summarizes results.
-- [ ] Registered krew, gvm, WezTerm terminfo, pyenv and nvm installers replace legacy install functions.
-- [ ] Golden, runner and registry tests plus startup and install regression checks pass.
+- [x] Enabled module and overlay `package`, `update` and `installer` directives work safely as data.
+- [x] Bootstrap creates a Brewfile and runs Homebrew; apt/dnf commands are printed and confirmed.
+- [x] Update runs sync, plugin pins and module steps in order, supports list, only and dry-run, continues on errors and summarizes results.
+- [x] Registered krew, gvm, WezTerm terminfo, pyenv and nvm installers replace legacy install functions.
+- [x] Golden Brewfile, runner and registry tests plus startup and install regression checks pass locally.
 - [ ] Companion personal package/update migration is prepared and coordinated separately; real host replacement is verified or explicitly reported as unverified.
+
+## Validation and boundary
+
+The isolated install e2e runs bootstrap with a stubbed Homebrew in both checkout and
+clone installations. The companion overlay was exercised separately in a disposable
+home: apt decline and confirmation with stubbed sudo, update listing and the Codex
+step including daemon restart, and the Go tools installer from an unrelated working
+directory. The WezTerm installer was exercised using the current upstream terminfo
+source as a local curl fixture and real `tic` in a disposable home.
+
+Companion publication is pending its own authorization. Real package installation,
+remote installer execution, fresh physical macOS/Ubuntu host setup, and replacement
+of the legacy updater on the Mac and sol remain unverified.

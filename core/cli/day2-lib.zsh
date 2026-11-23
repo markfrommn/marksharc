@@ -6,7 +6,7 @@ config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 _day2_collect() {
     local name conf line _day2_dir
     _ms_modules_discover
-    _ms_modules_plan init
+    if [[ ${_day2_allow_missing:-0} == 1 ]]; then _ms_modules_plan env; else _ms_modules_plan init; fi
     for name in "${_ms_plan[@]}"; do
         _day2_dir=${_ms_mod_dir[$name]}; conf=$_day2_dir/module.conf
         while IFS= read -r line || [[ -n $line ]]; do
