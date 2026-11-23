@@ -639,6 +639,17 @@ The renderer remains P3.1; MVP refreshes the existing caches and environment ID.
 - PATH and env are identical before and after on the Mac and sol.
 - Startup time is equal or better.
 
+**Outcome:** Implemented in [PR #7](https://github.com/markfrommn/marksharc/pull/7).
+The renderer covers declarative env, PATH, aliases, completions, guards, overlay tiers,
+render ids, stale refresh, transactional reload, and cache recovery. Local gates pass:
+lint 69 files; zsh 396 examples with zero failures and one Apple-Terminal platform skip;
+contract 4/4, install 46/46, repository 26/26, and fresh-HOME install e2e. Independent
+quality review is clean after all findings were fixed and re-reviewed; stack-check passes.
+Final 30-round warm-start medians are 41.82 ms batch and 121.73 ms interactive, compared
+with the original 73.59 ms and 157.86 ms measurements. Live Mac/sol parity and the real
+herdr/cwf generator contracts remain unverified beyond hermetic fixtures and stubs;
+hosted macOS/Ubuntu CI is required before merge.
+
 #### P3.2 — Bash environment parity (DEV-50)
 
 - **Repo:** marksharc
