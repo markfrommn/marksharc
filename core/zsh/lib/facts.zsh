@@ -4,7 +4,7 @@
 
 _ms_facts() {
     emulate -L zsh
-    local root=${_ms_fs_root-} line kernel distro_name
+    local root=${_ms_fs_root-} line kernel
 
     # Modernization removes the old compatibility names, including on reload in a
     # shell that still has values from an earlier core.

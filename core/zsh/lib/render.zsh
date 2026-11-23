@@ -75,7 +75,7 @@ _ms_render_conf() {
                 name=${reply[2]-} value=${reply[3]-}
                 [[ $name =~ '^[A-Za-z0-9_-]+$' && -n $value ]] || continue
                 _ms_render_guard_expression 4 || continue
-                guard="(( \${_ms_env_rebuild:-1} ))"
+                guard="(( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} ))"
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
                 print -r -- "            $guard && _ms_path_add $name ${(qq)value}"
                 ;;
@@ -85,7 +85,7 @@ _ms_render_conf() {
                 _ms_render_guard_expression 4 || continue
                 guard="[[ \$MARKSHARC_SESSION == interactive ]]"
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
-                print -r -- "            $guard && alias $name=${(qq)value}"
+                print -r -- "            $guard && alias ${(qq)name}=${(qq)value}"
                 print -r -- "            $guard && _ms_rendered_aliases+=( ${(q)name} )"
                 ;;
             completion)

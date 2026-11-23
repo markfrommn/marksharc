@@ -38,8 +38,8 @@ _ms_rendered_env() {
     case \$1 in
         alpha)
             (( \${_ms_env_rebuild:-1} )) && export GREETING='two words'
-            (( \${_ms_env_rebuild:-1} )) && _ms_path_add user '$HOME/my tools'
-            [[ \$MARKSHARC_SESSION == interactive ]] && alias gs='git status'
+            (( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} )) && _ms_path_add user '$HOME/my tools'
+            [[ \$MARKSHARC_SESSION == interactive ]] && alias 'gs'='git status'
             [[ \$MARKSHARC_SESSION == interactive ]] && _ms_rendered_aliases+=( gs )
             ;;
         overlay)
@@ -298,6 +298,49 @@ Describe 'modern host facts'
   }
   It 'does not create compatibility host-fact names'
     When run compatibility_case
+    The status should be success
+  End
+End
+
+Describe 'renderer safety and optional path builder'
+  render_cli() {
+    env -i HOME="$HOME" PATH="$PATH" TERM=dumb MARKSHARC_HOME="$MS_HOME" \
+      MARKSHARC_CONFIG="${MARKSHARC_CONFIG:-$XDG_CONFIG_HOME/marksharc}" \
+      XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+      XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" HOST=testhost \
+      /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+  }
+
+  hostile_alias_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_mod hostile module.conf 'describe "hostile alias"
+env HOSTILE "$(touch $TEST_ROOT/env-pwned); `touch $TEST_ROOT/env-pwned2`"
+alias '\''bad;touch "$TEST_ROOT/pwned"'\'' '\''value; $(touch $TEST_ROOT/value-pwned)'\'''
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ $(<"$cache/env.zsh") == *"alias 'bad;touch"* ]] || { cat "$cache/env.zsh"; return 2; }
+    ms_unit "MARKSHARC_SESSION=interactive; source $cache/env.zsh; _ms_rendered_env hostile; print -r -- \"\$HOSTILE\"" || { cat "$TEST_ROOT/err"; return 2; }
+    [[ ! -e $TEST_ROOT/pwned && ! -e $TEST_ROOT/env-pwned && ! -e $TEST_ROOT/env-pwned2 && ! -e $TEST_ROOT/value-pwned ]] || return 3
+    [[ $(<"$TEST_ROOT/out") == "\$(touch $TEST_ROOT/env-pwned); \`touch $TEST_ROOT/env-pwned2\`" ]] || { cat "$TEST_ROOT/out"; return 4; }
+  }
+  It 'keeps hostile alias names and values as data when the generated file runs'
+    When run hostile_alias_case
+    The status should be success
+  End
+
+  disabled_path_case() {
+    emulate -L zsh
+    ms_fixture
+    mkdir -p "$HOME/custom"
+    ms_mod demo module.conf 'describe "path without builder"
+path user "$HOME/custom"'
+    ms_run HOST=testhost -c ':' || { cat "$TEST_ROOT/err"; return 1; }
+    [[ ! -s $TEST_ROOT/err && ! -s $TEST_ROOT/out ]] || { cat "$TEST_ROOT/out" "$TEST_ROOT/err"; return 2; }
+  }
+  It 'skips rendered path lines quietly when the path module is absent'
+    When run disabled_path_case
     The status should be success
   End
 End
