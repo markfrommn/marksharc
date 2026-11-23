@@ -75,7 +75,7 @@ Describe 'marksharc doctor'
     env -i "${MS_ENV[@]}" sh "$MARKSHARC_ROOT/install.sh" --home "$TEST_ROOT/framework-link" > "$TEST_ROOT/install-out" 2> "$TEST_ROOT/install-err" || return 1
     env -i "${MS_ENV[@]}" zsh -lc exit > /dev/null 2>&1 || return 4
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 2
-    [[ $(<"$TEST_ROOT/out") != *'modified stub'* && $(<"$TEST_ROOT/out") != *'stale environment ID'* && $(<"$TEST_ROOT/out") != *'stale generated stub'* && $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* ]] || { cat "$TEST_ROOT/out"; return 3; }
+    [[ $(<"$TEST_ROOT/out") != *'modified stub'* && $(<"$TEST_ROOT/out") != *'stale environment ID'* && $(<"$TEST_ROOT/out") != *'stale generated stub'* && $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bash_profile"* && $(<"$TEST_ROOT/out") != *"missing or unmanaged bash stub: $HOME/"* ]] || { cat "$TEST_ROOT/out"; return 3; }
   }
   It 'accepts the installer stub and environment from a valid fresh install'
     When run installed_case
@@ -92,7 +92,7 @@ Describe 'marksharc doctor'
     stub_command cksum '/usr/bin/cksum "$@" | sed "s/ /   /g"'
     ms_env
     env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
-    [[ $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") == *"modified bash stub: $HOME/.bash_profile"* ]] || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$TEST_ROOT/out") != *"foreign dotfile: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"modified bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") != *"missing or unmanaged bash stub: $HOME/.bashrc"* && $(<"$TEST_ROOT/out") == *"modified bash stub: $HOME/.bash_profile"* ]] || { cat "$TEST_ROOT/out"; return 1; }
   }
   It 'accepts an unchanged Bash stub and identifies a modified Bash profile'
     When run bash_stub_case
