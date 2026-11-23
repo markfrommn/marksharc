@@ -73,6 +73,14 @@ function _ms_fish_path_build
         set -l variable _ms_fish_tier_$tier_key
         set -a managed $$variable
     end
+    if test "$_ms_fish_verbose" = 1
+        for tier in first $order last
+            set -l tier_key (string replace -a -r '[^A-Za-z0-9]' _ -- "$tier")
+            set -l variable _ms_fish_tier_$tier_key
+            set -l entries (string join : -- $$variable)
+            printf 'marksharc: PATH tier %s: %s\n' "$tier" "$entries" >&2
+        end
+    end
     set -l prefix
     set -l suffix
     set -l seen 0

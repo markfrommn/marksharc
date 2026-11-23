@@ -52,7 +52,7 @@ function _ms_fish_module_env
                 _ms_fish_path_add user "$PNPM_HOME"
             end
         case python
-            if test -f "$HOME/.pyenv/bin/pyenv"; and not type -q uv
+            if test -f "$HOME/.pyenv/bin/pyenv"; and not _ms_fish_command_available uv
                 set -gx PYENV_ROOT "$HOME/.pyenv"
                 _ms_fish_path_add manager "$PYENV_ROOT/shims" "$PYENV_ROOT/bin"
             end

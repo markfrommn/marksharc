@@ -200,6 +200,41 @@ EOF
     The status should be success
   End
 
+  git_worktree_options_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/projects"
+    printf 'module path\nmodule git-worktree\nset git-worktree.roots "%s/projects"\nset git-worktree.orgs fixture-org\n' "$HOME" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" fish --no-config -c '
+      source "$MARKSHARC_HOME/core/fish/marksharc.fish"
+      test "$_ms_opt_git_worktree_roots" = "$HOME/projects"; or exit 2
+      test "$_ms_opt_git_worktree_orgs" = fixture-org; or exit 3
+      repo-sync; or exit 4
+      fish --no-config -c "repo-sync"; or exit 5
+    ' > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 2; }
+    [ ! -s "$TEST_ROOT/out" ] && [ ! -s "$TEST_ROOT/err" ]
+  }
+  It 'exports git-worktree policy to commands and child shells'
+    When run git_worktree_options_case
+    The status should be success
+  End
+
+  pending_uv_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/early" "$HOME/toolbin" "$HOME/.pyenv/bin" "$HOME/.pyenv/shims"
+    printf 'describe early\norder 20\npath user "$HOME/toolbin"\n' > "$XDG_CONFIG_HOME/marksharc/modules/early/module.conf"
+    printf '#!/bin/sh\nexit 0\n' > "$HOME/toolbin/uv"
+    chmod +x "$HOME/toolbin/uv"
+    : > "$HOME/.pyenv/bin/pyenv"
+    printf 'module path\nmodule early\nmodule python\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh"; print -r -- "$PATH|${PYENV_ROOT-unset}"' > "$TEST_ROOT/zsh-path" 2> "$TEST_ROOT/err" || return 2
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" fish --no-config -c 'source "$MARKSHARC_HOME/core/fish/marksharc.fish"; set -q PYENV_ROOT; and set root "$PYENV_ROOT"; or set root unset; printf "%s|%s\n" "$PATH" "$root"' > "$TEST_ROOT/fish-path" 2> "$TEST_ROOT/err" || return 3
+    cmp "$TEST_ROOT/zsh-path" "$TEST_ROOT/fish-path"
+  }
+  It 'recognizes uv in a previously contributed PATH tier before considering pyenv'
+    When run pending_uv_case
+    The status should be success
+  End
+
   gvm_parity_case() {
     mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/.gvm/environments" "$HOME/.gvm/gos/go1.23.1/bin"
     printf 'gvm_go_name="go1.23.1"\n' > "$HOME/.gvm/environments/default"
@@ -237,15 +272,17 @@ EOF
     [ -n "$PYTHON" ] || return 0
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish"
     printf 'describe demo\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/module.conf"
-    printf 'module path\nmodule demo\nenv RELOAD_VALUE old\nenv REMOVED_VALUE keep\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    printf 'module path\nmodule demo\nmodule git-worktree\nset git-worktree.roots "%s"\nenv RELOAD_VALUE old\nenv REMOVED_VALUE keep\n' "$HOME" > "$XDG_CONFIG_HOME/marksharc/config.conf"
     env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
     "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c '
       source "$MARKSHARC_HOME/core/fish/marksharc.fish"
       test "$MARKSHARC_SESSION" = interactive; or exit 2
+      test "$_ms_opt_git_worktree_roots" = "$HOME"; or exit 7
       contains -- "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish" $fish_function_path; or exit 5
       printf "module path\nenv RELOAD_VALUE new\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"
       marksharc reload; or exit 3
       test "$RELOAD_VALUE" = new; and not set -q REMOVED_VALUE; or exit 4
+      not set -q _ms_opt_git_worktree_roots; or exit 8
       not contains -- "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish" $fish_function_path; or exit 6
       echo reloaded
     ' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
@@ -253,6 +290,32 @@ EOF
   }
   It 'reloads changed configuration in the current interactive fish session'
     When run reload_case
+    The status should be success
+  End
+
+  verbose_case() {
+    [ -n "$PYTHON" ] || return 0
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/missing"
+    printf 'describe missing\nrequires command never_available_fixture\n' > "$XDG_CONFIG_HOME/marksharc/modules/missing/module.conf"
+    printf 'module path\nmodule missing\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    for action in 'marksharc reload' 'marksharc reload --verbose' cs li; do
+      "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c "source \"\$MARKSHARC_HOME/core/fish/marksharc.fish\"; $action; echo done" > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
+      grep -q '^done$' "$TEST_ROOT/out" || return 3
+      if [ "$action" = 'marksharc reload' ]; then
+        grep -q 'marksharc: module' "$TEST_ROOT/out" && return 4
+      else
+        grep -q 'marksharc: module path' "$TEST_ROOT/out" || { cat "$TEST_ROOT/out"; return 5; }
+        grep -q 'module missing: skipped.*never_available_fixture' "$TEST_ROOT/out" || return 6
+        grep -q 'PATH tier' "$TEST_ROOT/out" || return 7
+        grep -q 'Executed in' "$TEST_ROOT/out" || return 8
+      fi
+    done
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_VERBOSE=1 MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c 'source "$MARKSHARC_HOME/core/fish/marksharc.fish"; echo done' > "$TEST_ROOT/out" 2>&1 || return 9
+    grep -q 'marksharc: module path' "$TEST_ROOT/out" && grep -q 'Executed in' "$TEST_ROOT/out"
+  }
+  It 'reports module timing, skip reasons, and PATH tiers only when verbose'
+    When run verbose_case
     The status should be success
   End
 End

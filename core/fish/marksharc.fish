@@ -7,6 +7,13 @@ source "$MARKSHARC_HOME/core/fish/lib/directives.fish"
 source "$MARKSHARC_HOME/core/fish/lib/path.fish"
 source "$MARKSHARC_HOME/core/fish/lib/modules.fish"
 source "$MARKSHARC_HOME/core/fish/lib/plugins.fish"
+set -g _ms_fish_verbose 0
+if set -q MARKSHARC_VERBOSE; and test -n "$MARKSHARC_VERBOSE"; and test "$MARKSHARC_VERBOSE" != 0
+    set -g _ms_fish_verbose 1
+end
+if set -q _ms_fish_force_verbose
+    set -g _ms_fish_verbose 1
+end
 set -l _ms_host (string split -m 1 . -- "$hostname")[1]
 set -l _ms_cache_home "$HOME/.cache"
 set -q XDG_CACHE_HOME; and test -n "$XDG_CACHE_HOME"; and set _ms_cache_home "$XDG_CACHE_HOME"
@@ -77,11 +84,13 @@ if test "$MARKSHARC_SESSION" = interactive
             command "$MARKSHARC_HOME/bin/marksharc" $argv
             return $status
         end
+        set -l verbose 0
         for arg in $argv[2..]
             if not contains -- "$arg" --verbose -v
                 printf 'marksharc reload: unknown option: %s\n' "$arg" >&2
                 return 2
             end
+            set verbose 1
         end
         command "$MARKSHARC_HOME/bin/marksharc" render >/dev/null; or return 1
         for name in $_ms_fish_exports
@@ -109,8 +118,12 @@ if test "$MARKSHARC_SESSION" = interactive
         set -g _ms_fish_plugins_loaded
         set -e -g _ms_fish_gvm_root
         set -g _ms_fish_reloading 1
+        if test $verbose -eq 1
+            set -g _ms_fish_force_verbose 1
+        end
         source "$MARKSHARC_HOME/core/fish/marksharc.fish"
         set -e -g _ms_fish_reloading
+        set -e -g _ms_fish_force_verbose
         return 0
     end
     function cs

@@ -76,8 +76,33 @@ _ms_fish_render_conf() {
     done < "$file"
 }
 
+_ms_fish_render_module() {
+    local name=$1 key optvar module_name
+    _ms_fish_quote "$name"; module_name=$REPLY
+    print -r -- "set -ga _ms_fish_enabled_modules $module_name"
+    if [[ $name == path ]]; then
+        _ms_fish_quote "${_ms_cfg_set[path.tiers]-}"
+        print -r -- "if test \"\$_ms_fish_rebuild\" = 1; _ms_fish_path_begin $REPLY; end"
+    fi
+    for key in ${=_ms_mod_options[$name]-}; do
+        optvar=_ms_opt_${name//[^A-Za-z0-9]/_}_${key//[^A-Za-z0-9]/_}
+        _ms_fish_quote "${(P)optvar}"
+        if [[ $name == git-worktree && $key == (roots|orgs) ]]; then
+            print -r -- "set -gx $optvar $REPLY"
+            print -r -- "contains -- $optvar \$_ms_fish_exports; or set -ga _ms_fish_exports $optvar"
+        else
+            print -r -- "set -g $optvar $REPLY"
+        fi
+    done
+    _ms_fish_quote "$name"
+    print -r -- "if test \"\$_ms_fish_rebuild\" = 1; _ms_fish_module_env $REPLY; end"
+    _ms_fish_quote "${_ms_mod_dir[$name]}/env.fish"
+    print -r -- "if test \"\$_ms_fish_rebuild\" = 1; and test -r $REPLY; source $REPLY; end"
+    _ms_fish_render_conf "${_ms_mod_dir[$name]}/module.conf"
+}
+
 _ms_render_fish() {
-    local name cmd key optvar line plugin_name plugin_sha marker module_name
+    local name cmd line plugin_name plugin_sha marker module_name body reason
     local -a markers=()
     integer path_enabled=0
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
@@ -103,6 +128,7 @@ _ms_render_fish() {
     print -r -- 'set -g _ms_fish_enabled_modules'
     for name in "${_ms_plan[@]}"; do
         _ms_module_options "$name"
+        [[ $name == path ]] && path_enabled=1
         if [[ -n ${_ms_mod_req_cmd[$name]-} ]]; then
             print -n -r -- 'if '
             for cmd in ${=_ms_mod_req_cmd[$name]}; do
@@ -111,24 +137,29 @@ _ms_render_fish() {
             done
             print -r -- 'true'
         fi
+        body=$(_ms_fish_render_module "$name") || return 1
         _ms_fish_quote "$name"; module_name=$REPLY
-        print -r -- "set -ga _ms_fish_enabled_modules $module_name"
-        if [[ $name == path ]]; then
-            path_enabled=1
-            _ms_fish_quote "${_ms_cfg_set[path.tiers]-}"
-            print -r -- "if test \"\$_ms_fish_rebuild\" = 1; _ms_fish_path_begin $REPLY; end"
+        print -r -- 'if test "$_ms_fish_verbose" = 1'
+        print -r -- "    printf 'marksharc: module %s env\n' $module_name >&2"
+        print -r -- '    time begin'
+        print -r -- "$body"
+        print -r -- '    end'
+        print -r -- 'else'
+        print -r -- "$body"
+        print -r -- 'end'
+        if [[ -n ${_ms_mod_req_cmd[$name]-} ]]; then
+            reason="module $name: skipped (requires command ${_ms_mod_req_cmd[$name]})"
+            _ms_fish_quote "$reason"
+            print -r -- 'else'
+            print -r -- "    if test \"\$_ms_fish_verbose\" = 1; printf 'marksharc: %s\n' $REPLY >&2; end"
+            print -r -- end
         fi
-        for key in ${=_ms_mod_options[$name]-}; do
-            optvar=_ms_opt_${name//[^A-Za-z0-9]/_}_${key//[^A-Za-z0-9]/_}
-            _ms_fish_quote "${(P)optvar}"
-            print -r -- "set -g $optvar $REPLY"
-        done
-        _ms_fish_quote "$name"
-        print -r -- "if test \"\$_ms_fish_rebuild\" = 1; _ms_fish_module_env $REPLY; end"
-        _ms_fish_quote "${_ms_mod_dir[$name]}/env.fish"
-        print -r -- "if test \"\$_ms_fish_rebuild\" = 1; and test -r $REPLY; source $REPLY; end"
-        _ms_fish_render_conf "${_ms_mod_dir[$name]}/module.conf"
-        [[ -z ${_ms_mod_req_cmd[$name]-} ]] || print -r -- end
+    done
+    for name in "${_ms_mod_names[@]}"; do
+        (( ${_ms_plan[(Ie)$name]} )) && continue
+        reason="module $name: skipped (requires os ${_ms_mod_req_os[$name]-})"
+        _ms_fish_quote "$reason"
+        print -r -- "if test \"\$_ms_fish_verbose\" = 1; printf 'marksharc: %s\n' $REPLY >&2; end"
     done
     _ms_fish_render_conf "$config/config.conf"
     _ms_fish_render_conf "$config/hosts/$MARKSHARC_HOST.conf"
@@ -148,7 +179,14 @@ _ms_render_fish() {
         _ms_fish_quote "$name"
         print -r -- "  if contains -- $REPLY \$_ms_fish_enabled_modules"
         _ms_fish_quote "${_ms_mod_dir[$name]}"
-        print -r -- "    _ms_fish_init_module $REPLY"
+        body=$REPLY
+        _ms_fish_quote "$name"
+        print -r -- '    if test "$_ms_fish_verbose" = 1'
+        print -r -- "      printf 'marksharc: module %s init\n' $REPLY >&2"
+        print -r -- "      time _ms_fish_init_module $body"
+        print -r -- '    else'
+        print -r -- "      _ms_fish_init_module $body"
+        print -r -- '    end'
         if [[ -r ${_ms_mod_dir[$name]}/fish.plugins ]]; then
             while IFS= read -r line || [[ -n $line ]]; do
                 _ms_words "$line" || continue
