@@ -33,7 +33,7 @@ _ms_apply_directives() {
                 _ms_name=$_ms_fields[2]
                 [[ $_ms_name =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || continue
                 case ${parameters[$_ms_name]-} in
-                    integer*|float*|array*|association*|*readonly*|*special*)
+                    integer*|float*|array*|association*|*readonly*)
                         print -ru2 -- "marksharc: unsafe directive target: $_ms_name"
                         return 1 ;;
                 esac

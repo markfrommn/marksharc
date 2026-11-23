@@ -112,4 +112,17 @@ Describe 'caller-state directives'
     When run typed_target_case
     The status should be success
   End
+  scalar_special_case() {
+    emulate -L zsh
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    local directives=$TEST_ROOT/directives PATH=/usr/bin:/bin
+    local expected='$HOME/$(touch HACK):/tmp'
+    print -r -- $'setenv\tPATH\t'"$expected" > "$directives"
+    _ms_apply_directives "$directives" || return 1
+    [[ $PATH == "$expected" && ! -e HACK ]]
+  }
+  It 'assigns scalar special variables as literal data'
+    When run scalar_special_case
+    The status should be success
+  End
 End
