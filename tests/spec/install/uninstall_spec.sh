@@ -26,6 +26,22 @@ Describe 'marksharc uninstall'
     : > "$XDG_CACHE_HOME/marksharc/somehost/cached"
   }
 
+  fish_uninstall_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    mkdir -p "$FW/core/fish" "$XDG_CONFIG_HOME/fish"
+    : > "$FW/core/fish/marksharc.fish"
+    printf 'user config\n' > "$XDG_CONFIG_HOME/fish/config.fish"
+    inst --home "$FW" --no-plugins || return 1
+    uninstall || { cat "$TEST_ROOT/err"; return 2; }
+    [ ! -e "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish" ] || return 3
+    [ "$(cat "$XDG_CONFIG_HOME/fish/config.fish")" = 'user config' ]
+  }
+  It 'removes the managed fish stub while preserving user configuration'
+    When run fish_uninstall_case
+    The status should be success
+  End
+
   restore_case() {
     SETUP_LINK=1 setup || return 1
     uninstall || { cat "$TEST_ROOT/err"; return 3; }

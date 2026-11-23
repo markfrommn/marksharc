@@ -78,6 +78,9 @@ xdg_dir() {
   case $xd_value in /*) ;; *) die "$1 must be an absolute path (got: $xd_value)" ;; esac
 }
 xdg_dir XDG_CONFIG_HOME "$HOME/.config"; CONFIG_BASE=$xd_value
+while [ "${#CONFIG_BASE}" -gt 1 ]; do
+  case $CONFIG_BASE in */) CONFIG_BASE=${CONFIG_BASE%/} ;; *) break ;; esac
+done
 xdg_dir XDG_DATA_HOME "$HOME/.local/share"; DATA_BASE=$xd_value
 xdg_dir XDG_STATE_HOME "$HOME/.local/state"; STATE_BASE=$xd_value
 xdg_dir XDG_CACHE_HOME "$HOME/.cache"; CACHE_BASE=$xd_value
@@ -94,7 +97,7 @@ while [ "${#CONFIG_DIR}" -gt 1 ]; do
 done
 REPO=${MARKSHARC_REPO:-$REPO_DEFAULT}
 case $CONFIG_DIR in /*) ;; *) die "MARKSHARC_CONFIG must be an absolute path" ;; esac
-for p in "$HOME" "$CONFIG_DIR" "$DATA_BASE" "$STATE_DIR" "$CACHE_DIR"; do
+for p in "$HOME" "$CONFIG_BASE" "$CONFIG_DIR" "$DATA_BASE" "$STATE_DIR" "$CACHE_DIR"; do
   case $p in *"$NL"*|*:*) die "unsupported character (newline or colon) in path: $p" ;; esac
 done
 
@@ -119,6 +122,8 @@ physpath() { (CDPATH='' cd -P -- "$1" 2> /dev/null && pwd -P); }
 valid_fw() { [ -r "$1/core/zsh/zshenv.zsh" ]; }
 # shq STRING: single-quote STRING for a shell, so the stub carries it as data.
 shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+# fish single-quoted strings escape backslashes and single quotes.
+fishq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/\\\\/\\\\\\\\/g; s/'/\\\\'/g")"; }
 # mf_get KEY: the first value of KEY in the existing manifest, if any.
 mf_get() {
   [ -f "$MANIFEST" ] || return 0
@@ -200,6 +205,18 @@ fi
 
 # --- plan: dotfiles and stub ------------------------------------------------
 STUB=$HOME/.zshenv
+FISH_STUB=${CONFIG_BASE%/}/fish/conf.d/00-marksharc.fish
+fish_enabled=0
+if [ "$fw_action" = clone ] || [ -r "$FW/core/fish/marksharc.fish" ]; then
+  fish_enabled=1
+  if dest_present "$FISH_STUB"; then
+    [ -f "$FISH_STUB" ] && [ ! -L "$FISH_STUB" ] || die "$FISH_STUB is not a regular managed stub"
+    IFS= read -r fish_first < "$FISH_STUB" || :
+    case $fish_first in "$STUB_MARK"*) ;; *) die "$FISH_STUB already exists and is not a marksharc stub" ;; esac
+  fi
+  old_fish_stub=$(mf_get fish_stub)
+  [ -z "$old_fish_stub" ] || [ "$old_fish_stub" = "$FISH_STUB" ] || die "fish stub moved from $old_fish_stub; uninstall before changing XDG_CONFIG_HOME"
+fi
 stub_text() {
   printf '%s\n' "$STUB_MARK (install.sh); do not edit. Remove with: marksharc uninstall"
   printf 'MARKSHARC_HOME=%s\n' "$(shq "$FW")"
@@ -222,6 +239,15 @@ _ms_stub_ok=0
 }
 unset _ms_stub_ok
 EOF
+}
+fish_stub_text() {
+  printf '%s\n' "$STUB_MARK (install.sh); do not edit. Remove with: marksharc uninstall"
+  printf 'set -gx MARKSHARC_HOME %s\n' "$(fishq "$FW")"
+  if [ "$CONFIG_DIR" != "$DEFAULT_CONFIG" ]; then
+    printf 'set -gx MARKSHARC_CONFIG %s\n' "$(fishq "$CONFIG_DIR")"
+  fi
+  # shellcheck disable=SC2016 # the variables belong to the generated fish stub
+  printf '%s\n' 'test -r "$MARKSHARC_HOME/core/fish/marksharc.fish"; and source "$MARKSHARC_HOME/core/fish/marksharc.fish"'
 }
 # cksum_of: "crc size" of the data on stdin (the stub fingerprint kept in the manifest).
 cksum_of() { cksum | tr -s ' ' ' '; }
@@ -341,6 +367,10 @@ write_manifest() {
   printf 'state=%s\n' "$STATE_DIR"
   printf 'cache=%s\n' "$CACHE_DIR"
   printf 'stub_sum=%s\n' "$new_sum"
+  if [ "$fish_enabled" -eq 1 ]; then
+    printf 'fish_stub=%s\n' "$FISH_STUB"
+    printf 'fish_stub_sum=%s\n' "$fish_sum"
+  fi
   if [ "$mode" = fresh ]; then
     [ -z "$backup" ] || printf 'backup=%s\n' "$backup"
     for n in $backup_files; do printf 'file=%s\n' "$n"; done
@@ -351,6 +381,8 @@ write_manifest() {
 }
 new_stub=$(stub_text; printf x); new_stub=${new_stub%x}
 new_sum=$(printf '%s' "$new_stub" | cksum_of)
+fish_text=$(fish_stub_text; printf x); fish_text=${fish_text%x}
+fish_sum=$(printf '%s' "$fish_text" | cksum_of)
 stub_current=0
 stub_edited=0
 if [ "$mode" = update ]; then
@@ -371,6 +403,7 @@ manifest_current=0
 if [ -f "$MANIFEST" ] && [ "$(cat "$MANIFEST"; printf x)" = "$new_manifest"x ]; then manifest_current=1; fi
 
 if [ "$DRY" -eq 1 ]; then
+  if [ "$fish_enabled" -eq 1 ]; then say "would write the fish stub $FISH_STUB"; fi
   if [ "$stub_edited" -eq 1 ]; then say "would keep a copy of the edited stub in $replaced_copy"; fi
   if [ "$stub_current" -eq 1 ]; then say "the stub $STUB is up to date"; else say "would write the stub $STUB"; fi
   if [ "$manifest_current" -eq 0 ]; then say "would write the manifest $MANIFEST"; fi
@@ -379,6 +412,21 @@ if [ "$DRY" -eq 1 ]; then
   done
 else
   mkdir -p -- "$STATE_DIR"
+  if [ "$fish_enabled" -eq 1 ]; then
+    mkdir -p -- "${FISH_STUB%/*}"
+    if [ ! -f "$FISH_STUB" ] || [ "$(cat "$FISH_STUB"; printf x)" != "$fish_text"x ]; then
+      if [ -f "$FISH_STUB" ] && [ "$(cksum_of < "$FISH_STUB")" != "$(mf_get fish_stub_sum)" ]; then
+        mkdir -p -- "$STATE_DIR/replaced"
+        chmod 700 "$STATE_DIR/replaced"
+        cp -p -- "$FISH_STUB" "$STATE_DIR/replaced/fish.$stamp_now.$$"
+      fi
+      TMP_STUB=$FISH_STUB.tmp.$$
+      printf '%s' "$fish_text" > "$TMP_STUB"
+      mv -f -- "$TMP_STUB" "$FISH_STUB"
+      TMP_STUB=
+      say "wrote the fish stub $FISH_STUB"
+    fi
+  fi
   if [ "$manifest_current" -eq 0 ]; then
     TMP_MANIFEST=$STATE_DIR/.install.manifest.$$
     printf '%s' "$new_manifest" > "$TMP_MANIFEST"

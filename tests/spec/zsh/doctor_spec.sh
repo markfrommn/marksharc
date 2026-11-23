@@ -51,6 +51,20 @@ Describe 'marksharc doctor'
     When run altered_stub_case
     The status should be success
   End
+  altered_fish_stub_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_STATE_HOME/marksharc" "$XDG_CONFIG_HOME/fish/conf.d"
+    print -r -- '# marksharc: managed stub' > "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
+    print -r -- "fish_stub=$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"$'\n''fish_stub_sum=1 1' > "$XDG_STATE_HOME/marksharc/install.manifest"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *'modified fish stub'* ]]
+  }
+  It 'detects edits to the fish installer stub'
+    When run altered_fish_stub_case
+    The status should be success
+  End
   installed_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
@@ -103,6 +117,19 @@ Describe 'marksharc doctor'
   }
   It 'reports a missing enabled-module plugin clone'
     When run plugin_missing_case
+    The status should be success
+  End
+  fish_plugin_missing_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_mod sample module.conf 'describe sample'
+    ms_mod sample fish.plugins 'plugin fish-sample /not-used abc shell fish kind source'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *'missing plugin'*fish-sample*'(run marksharc update)'* ]]
+  }
+  It 'reports a missing fish plugin pin'
+    When run fish_plugin_missing_case
     The status should be success
   End
   repo_state_case() {

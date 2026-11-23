@@ -1,11 +1,17 @@
 #!/usr/bin/env zsh
 # Render declarative module and overlay directives into the per-host cache.
 emulate -L zsh
-(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc render'; exit 2; }
+generate=1
+if [[ ${1-} == --env-only && $# == 1 ]]; then
+    generate=0
+elif (( $# != 0 )); then
+    print -ru2 -- 'Usage: marksharc render'
+    exit 2
+fi
 MARKSHARC_HOME=${${(%):-%x}:A:h:h:h}
 for _l in util facts envid modules render; do source "$MARKSHARC_HOME/core/zsh/lib/$_l.zsh"; done
 unset _l
 _ms_verbose=0
 _ms_facts
 _ms_env_id
-_ms_render
+_ms_render "$generate"

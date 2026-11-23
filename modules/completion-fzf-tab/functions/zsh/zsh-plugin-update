@@ -12,11 +12,11 @@ local -a registries=()
 local -A registry_by_module=()
 confdir=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 for rootdir in "${MARKSHARC_HOME:-${zdir:-}}/modules" "$confdir/modules"; do
-  for registry in "$rootdir"/*/zsh.plugins(N); do
-    registry_by_module[${registry:h:t}]=$registry
+  for registry in "$rootdir"/*/(zsh|fish).plugins(N); do
+    registry_by_module[${registry:h:t}/${registry:t}]=$registry
   done
 done
-registries=( "${(@v)registry_by_module}" )
+registries=( "${(@onv)registry_by_module}" )
 local cache_parent="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins"
 local line name url sha kind key root
 local -a words

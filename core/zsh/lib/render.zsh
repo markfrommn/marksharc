@@ -224,6 +224,12 @@ _ms_render() {
         command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"
         return 1
     fi
+    source "$MARKSHARC_HOME/core/zsh/lib/render-fish.zsh" || return 1
+    _ms_render_fish > "$cache/env.fish.tmp.$$" || {
+        command rm -rf -- "$tmp" "$cache/env.fish.tmp.$$" "$_ms_render_stage" "$_ms_shims_stage"
+        return 1
+    }
+    command mv -f -- "$cache/env.fish.tmp.$$" "$cache/env.fish" || return 1
     command mv -f -- "$tmp" "$cache/env.zsh" || { command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
     print -r -- "$_ms_env_id_value" > "$cache/render-id.tmp.$$" && \
         command mv -f -- "$cache/render-id.tmp.$$" "$cache/render-id" || {

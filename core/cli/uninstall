@@ -55,6 +55,12 @@ stub_is_ours() {
 }
 
 typeset -a problems=()
+fish_stub=${mf[fish_stub]-}
+fish_config_base=${${XDG_CONFIG_HOME:-$HOME/.config}%/}
+[[ -n $fish_config_base ]] || fish_config_base=/
+if [[ -n $fish_stub && $fish_stub != "${fish_config_base%/}/fish/conf.d/00-marksharc.fish" ]]; then
+    problems+=( "fish stub $fish_stub is outside the current XDG_CONFIG_HOME; restore the install-time XDG_CONFIG_HOME" )
+fi
 backup=${mf[backup]-}
 typeset -a names=( $files $linknames )
 for name in $names; do
@@ -116,6 +122,19 @@ if (( purge && ! yes )); then
 fi
 
 # --- act -------------------------------------------------------------------------
+if [[ -n $fish_stub && -f $fish_stub && ! -L $fish_stub ]]; then
+    IFS= read -r fish_first < "$fish_stub" || :
+    if [[ $fish_first == "$stub_mark"* ]]; then
+        cur=$(command cksum < "$fish_stub")
+        cur=${(j: :)${=cur}}
+        if [[ $cur != "${mf[fish_stub_sum]-}" ]]; then
+            saved=$fish_stub.marksharc-removed
+            [[ -e $saved || -L $saved ]] && saved=$saved.$$
+            command cp -p -- "$fish_stub" "$saved" || die "could not save the edited fish stub to $saved"
+        fi
+        command rm -f -- "$fish_stub"
+    fi
+fi
 if stub_is_ours; then
     # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
     # file. The fingerprint recorded at install time tells an edit from the stub as written.

@@ -3,6 +3,53 @@
 Describe 'install.sh'
   installer="$MARKSHARC_ROOT/install.sh"
 
+  fish_stub_case() {
+    fake_fw "$TEST_ROOT/fw"
+    mkdir -p "$XDG_CONFIG_HOME/fish" "$TEST_ROOT/fw/core/fish"
+    : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
+    printf 'user config\n' > "$XDG_CONFIG_HOME/fish/config.fish"
+    inst --home "$TEST_ROOT/fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    stub="$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
+    [ -f "$stub" ] || return 2
+    [ "$(cat "$XDG_CONFIG_HOME/fish/config.fish")" = 'user config' ] || return 3
+    grep -Fq 'core/fish/marksharc.fish' "$stub" || return 4
+    before=$(cksum "$stub")
+    inst --home "$TEST_ROOT/fw" --no-plugins || return 5
+    [ "$(cksum "$stub")" = "$before" ]
+  }
+  It 'installs an idempotent fish stub without touching fish config'
+    When run fish_stub_case
+    The status should be success
+  End
+
+  fish_quote_case() {
+    fw="$TEST_ROOT/fw 'dollar\$ and \\ slash"
+    fake_fw "$fw"
+    mkdir -p "$fw/core/fish"
+    printf 'printf "%%s\\n" "$MARKSHARC_HOME"\n' > "$fw/core/fish/marksharc.fish"
+    inst --home "$fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    result=$(fish --no-config -c 'source "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"') || return 2
+    [ "$result" = "$fw" ] || { printf 'expected <%s> got <%s>\n' "$fw" "$result"; cat "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"; return 3; }
+  }
+  It 'preserves quotes, dollar signs, and backslashes in the fish framework path'
+    When run fish_quote_case
+    The status should be success
+  End
+
+  fish_collision_case() {
+    fake_fw "$TEST_ROOT/fw"
+    mkdir -p "$XDG_CONFIG_HOME/fish/conf.d" "$TEST_ROOT/fw/core/fish"
+    : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
+    printf 'foreign\n' > "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
+    inst --home "$TEST_ROOT/fw" --no-plugins && return 1
+    [ "$(cat "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish")" = foreign ] || return 2
+    [ ! -e "$HOME/.zshenv" ]
+  }
+  It 'refuses a foreign fish stub before writing'
+    When run fish_collision_case
+    The status should be success
+  End
+
   fresh_case() {
     fake_fw "$TEST_ROOT/fw"
     # With the XDG variables at their defaults the stub names no MARKSHARC_CONFIG.
