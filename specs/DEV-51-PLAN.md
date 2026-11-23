@@ -28,7 +28,7 @@ data-only conf files and generated shims read provider values on invocation. Ses
 refreshed by render; cached shim manifests support recovery on reload. Provider and hook migration
 is documented in `docs/write-once.md`.
 
-Local `tests/check` passed: lint 78 files, zsh 416 examples (one Apple Terminal platform skip),
+Local `tests/check` passed: lint 78 files, zsh 422 examples (one Apple Terminal platform skip),
 contract 4, install 46 and repository 26. The standalone install e2e passed both checkout and
 clone paths. Hermetic renderer tests cover repeat output, stale shim removal and failure recovery;
 runtime artifacts stay in the temporary cache, with no repository drift. Tests use stubs and
