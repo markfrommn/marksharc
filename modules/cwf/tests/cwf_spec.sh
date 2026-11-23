@@ -1,4 +1,14 @@
 Describe 'cwf-new creation checks, unmanaged copies and hook points'
+  executable_usage_case() {
+    emulate -L zsh
+    cd "$HOME" || return 1
+    bash -c '"$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" fixture' > "$TEST_ROOT/output" 2>&1
+    [[ $? != 0 && $(<"$TEST_ROOT/output") == *'Usage: cwf-new'* ]]
+  }
+  It 'checks its repository precondition when invoked from bash'
+    When run executable_usage_case
+    The status should be success
+  End
   cwf_case() {
     emulate -L zsh
     local fixture_mode=$1
@@ -14,11 +24,6 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
     local fixture_workdir="$TEST_ROOT/work tree-${TEST_ROOT:t}" before=$PWD repo=demo-frontend
     "$REAL_GIT" remote add origin "git@github.com:fixture/$repo.git"
     mkdir "$fixture_workdir"
-    # cwf-new reindexes with codegraph only when the new session was indexed
-    # before (its worktree carries a tracked .codegraph/.gitignore); model that
-    # state directly in the session directory. no-index pins the bare/absent
-    # .codegraph case, which must not index.
-    [[ $fixture_mode == no-index ]] || { mkdir "$fixture_workdir/.codegraph"; print indexed > "$fixture_workdir/.codegraph/.gitignore"; }
     cwf() {
       if [[ $1 == session && $2 == new ]]; then
         print -r -- "  cd '$fixture_workdir'"
@@ -26,7 +31,6 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
         [[ $fixture_mode != creation-fail ]]
       else return 0; fi
     }
-    codegraph() { print INDEX >> "$OPLOG"; [[ $fixture_mode != index-fail ]]; }
     # Hooks see the copied files and run before the shell enters the session.
     hook_a() { print -r -- "hook_a:$1|$2|$3|$4|$([[ -f $2/.env.local ]] && print copied)|${PWD:t}" >> "$OPLOG"; }
     hook_b() { print -r -- "hook_b" >> "$OPLOG"; [[ $fixture_mode != hook-fail ]]; }
@@ -35,10 +39,39 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
       hook-missing) cwf_new_post_create_hooks=( hook_a no_such_hook );;
       exclude) cwf_new_copy_exclude=( 'other-repo:*' 'demo-frontend:.env.l*' );;
     esac
-    load_mfn git-worktree git_managed_arr_core
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
     load_mfn cwf cwf-new
-    [[ $fixture_mode != copy-fail ]] || cp() { return 8; }
-    [[ $fixture_mode != no-git-worktree ]] || unfunction git_managed_arr_core
+    cat > "$TEST_ROOT/bin/cwf" <<'DATA'
+#!/bin/sh
+if [ "$1 $2" = 'session new' ]; then
+  printf "  cd '%s'\n" "$FIXTURE_WORKDIR"
+  if [ "$FIXTURE_MODE" = malformed ]; then printf '%s\n' 'export COMMON_SESSION_ID=bad'; else printf '%s\n' '  export COMMON_SESSION_ID=12'; fi
+  [ "$FIXTURE_MODE" != creation-fail ]
+fi
+DATA
+    cat > "$TEST_ROOT/bin/hook_a" <<'DATA'
+#!/bin/sh
+if [ -f "$2/.env.local" ]; then copied=copied; else copied=; fi
+printf 'hook_a:%s|%s|%s|%s|%s|%s\n' "$1" "$2" "$3" "$4" "$copied" "${PWD##*/}" >> "$OPLOG"
+DATA
+    cat > "$TEST_ROOT/bin/hook_b" <<'DATA'
+#!/bin/sh
+printf '%s\n' hook_b >> "$OPLOG"
+[ "$FIXTURE_MODE" != hook-fail ]
+DATA
+    chmod +x "$TEST_ROOT/bin/cwf" "$TEST_ROOT/bin/hook_a" "$TEST_ROOT/bin/hook_b"
+    if [[ $fixture_mode == copy-fail ]]; then
+      print -r -- $'#!/bin/sh\nexit 8' > "$TEST_ROOT/bin/cp"
+      chmod +x "$TEST_ROOT/bin/cp"
+    fi
+    local framework=$MARKSHARC_ROOT
+    if [[ $fixture_mode == no-git-worktree ]]; then
+      framework=$TEST_ROOT/framework
+      mkdir -p "$framework/core/zsh/lib"
+      command cp "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh" "$framework/core/zsh/lib/directives.zsh"
+    fi
+    path=( "$MARKSHARC_ROOT/modules/cwf/bin" $path )
+    export FIXTURE_MODE=$fixture_mode FIXTURE_WORKDIR=$fixture_workdir MARKSHARC_HOME=$framework
     cwf-new demo > "$TEST_ROOT/output" 2>&1
     local rc=$?
     case $fixture_mode in
@@ -63,17 +96,15 @@ Describe 'cwf-new creation checks, unmanaged copies and hook points'
         else
           [[ -f "$fixture_workdir/.env.local" && $(<"$fixture_workdir/.env.local") == secret ]] || return 13
         fi
-        if [[ $fixture_mode == index-fail ]]; then [[ $rc != 0 ]] || return 8; else [[ $rc == 0 ]] || { cat "$TEST_ROOT/output"; return 9; }; fi
+        [[ $rc == 0 ]] || { cat "$TEST_ROOT/output"; return 9; }
         if [[ $fixture_mode == hook-ok ]]; then
-          [[ $(<"$OPLOG") == "hook_a:$repo|$fixture_workdir|12|${fixture_workdir:t}|copied|base"$'\nhook_b\nINDEX' ]] || { cat "$OPLOG"; return 10; }
-        elif [[ $fixture_mode == no-index ]]; then
-          [[ ! -s $OPLOG ]] || { cat "$OPLOG"; return 14; }
+          [[ $(<"$OPLOG") == "hook_a:$repo|$fixture_workdir|12|${fixture_workdir:t}|copied|base"$'\nhook_b' ]] || { cat "$OPLOG"; return 10; }
         else
-          [[ $(<"$OPLOG") == INDEX ]] || { cat "$OPLOG"; return 11; }
+          [[ ! -s $OPLOG ]] || { cat "$OPLOG"; return 11; }
         fi;;
     esac
   }
-  Parameters:value success creation-fail malformed copy-fail index-fail no-index hook-ok hook-fail hook-missing exclude no-git-worktree
+  Parameters:value success creation-fail malformed copy-fail hook-ok hook-fail hook-missing exclude no-git-worktree
   It "handles $1 with spaced output as data"
     When run cwf_case "$1"
     The status should be success

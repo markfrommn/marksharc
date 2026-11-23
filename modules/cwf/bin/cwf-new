@@ -1,0 +1,67 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+setopt pipefail extendedglob
+local framework=${MARKSHARC_HOME:-${0:A:h:h:h:h}}
+source "$framework/core/zsh/lib/directives.zsh" || exit 1
+[[ $# == 1 && -d .git ]] || { print -ru2 'Usage: cwf-new <branch>, from a base repository root'; return 1; }
+# Hook points: functions named in cwf_new_post_create_hooks run as
+# `hook <repo> <workdir> <session> <issue>` after the unmanaged files are copied; a failing or
+# undefined hook aborts with the session retained. Patterns in cwf_new_copy_exclude (matched
+# against `<repo>:<file>`) name files the copy must not take.
+local output line workdir='' session='' exports='' repo url file destination issue hook pattern skip pair name value
+local -a export_fields=() words=()
+url=$(git config --get remote.origin.url) || return 1
+repo=${${url:t}%.git}
+output=$(cwf session new "$1" --no-tmux) || { print -ru2 'CWF creation failed'; return 1; }
+for line in "${(@f)output}"; do
+    line=${line##[[:space:]]#}
+    case $line in
+        'cd '*)
+            [[ -z $workdir ]] || { print -ru2 'Ambiguous CWF directory; created session retained'; return 1; }
+            workdir=${line#cd }
+            if [[ $workdir == \'*\' || $workdir == \"*\" ]]; then workdir=${workdir[2,-2]}; fi;;
+        'export '*)
+            exports+="$line"$'\n'
+            words=( "${(z)line}" )
+            (( $#words == 2 )) && [[ $words[2] == *=* ]] || { print -ru2 'Invalid CWF export hint; created session retained'; return 1; }
+            pair=${(Q)words[2]}; name=${pair%%=*}; value=${pair#*=}
+            [[ $name =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || { print -ru2 'Invalid CWF export hint; created session retained'; return 1; }
+            export_fields+=( "$name" "$value" )
+            if [[ $line == 'export COMMON_SESSION_ID='* ]]; then
+                session=${line#export COMMON_SESSION_ID=}; session=${session%;}
+                if [[ $session == \'*\' || $session == \"*\" ]]; then session=${session[2,-2]}; fi
+            fi;;
+    esac
+done
+[[ -n $workdir && -d $workdir && -n $exports && $session == <-> && ${#session} -le 3 ]] || {
+    print -ru2 'Invalid CWF directory/session hints; created session retained'; return 1
+}
+workdir=${workdir:A}; issue=${workdir:t}
+[[ -r $framework/modules/git-worktree/functions/zsh/git_managed_arr_core ]] || { print -ru2 'cwf-new needs the git-worktree module'; return 1; }
+fpath=( "$framework/modules/git-worktree/functions/zsh" $fpath )
+autoload -Uz git_managed_arr_core
+local -a candidates=( .{codex,ai,claude,vscode,cursor}/*(ND.) .env*(N.) ) unmanaged=()
+git_managed_arr_core unmanaged unmanaged "${candidates[@]}" || return 1
+for file in "${unmanaged[@]}"; do
+    skip=0
+    for pattern in "${(@f)MARKSHARC_CWF_NEW_COPY_EXCLUDE}"; do
+        [[ "$repo:$file" == ${~pattern} ]] && { skip=1; break; }
+    done
+    (( ! skip )) || continue
+    destination=$workdir/$file
+    mkdir -p -- "${destination:h}" && cp -- "$file" "$destination" || {
+        print -ru2 "Copy failed: $file; created session retained at $workdir"; return 1
+    }
+done
+for hook in "${(@f)MARKSHARC_CWF_NEW_HOOKS}"; do
+    [[ -n $hook ]] || continue
+    (( $+commands[$hook] )) || [[ -x $hook && ! -d $hook ]] || { print -ru2 "Post-create hook not defined: $hook; session retained at $workdir"; return 1; }
+    "$hook" "$repo" "$workdir" "$session" "$issue" || { print -ru2 "Post-create hook failed: $hook; session retained at $workdir"; return 1; }
+done
+print -r -- "$exports"
+for name value in "${(@)export_fields}"; do _ms_directive_emit setenv "$name" "$value" || return 1; done
+cd -- "$workdir" || { print -ru2 "Cannot enter created session at $workdir"; return 1; }
+_ms_directive_emit pushd "$workdir" || return 1
+cwf session name || { print -ru2 "Session created at $workdir but name lookup failed"; return 1; }
+
+return 0
