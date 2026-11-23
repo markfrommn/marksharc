@@ -17,6 +17,7 @@ _ms_apply_directives() {
     emulate -L zsh
     local _ms_line _ms_op _ms_name _ms_decoded
     local -a _ms_fields
+    zmodload -F zsh/parameter p:parameters 2>/dev/null || return 1
     while IFS= read -r _ms_line || [[ -n $_ms_line ]]; do
         _ms_fields=( "${(@ps:\t:)_ms_line}" )
         _ms_op=${_ms_fields[1]-}
@@ -31,6 +32,11 @@ _ms_apply_directives() {
                 (( $#_ms_fields == 3 )) || continue
                 _ms_name=$_ms_fields[2]
                 [[ $_ms_name =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || continue
+                case ${parameters[$_ms_name]-} in
+                    integer*|float*|array*|association*|*readonly*|*special*)
+                        print -ru2 -- "marksharc: unsafe directive target: $_ms_name"
+                        return 1 ;;
+                esac
                 _ms_decoded=${_ms_fields[3]//\%0A/$'\n'}
                 _ms_decoded=${_ms_decoded//\%09/$'\t'}
                 _ms_decoded=${_ms_decoded//\%25/\%}

@@ -97,4 +97,19 @@ Describe 'caller-state directives'
     When run malformed_case
     The status should be success
   End
+  typed_target_case() {
+    emulate -L zsh
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    local directives=$TEST_ROOT/directives
+    local -i TARGET=12
+    local -a probe=(0)
+    print -r -- 'setenv'$'\t''TARGET'$'\t''probe[$(touch "$HOME/INJECTED")]' > "$directives"
+    _ms_apply_directives "$directives" 2> "$TEST_ROOT/err"
+    local rc=$?
+    [[ $rc != 0 && $TARGET == 12 && ! -e $HOME/INJECTED && -s $TEST_ROOT/err ]]
+  }
+  It 'rejects integer targets without evaluating directive data or changing caller state'
+    When run typed_target_case
+    The status should be success
+  End
 End
