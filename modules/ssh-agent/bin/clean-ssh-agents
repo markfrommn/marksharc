@@ -1,3 +1,8 @@
+#!/bin/zsh -f
+emulate -L zsh
+_ms_ssh_dir=${0:A:h:h}
+fpath=( "$_ms_ssh_dir/lib" $fpath )
+autoload -Uz _ms_agent_cache_file _ms_agent_local _ms_agent_migrate _ms_agent_parse _ms_agent_probe _ms_agent_process _ms_agent_save _ms_agent_state_dir
 emulate -L zsh
 _ms_agent_probe && _ms_agent_local "$SSH_AGENT_PID" "$SSH_AUTH_SOCK" || {
     print -ru2 'Cannot verify selected local agent/socket; no agents terminated'; return 1
@@ -16,7 +21,7 @@ for line in "${(@f)$(ps -u "$EUID" -o pid=,comm=)}"; do
     done
     [[ -n $owned_socket && $owned_socket != $SSH_AUTH_SOCK ]] || continue
     _ms_agent_local "$pid" "$owned_socket" || continue
-    kill -- "$pid" || result=1
+    command kill "$pid" || result=1
 done
 _ms_agent_save || return 1
 return $result
