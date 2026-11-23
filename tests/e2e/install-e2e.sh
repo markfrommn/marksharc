@@ -62,6 +62,17 @@ exercise() {
   [ -f "$home/.local/state/marksharc/install.manifest" ] || fail "no install manifest"
   [ -f "$home/.config/marksharc/config.conf" ] || fail "the template overlay was not installed"
 
+  step "bootstrap declared packages with a stubbed manager"
+  mkdir -p "$work/$pass/stubs"
+  cat > "$work/$pass/stubs/brew" <<'EOF'
+#!/bin/sh
+[ "$1" = bundle ] && [ "$2" = --file ] || exit 1
+grep -qx 'brew "fixture-package"' "$3"
+EOF
+  chmod +x "$work/$pass/stubs/brew"
+  printf '%s\n' 'package brew fixture-package' >> "$home/.config/marksharc/config.conf"
+  silent "bootstrap" env PATH="$work/$pass/stubs:$PATH" "$fw/bin/marksharc" bootstrap
+
   step "login shell comes up working"
   # shellcheck disable=SC2016 # the zsh code is single-quoted on purpose
   silent "login shell" zsh -l -c 'print -r -- "$MARKSHARC_SESSION|$MARKSHARC_HOME"; command -v marksharc'

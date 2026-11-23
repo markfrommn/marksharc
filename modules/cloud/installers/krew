@@ -1,3 +1,5 @@
+#!/usr/bin/env zsh
+main() {
 (
     emulate -L zsh
     local directory os arch archive result
@@ -15,3 +17,5 @@
     }
     return $result
 )
+}
+main

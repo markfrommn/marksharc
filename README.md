@@ -8,9 +8,9 @@ Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer, Bash environment and the `marksharc` command are in place. The fish
-> core loads the shared environment and native plugins. The remaining fish
-> modules and the full module updater come in later releases.
+> installer, Bash environment, and `marksharc` bootstrap, update, and install commands
+> are in place. The fish core loads the shared environment and native plugins.
+> The remaining fish modules come in later releases.
 
 ## Requirements
 
@@ -73,9 +73,13 @@ marksharc module list              # enabled, disabled and skipped modules
 marksharc module disable <name>    # edits config.conf in your overlay
 marksharc reload                   # apply it in this shell (--verbose to trace)
 marksharc render                   # refresh cached env, completions and command shims
+marksharc bootstrap                # install declared packages
 marksharc sync                     # fast-forward safe checkouts and refresh pins
 marksharc doctor                   # report local health
-marksharc update                   # sync, plugin pins and declarative render
+marksharc update                   # sync, plugin pins and module update steps
+marksharc update --list            # list available step labels
+marksharc update --only <label>    # run one step; --dry-run previews commands
+marksharc install <name>           # run a registered explicit installer
 marksharc version
 marksharc uninstall                # restore backed-up dotfiles and remove managed stubs
 ```
@@ -103,6 +107,22 @@ or `hosts/<host>.conf`);
 a module enabled by default skips itself when its command is absent.
 
 An assignment in `hosts/<hostname>.conf` replaces the global `sync.repos` list.
+
+Bootstrap consumes `package brew|cask|apt|dnf <name>` directives from enabled modules
+and overlay configuration. Homebrew must already be installed to process brew packages;
+the command writes a temporary Brewfile and runs `brew bundle`. On Linux it prints each
+apt or dnf command and asks before invoking sudo. An empty selection needs no manager.
+Overlay `packages/*.Brewfile` files accept data-only `brew "name"` and `cask "name"`
+lines; `*.darwin.Brewfile` and `*.linux.Brewfile` apply only on the named platform.
+Files ending `.apt` or `.dnf` contain one package name per line. Comments and blank
+lines are allowed. Bootstrap rejects arbitrary Ruby and package-manager flags.
+
+Modules and overlay configuration register `update <label> <command> [args...]` and
+`installer <name> <script>`. Arguments are parsed as data, not shell code. Relative
+installer paths and update executable paths beginning `./` resolve from the declaring
+module or overlay root. Missing update commands are skipped; other failures are reported
+after remaining steps run. `marksharc install` runs only an executable registered script.
+The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv` and `nvm`.
 
 The same module and host conf files accept declarative environment lines. Values use shell-word
 quoting; `~` and `$NAME` are references, never command substitution. `when command`, `dir` and

@@ -1,0 +1,17 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+(( $# == 1 )) || { print -ru2 -- 'Usage: marksharc install <name>'; exit 2; }
+wanted=$1
+source "$MARKSHARC_HOME/core/cli/day2-lib.zsh"
+typeset script= found=0
+_day2_allow_missing=1
+_day2_directive() {
+    [[ $1 == installer && ${2-} == $wanted ]] || return 0
+    (( $# == 3 && ! found )) || { print -ru2 -- "install: invalid or duplicate installer: $wanted"; return 1; }
+    found=1
+    if [[ $3 == /* ]]; then script=$3; else script=$_day2_dir/$3; fi
+}
+_day2_collect || exit 1
+(( found )) || { print -ru2 -- "install: unknown installer: $wanted"; exit 1; }
+[[ -x $script && -f $script ]] || { print -ru2 -- "install: not executable: $script"; exit 1; }
+exec "$script"
