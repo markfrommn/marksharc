@@ -198,6 +198,29 @@ completion pending pending-tool when command pending-tool'
     The status should be success
   End
 
+  late_requires_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_mod late module.conf 'describe "late activation"
+requires command late-tool
+env LATE_VALUE available
+completion late late-tool'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost" id
+    id=$(<"$cache/render-id")
+    [[ ! -e $cache/completions/zsh/_late && ! -s $OPLOG ]] || return 2
+    ms_run HOST=testhost -c 'if _ms_module_requires_command late; then req=pass; else req=fail; fi; print -r -- "requires=$req value=${LATE_VALUE-unset}"' || { cat "$TEST_ROOT/err"; return 3; }
+    [[ $(<"$TEST_ROOT/out") == 'requires=fail value=unset' ]] || { cat "$TEST_ROOT/out"; return 4; }
+    printf '#!/bin/sh\n' > "$TEST_ROOT/bin/late-tool"
+    chmod +x "$TEST_ROOT/bin/late-tool"
+    ms_run HOST=testhost -c 'if _ms_module_requires_command late; then req=pass; else req=fail; fi; print -r -- "requires=$req value=${LATE_VALUE-unset}"' || { cat "$TEST_ROOT/err"; return 5; }
+    [[ $(<"$TEST_ROOT/out") == 'requires=pass value=available' && $(<"$cache/render-id") == "$id" ]] || { cat "$TEST_ROOT/out"; return 6; }
+  }
+  It 'activates rendered directives when a required command appears without rerendering'
+    When run late_requires_case
+    The status should be success
+  End
+
   partial_completion_case() {
     emulate -L zsh
     ms_fixture

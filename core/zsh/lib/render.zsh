@@ -79,9 +79,9 @@ _ms_render_conf() {
     emulate -L zsh
     local file=$1 module=$2 line kind name value guard out
     local -a generator=()
-    integer i end
+    integer i end module_ready=1
     [[ -r $file ]] || return 0
-    if [[ -n $module ]] && ! _ms_module_requires_command "$module"; then return 0; fi
+    if [[ -n $module ]]; then _ms_module_requires_command "$module" || module_ready=0; fi
     while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
         kind=${reply[1]}
@@ -103,7 +103,7 @@ _ms_render_conf() {
                 guard="(( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} ))"
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
                 print -r -- "            $guard && _ms_path_add $name ${(qq)value}"
-                if _ms_render_completion_guards 4 && _ms_render_dir "$value"; then
+                if (( module_ready )) && _ms_render_completion_guards 4 && _ms_render_dir "$value"; then
                     (( ${_ms_render_pending_paths[(Ie)$value]} )) || _ms_render_pending_paths+=( "$value" )
                 fi
                 ;;
@@ -117,6 +117,7 @@ _ms_render_conf() {
                 print -r -- "            $guard && _ms_rendered_aliases+=( ${(q)name} )"
                 ;;
             completion)
+                (( module_ready )) || continue
                 name=${reply[2]-}
                 [[ $name =~ '^[A-Za-z0-9_][A-Za-z0-9+_.-]*$' && $#reply -ge 3 ]] || continue
                 end=$(( $#reply + 1 ))
