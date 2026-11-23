@@ -12,3 +12,14 @@ provider files and generated commands, and DEV-58 owns the remaining fish work.
 - Record fish stub and foreign-config coverage in the DEV-58 plan.
 - Exercise diagnostics in temporary homes, run `tests/check`, and run
   `tests/e2e/install-e2e.sh "$PWD"`.
+
+## Outcome
+
+[PR #12](https://github.com/markfrommn/marksharc/pull/12) implements the Bash
+stub and provider diagnostics. The local suites and both installer paths pass.
+A scratch installation verified that converting a legacy provider definition
+and rendering makes the generated command available in a fresh shell.
+
+The affected installation needs the private overlay migration described in
+[the provider guide](../docs/write-once.md). The `cwf-new` post-create hook
+requires its own executable-hook migration under the DEV-51 contract.
