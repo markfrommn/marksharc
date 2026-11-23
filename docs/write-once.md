@@ -17,6 +17,18 @@ render` after adding, removing, or renaming a provider. The resulting `claude`
 and `models` commands read the file on each invocation, so value changes need
 no render. `models` requires `MODELS_URL`, `curl`, and `jq`.
 
+For an existing installation, `setup-cc-providers` has been replaced by the
+render step. Name each new `.conf` file for the desired command suffix. The
+old `demo-description.provider` produced `claudedemo`, so use `demo.conf`
+to retain that command. Express each required assignment as an `env` directive.
+Replace shell file reads and substitutions with exported environment references.
+Move the old files outside that directory after conversion, then run `marksharc
+render` and open a new shell or run `marksharc reload`. The cache bin directory
+is added to PATH by the shell environment. `marksharc doctor` reports legacy
+files and an explicitly configured provider directory with no `.conf` files.
+Treat old files as shell code when reviewing them and translate the needed
+values and environment references into data directives.
+
 Herdr and Collie session commands are generated from the session list during
 render. Run `marksharc render` to refresh them after sessions change.
 
