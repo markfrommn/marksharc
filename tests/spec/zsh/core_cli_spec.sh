@@ -300,4 +300,19 @@ Describe 'marksharc function and PATH'
     When run path_case
     The status should be success
   End
+  module_bin_case() {
+    emulate -L zsh
+    ms_fixture_full
+    ms_mod probe module.conf 'describe "probe"'
+    mkdir -p "$MS_HOME/modules/probe/bin" "$XDG_CACHE_HOME/marksharc/${HOST%%.*}/bin"
+    local flags
+    for flags in '-c' '-lc' '-ic'; do
+      ms_run ${=flags} '(( ${path[(Ie)$MARKSHARC_HOME/modules/probe/bin]} && ${path[(Ie)$XDG_CACHE_HOME/marksharc/$MARKSHARC_HOST/bin]} )) && print "1|1"' || return 1
+      [[ $(<"$TEST_ROOT/out") == '1|1' && ! -s $TEST_ROOT/err ]] || { cat "$TEST_ROOT/out" "$TEST_ROOT/err"; return 2; }
+    done
+  }
+  It 'puts enabled module and host shim bins on PATH in every session class'
+    When run module_bin_case
+    The status should be success
+  End
 End

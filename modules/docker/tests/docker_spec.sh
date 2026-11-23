@@ -30,8 +30,7 @@ case "$1 $2" in
 esac
 DATA
     chmod +x "$TEST_ROOT/bin/docker"
-    load_mfn docker cleanup-docker
-    cleanup-docker > "$TEST_ROOT/out" 2>&1 || return 1
+    bash -c '"$MARKSHARC_ROOT/modules/docker/bin/cleanup-docker"' > "$TEST_ROOT/out" 2>&1 || return 1
     [[ $(<"$OPLOG") == $'kill aaa\nrm ccc' ]] || { cat "$OPLOG"; return 2; }
   }
   It 'cleanup-docker kills running and removes stopped containers through docker only'
