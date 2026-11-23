@@ -1,12 +1,15 @@
+#!/bin/zsh -f
 emulate -L zsh
+fpath=( "${0:A:h:h}/functions/zsh" $fpath )
+autoload -Uz _ms_repo_sync_one
 local entry root result=0
 local -a roots=( ${=_ms_opt_git_worktree_roots-} ) repos=()
 if (( $#roots == 0 )); then
     print -ru2 'repo-sync: no roots configured (set git-worktree.roots)'
-    return 1
+    exit 1
 fi
 for root in $roots; do repos+=( ${root%/}/*/.git(N) ); done
 for entry in "${repos[@]}"; do
     _ms_repo_sync_one "${entry:h}" || result=1
 done
-return $result
+exit $result

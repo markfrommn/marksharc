@@ -36,7 +36,11 @@ _ms_word() {
         out=
         rest=$value
         while [[ $rest =~ '\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?' ]]; do
-            out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
+            if [[ ${(t)_ms_provider_environment} == *association* ]]; then
+                out+=${rest[1,MBEGIN-1]}${_ms_provider_environment[${match[1]}]-}
+            else
+                out+=${rest[1,MBEGIN-1]}${(P)match[1]:-}
+            fi
             rest=${rest[MEND+1,-1]}
         done
         REPLY=$out$rest
@@ -80,7 +84,11 @@ _ms_word_quoted() {
             rest=$raw[i,-1]
             if [[ $rest =~ '^\$\{([A-Za-z_][A-Za-z0-9_]*)\}' || $rest =~ '^\$([A-Za-z_][A-Za-z0-9_]*)' ]]; then
                 name=$match[1]
-                REPLY+=${(P)name-}
+                if [[ ${(t)_ms_provider_environment} == *association* ]]; then
+                    REPLY+=${_ms_provider_environment[$name]-}
+                else
+                    REPLY+=${(P)name-}
+                fi
                 (( i += MEND - 1 ))
                 continue
             fi

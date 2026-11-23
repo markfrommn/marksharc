@@ -136,6 +136,76 @@ Describe 'renderer cache and generated completions'
       /bin/zsh -f "$MS_HOME/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
   }
 
+  shim_stage_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$MS_HOME/core/zsh/lib/shims.zsh" <<'DATA'
+_ms_shims_render() {
+    print -r -- shim > "$1/generated"
+    [[ ! -e $TEST_ROOT/fail-shims ]]
+}
+DATA
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ $(<"$cache/bin/generated") == shim && $(file_mode "$cache/bin") == 700 ]] || return 2
+    print old > "$cache/bin/generated"
+    touch "$TEST_ROOT/fail-shims"
+    render_cli && return 3
+    [[ $(<"$cache/bin/generated") == old ]]
+  }
+  It 'privately stages shim artifacts and retains the previous bin when generation fails'
+    When run shim_stage_case
+    The status should be success
+  End
+  real_shim_render_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module cc-providers
+    local config=$XDG_CONFIG_HOME/marksharc cache=$XDG_CACHE_HOME/marksharc/testhost
+    mkdir -p "$config/providers"
+    print 'module cc-providers' > "$config/config.conf"
+    print "env ANTHROPIC_AUTH_TOKEN 'private fixture value'" > "$config/providers/a.conf"
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    [[ -x $cache/bin/claudea && -x $cache/bin/modelsa && $(file_mode "$cache/bin") == 700 ]] || return 2
+    ! grep -q 'private fixture value' "$cache/bin/claudea" || return 3
+    local before=$(<"$cache/bin/claudea") id=$(<"$cache/render-id")
+    render_cli || return 4
+    [[ $(<"$cache/bin/claudea") == "$before" && $(<"$cache/render-id") == "$id" ]] || return 5
+    mv "$config/providers/a.conf" "$config/providers/b.conf"
+    render_cli || return 6
+    [[ ! -e $cache/bin/claudea && -x $cache/bin/claudeb ]] || return 7
+    print 'env BAD-NAME invalid' > "$config/providers/b.conf"
+    render_cli && return 8
+    [[ -x $cache/bin/claudeb && ! -e $cache/bin/claudea ]]
+  }
+  It 'renders real provider shims reproducibly, removes stale names, and retains the last good bin on failure'
+    When run real_shim_render_case
+    The status should be success
+  End
+  shim_recovery_case() {
+    emulate -L zsh
+    ms_fixture
+    ms_copy_module cc-providers
+    local config=$XDG_CONFIG_HOME/marksharc cache=$XDG_CACHE_HOME/marksharc/testhost id
+    mkdir -p "$config/providers"
+    print 'module cc-providers' > "$config/config.conf"
+    print 'env TEST value' > "$config/providers/a.conf"
+    render_cli || return 1
+    id=$(<"$cache/render-id")
+    rm "$cache/bin/claudea"
+    ms_run HOST=testhost -c 'true' || return 2
+    [[ ! -e $cache/bin/claudea ]] || return 3
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 4
+    [[ -x $cache/bin/claudea ]] || return 5
+    rm -rf "$cache/bin"
+    ms_run HOST=testhost MARKSHARC_ENV="$id" -c 'source "$MARKSHARC_HOME/core/zsh/reload.zsh"' || return 6
+    [[ -x $cache/bin/claudea && $(file_mode "$cache/bin") == 700 ]]
+  }
+  It 'recovers deleted shim files and directories on reload without cold-start generation'
+    When run shim_recovery_case
+    The status should be success
+  End
+
   completion_case() {
     emulate -L zsh
     ms_fixture

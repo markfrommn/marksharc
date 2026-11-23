@@ -1,0 +1,42 @@
+#!/bin/zsh -f
+emulate -L zsh
+_ms_ssh_dir=${0:A:h:h}
+fpath=( "$_ms_ssh_dir/lib" $fpath )
+autoload -Uz _ms_agent_cache_file _ms_agent_local _ms_agent_migrate _ms_agent_parse _ms_agent_probe _ms_agent_process _ms_agent_save _ms_agent_state_dir
+source "${MARKSHARC_HOME:-${_ms_ssh_dir:h:h}}/core/zsh/lib/directives.zsh" || exit 1
+emulate -L zsh
+[[ -d $HOME/.ssh ]] || return 0
+local cache result output
+_ms_agent_cache_file || return 1
+cache=$REPLY
+if ! _ms_agent_probe; then
+    unset SSH_AUTH_SOCK SSH_AGENT_PID
+    if [[ -f $cache && -O $cache && ! -L $cache ]]; then
+        _ms_agent_parse < "$cache"
+    fi
+    if ! _ms_agent_probe; then
+        unset SSH_AUTH_SOCK SSH_AGENT_PID
+        output=$(ssh-agent -s) || { print -ru2 'Unable to start SSH agent'; return 1; }
+        _ms_agent_parse <<< "$output"
+        _ms_agent_probe || { unset SSH_AUTH_SOCK SSH_AGENT_PID; print -ru2 'New SSH agent is unreachable'; return 1; }
+    fi
+fi
+# A forwarded/launchd socket may be live without an associated local PID.
+if [[ -n $SSH_AGENT_PID ]] && ! _ms_agent_local "$SSH_AGENT_PID" "$SSH_AUTH_SOCK"; then
+    unset SSH_AGENT_PID
+fi
+export SSH_AUTH_SOCK
+[[ -z $SSH_AGENT_PID ]] || export SSH_AGENT_PID
+_ms_agent_save || return 1
+_ms_directive_emit setenv SSH_AUTH_SOCK "$SSH_AUTH_SOCK" || return 1
+if [[ -n $SSH_AGENT_PID ]]; then
+    _ms_directive_emit setenv SSH_AGENT_PID "$SSH_AGENT_PID" || return 1
+else
+    _ms_directive_emit unsetenv SSH_AGENT_PID || return 1
+fi
+ssh-add -l >/dev/null 2>&1
+result=$?
+if (( result == 1 )) && [[ ${MARKSHARC_SESSION-} == interactive ]]; then
+    ssh-add || return $?
+fi
+return 0

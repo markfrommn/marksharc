@@ -1,4 +1,25 @@
 Describe 'repo-sync policy'
+  installed_override_case() {
+    emulate -L zsh
+    ms_fixture_full
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/repositories"
+    print -rl -- 'module path' 'module git-worktree' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    ms_run -c 'export _ms_opt_git_worktree_roots="$HOME/repositories"; command repo-sync' || { cat "$TEST_ROOT/err"; return 1; }
+    [[ ! -s $TEST_ROOT/out && ! -s $TEST_ROOT/err ]]
+  }
+  It 'preserves an exported native roots override through the installed loader'
+    When run installed_override_case
+    The status should be success
+  End
+  executable_case() {
+    emulate -L zsh
+    _ms_opt_git_worktree_roots='' bash -c '"$MARKSHARC_ROOT/modules/git-worktree/bin/repo-sync"' > "$TEST_ROOT/out" 2>&1
+    [[ $? == 1 && $(<"$TEST_ROOT/out") == *'no roots configured'* ]]
+  }
+  It 'rejects missing roots when called as an executable from bash'
+    When run executable_case
+    The status should be success
+  End
   setup_org() { _ms_opt_git_worktree_orgs='acme other-org'; load_mfn git-worktree; }
   repo_case() {
     emulate -L zsh
@@ -62,13 +83,24 @@ Describe 'repo-sync policy'
     local mode=$1 r1="$TEST_ROOT/r1" r2="$TEST_ROOT/r2"
     mkdir -p "$r1/a/.git" "$r1/b/.git" "$r1/notrepo" "$r2/c/.git"
     : > "$OPLOG"
-    load_mfn git-worktree
-    _ms_repo_sync_one() { print -r -- "visit:${1:t}" >> "$OPLOG"; [[ ${1:t} != b || $mode != one-fails ]]; }
+    cat > "$TEST_ROOT/bin/git" <<'DATA'
+#!/bin/sh
+case "$1 $2" in
+  'remote get-url') printf '%s\n' git@github.com:acme/project.git ;;
+  'fetch --prune')
+    printf 'visit:%s\n' "${PWD##*/}" >> "$OPLOG"
+    [ "${PWD##*/}:$REPO_SYNC_TEST_MODE" != b:one-fails ] ;;
+  'symbolic-ref --quiet') printf '%s\n' main ;;
+  'pull --ff-only') exit 0 ;;
+esac
+DATA
+    chmod +x "$TEST_ROOT/bin/git"
     case $mode in
       two-roots|one-fails) _ms_opt_git_worktree_roots="$r1 $r2/";;
       none) _ms_opt_git_worktree_roots='';;
     esac
-    repo-sync > "$TEST_ROOT/out" 2>&1
+    _ms_opt_git_worktree_roots="$_ms_opt_git_worktree_roots" _ms_opt_git_worktree_orgs=acme REPO_SYNC_TEST_MODE="$mode" \
+      bash -c '"$MARKSHARC_ROOT/modules/git-worktree/bin/repo-sync"' > "$TEST_ROOT/out" 2>&1
     local rc=$?
     case $mode in
       two-roots) [[ $rc == 0 && $(<"$OPLOG") == $'visit:a\nvisit:b\nvisit:c' ]] || { cat "$OPLOG"; return 1; };;
