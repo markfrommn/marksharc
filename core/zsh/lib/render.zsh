@@ -52,6 +52,28 @@ _ms_render_completion_guards() {
     return 0
 }
 
+# Resolve a command in declarative paths contributed earlier in this render. The
+# caller's inherited PATH is checked first by _ms_command_available; no native
+# module code or external probe is run for the pending entries.
+_ms_render_pending_command() {
+    emulate -L zsh
+    local name=$1 dir candidate
+    [[ -n $name && $name != */* ]] || return 1
+    for dir in "${_ms_render_pending_paths[@]}"; do
+        if (( $+functions[_ms_fs_path] )); then
+            _ms_fs_path "$dir/$name"
+            candidate=$REPLY
+        elif [[ -n ${_ms_fs_root-} && $dir != "$HOME" && $dir != "$HOME"/* ]]; then
+            candidate=${_ms_fs_root}$dir/$name
+        else
+            candidate=$dir/$name
+        fi
+        [[ -x $candidate && ! -d $candidate ]] && { REPLY=$candidate; return 0; }
+    done
+    return 1
+}
+_ms_command_pending() { _ms_render_pending_command "$1"; }
+
 # Print the native statements for the env/path/alias lines in one conf file.
 _ms_render_conf() {
     emulate -L zsh
@@ -59,6 +81,7 @@ _ms_render_conf() {
     local -a generator=()
     integer i end
     [[ -r $file ]] || return 0
+    if [[ -n $module ]] && ! _ms_module_requires_command "$module"; then return 0; fi
     while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
         kind=${reply[1]}
@@ -80,6 +103,9 @@ _ms_render_conf() {
                 guard="(( \${+functions[_ms_path_add]} )) && (( \${_ms_env_rebuild:-1} ))"
                 [[ -z $REPLY ]] || guard+=" && $REPLY"
                 print -r -- "            $guard && _ms_path_add $name ${(qq)value}"
+                if _ms_render_completion_guards 4 && _ms_render_dir "$value"; then
+                    (( ${_ms_render_pending_paths[(Ie)$value]} )) || _ms_render_pending_paths+=( "$value" )
+                fi
                 ;;
             alias)
                 name=${reply[2]-} value=${reply[3]-}
@@ -91,7 +117,6 @@ _ms_render_conf() {
                 print -r -- "            $guard && _ms_rendered_aliases+=( ${(q)name} )"
                 ;;
             completion)
-                [[ -z $module ]] || _ms_module_requires_command "$module" || continue
                 name=${reply[2]-}
                 [[ $name =~ '^[A-Za-z0-9_][A-Za-z0-9+_.-]*$' && $#reply -ge 3 ]] || continue
                 end=$(( $#reply + 1 ))
@@ -102,6 +127,9 @@ _ms_render_conf() {
                 generator=( "${(@)reply[3,end-1]}" )
                 _ms_render_completion_guards $end || continue
                 (( _ms_render_generate )) || continue
+                if [[ ${generator[1]} != */* ]] && ! whence -p -- "${generator[1]}" >/dev/null 2>&1; then
+                    _ms_render_pending_command "${generator[1]}" && generator[1]=$REPLY
+                fi
                 out=$_ms_render_stage/zsh/_$name
                 if ! command "${generator[@]}" > "$out" 2>/dev/null; then
                     _ms_render_failed=1
@@ -132,7 +160,7 @@ _ms_render() {
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
     local tmp=$cache/env.zsh.tmp.$$ name old key
-    local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=()
+    local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=() _ms_render_pending_paths=()
     local _ms_render_generate=${1:-1} _ms_render_stage=$cache/completions.tmp.$$
     integer _ms_render_failed=0
     _ms_modules_plan env

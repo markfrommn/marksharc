@@ -171,6 +171,33 @@ completion optional optional-gen'
     The status should be success
   End
 
+  pending_requires_case() {
+    emulate -L zsh
+    ms_fixture
+    mkdir -p "$HOME/pending"
+    cat > "$HOME/pending/pending-tool" <<'DATA'
+#!/bin/sh
+printf 'GENERATED\n' >> "$OPLOG"
+printf '#compdef pending\n'
+DATA
+    chmod +x "$HOME/pending/pending-tool"
+    ms_mod first module.conf 'describe "earlier path"
+order 10
+path user "$HOME/pending" when dir "$HOME/pending"'
+    ms_mod second module.conf 'describe "later completion"
+order 20
+requires command pending-tool
+completion pending pending-tool when command pending-tool'
+    render_cli || { cat "$TEST_ROOT/err"; return 1; }
+    local cache="$XDG_CACHE_HOME/marksharc/testhost"
+    [[ -r $cache/completions/zsh/_pending ]] || { print generated=no; return 2; }
+    [[ $(<"$cache/completions/zsh/_pending") == '#compdef pending' && $(<"$OPLOG") == GENERATED ]] || { cat "$OPLOG"; return 3; }
+  }
+  It 'resolves required commands supplied by earlier ordered path directives during standalone render'
+    When run pending_requires_case
+    The status should be success
+  End
+
   metadata_case() {
     emulate -L zsh
     ms_fixture
