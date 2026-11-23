@@ -50,6 +50,45 @@ Describe 'install.sh'
     The status should be success
   End
 
+  bash_install_case() {
+    fake_fw "$TEST_ROOT/fw"
+    printf 'original bash rc\n' > "$HOME/.bashrc"
+    printf 'original profile\n' > "$HOME/profile-target"
+    ln -s profile-target "$HOME/.bash_profile"
+    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
+    [ -f "$HOME/.bashrc" ] && [ ! -L "$HOME/.bash_profile" ] || return 2
+    head -n 1 "$HOME/.bashrc" | grep -q '^# marksharc: managed stub' || return 3
+    head -n 1 "$HOME/.bash_profile" | grep -q '^# marksharc: managed stub' || return 4
+    grep -qx 'file=.bashrc' "$XDG_STATE_HOME/marksharc/install.manifest" || return 5
+    grep -qx 'link=.bash_profile=profile-target' "$XDG_STATE_HOME/marksharc/install.manifest" || return 6
+  }
+  It 'backs up existing Bash files and installs both Bash stubs'
+    When run bash_install_case
+    The status should be success
+  End
+
+  bash_upgrade_case() {
+    fake_fw "$TEST_ROOT/fw"
+    printf 'original zsh rc\n' > "$HOME/.zshrc"
+    inst --home "$TEST_ROOT/fw" || return 1
+    # Recreate the manifest and HOME state of an earlier zsh-only install.
+    sed '/^bash_stubs=/d; /^bash_stub_sum=/d' "$XDG_STATE_HOME/marksharc/install.manifest" > "$TEST_ROOT/legacy"
+    cp "$TEST_ROOT/legacy" "$XDG_STATE_HOME/marksharc/install.manifest"
+    rm "$HOME/.bashrc" "$HOME/.bash_profile"
+    printf 'original bash rc\n' > "$HOME/.bashrc"
+    ln -s target "$HOME/.bash_profile"
+    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 2; }
+    [ "$(cat "$(backup_dir)/.zshrc")" = 'original zsh rc' ] || return 3
+    [ "$(cat "$(backup_dir)/.bashrc")" = 'original bash rc' ] || return 4
+    grep -qx 'link=.bash_profile=target' "$XDG_STATE_HOME/marksharc/install.manifest" || return 5
+    inst --home "$TEST_ROOT/fw" || return 6
+    [ "$(cat "$(backup_dir)/.bashrc")" = 'original bash rc' ]
+  }
+  It 'upgrades a zsh-only install without losing the earlier backup'
+    When run bash_upgrade_case
+    The status should be success
+  End
+
   fresh_case() {
     fake_fw "$TEST_ROOT/fw"
     # With the XDG variables at their defaults the stub names no MARKSHARC_CONFIG.

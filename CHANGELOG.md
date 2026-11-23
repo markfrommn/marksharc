@@ -5,6 +5,9 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Bash environment rendering and startup stubs provide PATH and tool exports to Bash
+  sessions. `set agent.bash_env on` enables the noninteractive Bash hook for agents.
+
 ### Fixed
 
 - Interactive zsh startup on the Mac drops from about 5 s to under 1 s: `node-nvm`

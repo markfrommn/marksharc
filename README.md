@@ -8,9 +8,9 @@ Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer and the `marksharc` command are in place. The fish core loads the
-> shared environment and native plugins. The remaining fish modules, bash
-> startup wiring and the full module updater come in later releases.
+> installer, Bash environment and the `marksharc` command are in place. The fish
+> core loads the shared environment and native plugins. The remaining fish
+> modules and the full module updater come in later releases.
 
 ## Requirements
 
@@ -50,9 +50,10 @@ What it does:
   `${XDG_CONFIG_HOME:-~/.config}/marksharc` when nothing is there. `--overlay <path>`
   links an existing directory instead; `--overlay <url>` clones one. An overlay that
   already exists is never modified, and a different one requested with `--overlay` is an error.
-- **Dotfiles.** Moves `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin` and
-  `~/.zlogout` into `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
-  (symlinks are recorded by target), and writes a small `~/.zshenv` stub. If the core
+- **Dotfiles.** Backs up `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin`,
+  `~/.zlogout`, `~/.bashrc` and `~/.bash_profile` in
+  `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
+  (symlinks are recorded by target), and writes zsh and Bash startup stubs. If the zsh core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
   The installer also manages `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`
   and leaves the user's `config.fish` untouched.
@@ -114,8 +115,8 @@ alias ll "ls -lA" when command ls
 tiers "manager brew system user app local"
 ```
 
-`marksharc render` writes per-host `env.zsh` and `env.fish` in the cache, along with generated
-completions and command shims.
+`marksharc render` writes per-host `env.zsh`, `env.bash` and `env.fish` in the cache,
+along with generated completions and command shims.
 Startup refreshes stale env without running generators; install, update and explicit reload refresh
 the generated artifacts. Render again after adding or removing a provider or Herdr session.
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
@@ -125,6 +126,28 @@ Module commands and generated provider and session shims are on PATH in zsh and 
 are inherited by child processes, including `bash -c`. Native wrappers apply caller-state changes
 for commands such as `cwf-new` in either shell. See the
 [write-once command and provider migration guide](docs/write-once.md) for configuration and hooks.
+
+## Bash and agents
+
+Bash login and interactive shells load the MarkSharc environment from the installed stubs.
+For noninteractive Bash processes started by agents, opt in through the overlay:
+
+```text
+set agent.bash_env on
+```
+
+Run `marksharc reload`, or start a new zsh session, then launch the agent:
+
+```sh
+SHELL=/bin/bash claude
+SHELL=/bin/bash codex
+```
+
+The option exports `BASH_ENV` so Bash loads the environment in `bash -c`. It is off by
+default. Enabling it replaces an existing `BASH_ENV` value for children. A child of an
+already configured shell also inherits its environment. Re-run the
+installer to add the Bash stubs to an existing installation. `marksharc uninstall` restores
+the original startup files from the recorded backup.
 
 An eligible interactive zsh shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a
