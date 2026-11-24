@@ -34,9 +34,9 @@
 | 3. Modernization | marksharc | Rendered env, bash env, write-once commands, Day 0 / Day 2 commands, multiplexers, upgrades, push sync | DEV-49, DEV-50, DEV-51, DEV-52, DEV-53, DEV-54, DEV-55, DEV-56 |
 | 4. Fish | marksharc | Fish on the same structure | DEV-57, DEV-58 |
 | 6. Cleanup | mark-desktop-files | No shell code left outside the overlay | DEV-59 |
-| 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64 |
+| 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64, DEV-TBD (L6) |
 
-Rough size: 95 estimate points across 26 scheduled PRs, plus 5 unscheduled candidates.
+Rough size: 95 estimate points across 26 scheduled PRs, plus 6 unscheduled candidates.
 
 ## Dependencies
 
@@ -73,6 +73,7 @@ flowchart LR
   L3["L3 DEV-62"]
   L4["L4 DEV-63"]
   L5["L5 DEV-64"]
+  L6["L6 DEV-TBD"]
   P1_1 --> P1_2
   P1_2 --> P1_3
   P1_2 --> P1_4
@@ -111,6 +112,7 @@ flowchart LR
   P2_6 --> L3
   P2_4 --> L4
   P2_7 --> L5
+  L3 --> L6
 ```
 
 **Critical path to MVP:** P1.1 → P1.2 → P1.4 → P1.5 and P1.6 → P1.7 → P2.2 → P2.3 → P2.5 → P2.6.
@@ -953,18 +955,19 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 
 - Only if a host or user needs interactive bash.
 
-#### L3 — Evaluate mise or fnm for version management (DEV-62)
+#### L3 — Trial mise for version management (DEV-62)
 
 - **Repo:** marksharc
 - **Estimate:** 2
 - **Depends on:** P2.6 (DEV-46)
 
-**Goal:** Decide whether one cross-shell manager should replace nvm, gvm, and pyenv.
+**Goal:** Decide whether mise, for its multi-tool support, should take over from nvm, gvm, and pyenv. (The original "mise or fnm" scope narrowed to mise.)
 
 **Scope**
 
 - Measure startup cost of nvm and gvm today.
 - Trial mise for Node, Go, and Python on one host.
+- Consider the integration into the module framework, the fallback, and nvm/gvm muscle memory.
 - Write a recommendation.
 
 **Tests**
@@ -974,6 +977,32 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 **Done when**
 
 - A written decision; follow-up issues if the answer is yes.
+
+**Outcome:** Yes, as an opt-in module. Evidence and decision in [DEV-62-PLAN.md](DEV-62-PLAN.md): nvm and gvm cost about 3.5 ms at startup but about 1.9 s per `cd` into a `.nvmrc` directory; mise's hook costs about 30 ms and a shim about 27 ms per call. Operator decisions: approach A (a `mise` module owns the tools named in `mise.tools`, and the legacy modules stand aside per tool, with automatic fallback), shims for agent and batch shells, tools node, go, python, and ruby. Follow-up: L6.
+
+#### L6 — Opt-in mise module (DEV-TBD)
+
+- **Repo:** marksharc
+- **Estimate:** 3
+- **Depends on:** L3 (DEV-62)
+
+**Goal:** Let a host hand node, Go, Python, and Ruby to mise, with nvm, gvm, and pyenv as the default and fallback.
+
+**Scope**
+
+- `modules/mise` (order 29) with options `tools`, `version_files`, `compat`, `auto_install`, `set_gobin`, and `hook`.
+- Env phase: the shim directory in the `manager` tier in every session class, `MISE_*` exports from the options, and inherited nvm/gvm entries dropped for owned tools.
+- Init phase: cached `mise activate zsh`; optional `nvm` and `gvm` translation functions.
+- `node-nvm`, `go-gvm`, and the pyenv branch of `python` stand aside for owned tools, including on reload.
+- Doctor checks: mise missing for a non-empty `mise.tools`; a uv-format `~/.python-version` when python is owned.
+
+**Tests**
+
+- Temporary-HOME specs with a stub `mise`: empty `tools` changes nothing; stand-aside and fallback; session classes; stale-entry removal; compat translations; exports.
+
+**Done when**
+
+- On sol, an agent shell in a `.nvmrc` worktree gets that Node; the default Go beats Homebrew's `go` in every session class; doctor is clean; removing the option restores nvm, gvm, and pyenv.
 
 #### L4 — Coexist install mode (DEV-63)
 
@@ -1033,8 +1062,8 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 | 6.13 Multiplexers | DEV-39 (lift), DEV-53 (adapters) |
 | 6.14 Sync | DEV-45, DEV-56 |
 | 6.15 Day 0 and Day 2 | DEV-44, DEV-45, DEV-52 |
-| 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60 |
+| 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60, L6 (DEV-TBD) |
 | 8 Testing and quality | Every PR; DEV-41 (CI), DEV-48 (inventory) |
 | 9 Migration map | DEV-42, DEV-43, DEV-46, DEV-59 |
 | 10 Design rules | DEV-47 |
-| 4.3 Maybe later | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64; the Go helper has no issue yet |
+| 4.3 Maybe later | DEV-60, DEV-61, DEV-62 (decision) and L6 (mise module), DEV-63, DEV-64; the Go helper has no issue yet |
