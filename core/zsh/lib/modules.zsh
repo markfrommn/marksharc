@@ -196,6 +196,28 @@ _ms_modules_discover() {
     return 0
 }
 
+# Clean module-owned mise activation state before selecting the current module plan.
+_ms_mise_drop_activation_paths() {
+    local entry
+    local -a kept=()
+    for entry in "${path[@]}"; do
+        (( ${_ms_mise_activation_paths[(Ie)$entry]} )) || kept+=( "$entry" )
+    done
+    path=( "${kept[@]}" )
+    typeset -ga _ms_mise_activation_paths=()
+    unset MARKSHARC_MISE_ACTIVATION_PATHS
+}
+
+_ms_mise_drop_shims() {
+    local entry
+    local -a kept=()
+    for entry in "${path[@]}"; do
+        [[ $entry == "${MARKSHARC_MISE_SHIMS-}" ]] || kept+=( "$entry" )
+    done
+    path=( "${kept[@]}" )
+    unset MARKSHARC_MISE_SHIMS
+}
+
 # Declared options become $_ms_opt_<module>_<key> (non-alphanumerics -> _).
 _ms_module_options() {
     emulate -L zsh

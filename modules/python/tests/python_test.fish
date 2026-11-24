@@ -69,6 +69,33 @@ init_python
 @test "init output is applied without virtualenv-init" "$PYENV_INIT_RAN" = yes
 @test "virtualenv-init is skipped when pyenv does not list it" -z "$PYENV_VENV_RAN"
 
+# Owned Python suppresses pyenv without suppressing uv; both fallback triggers restore it.
+set -g _ms_opt_mise_tools ''
+init_python
+@test "fish legacy pyenv root exists before ownership" "$PYENV_ROOT" = "$HOME/.pyenv"
+set -g _ms_opt_mise_tools python
+ms_stub mise 'exit 0'
+command rm -rf "$XDG_CACHE_HOME"
+printf '' >"$OPLOG"
+set -e PYENV_INIT_RAN PYENV_VENV_RAN PYENV_ROOT
+init_python >"$TEST_ROOT/out" 2>&1
+@test "owned Python does not initialise pyenv" -z "$PYENV_INIT_RAN$PYENV_VENV_RAN"
+@test "owned Python does not run pyenv" ! -s "$OPLOG"
+@test "owned Python does not export PYENV_ROOT" (set -q PYENV_ROOT; echo $status) = 1
+@test "owned Python startup is quiet" ! -s "$TEST_ROOT/out"
+set -g _ms_opt_mise_tools ''
+command rm -rf "$XDG_CACHE_HOME"
+set -e PYENV_INIT_RAN PYENV_VENV_RAN PYENV_ROOT
+init_python
+@test "empty mise tools restore pyenv" "$PYENV_INIT_RAN" = yes
+command rm -f "$TEST_ROOT/bin/mise"
+set -g _ms_opt_mise_tools python
+command rm -rf "$XDG_CACHE_HOME"
+set -e PYENV_INIT_RAN PYENV_VENV_RAN PYENV_ROOT
+init_python
+@test "missing mise restores pyenv" "$PYENV_INIT_RAN" = yes
+set -g _ms_opt_mise_tools ''
+
 # uv is preferred: nothing is run or exported.
 ms_stub uv 'exit 0'
 command rm -rf "$XDG_CACHE_HOME"

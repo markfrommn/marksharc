@@ -48,9 +48,10 @@ same capability in a different way. *Not applicable* means the module has no mea
 | history-native | native-equivalent | fish's own history; `h` lists the last 35 entries when atuin is absent. |
 | lmstudio | supported | Path and env. |
 | ls | supported | `ll`, `la`, `dir`, `lf`, `lsf` (eza when installed) over fish's coloured `ls`. |
+| mise | supported | Owned-tool shims in every session class; cached directory-change-only activation and optional compatibility functions in interactive fish. |
 | mux | supported | `fix-tmux` re-imports the tmux client environment as data. |
 | nav | native-equivalent | Alt-Left/Right are fish's `prevd`/`nextd`; Alt-Up/Down go to the parent and first child on an empty line. zsh's Ctrl-Shift-arrow directory-stack cycling is not ported; fish's `dirh`, `cdh` and `prevd`/`nextd` cover the stack. |
-| node-nvm | native-equivalent | Default node on PATH from the env phase; the `.nvmrc` hook asks bash nvm in `$NVM_DIR`. Fish's `nvm` command is the nvm.fish plugin, which keeps its own Node store (`~/.local/share/nvm`); DEV-62 (mise or fnm) replaces both. |
+| node-nvm | native-equivalent | Default node on PATH from the env phase; the `.nvmrc` hook asks bash nvm in `$NVM_DIR`. Fish's fallback `nvm` command is the nvm.fish plugin, which keeps its own Node store (`~/.local/share/nvm`); when mise owns node, both the hook and plugin stand aside. |
 | pager | supported | `PAGER`, `LESS`, `MANPATH`, coloured `man`, coloured `diff`, `diffcp`. |
 | path | supported | Same tiers and order as zsh. |
 | pnpm | supported | `PNPM_HOME` and path. |

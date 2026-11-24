@@ -4,6 +4,10 @@
 # would set, and syncs GOROOT to it. The default environment is never rewritten (no
 # --default), and startup prints nothing. The go.mod hook loads gvm only to switch versions.
 autoload -Uz add-zsh-hook
+if (( ${+functions[_ms_mise_owns]} )) && _ms_mise_owns go; then
+    add-zsh-hook -d chpwd _gvm_auto_use
+    return 0
+fi
 if [[ -f ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm ]]; then
     if (( ! ${+functions[gvm]} )); then
         # The first gvm Go on PATH is a parent shell's explicit gvm use; else the selection.
@@ -22,6 +26,7 @@ if [[ -f ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm ]]; then
         unset _ms_gvm_want
         _ms_gvm_sync_goroot
         gvm() { _ms_gvm_load || return $?; gvm "$@"; }
+        typeset -g _ms_gvm_first_use_stub=1
     fi
 
     # _ms_gvm_load: source gvm once per shell, replacing the first-use stub. Sourcing activates
@@ -33,6 +38,7 @@ if [[ -f ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm ]]; then
         local want=${gvm_go_name-} result=0 saved_oldpwd=$OLDPWD
         local -a saved=( "${path[@]}" ) saved_dirs=( "${dirstack[@]}" )
         unfunction gvm 2>/dev/null
+        unset _ms_gvm_first_use_stub
         unset GVM_VERSION
         {
             typeset -g _ms_gvm_loading=1
@@ -54,6 +60,7 @@ if [[ -f ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm ]]; then
             print -ru2 -- "gvm: could not load ${GVM_ROOT:-$HOME/.gvm}/scripts/gvm"
             path=( "${saved[@]}" )
             gvm() { _ms_gvm_load || return $?; gvm "$@"; }
+            typeset -g _ms_gvm_first_use_stub=1
             result=1
         fi
         return $result

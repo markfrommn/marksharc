@@ -193,7 +193,14 @@ _ms_render_fish() {
                 [[ ${reply[1]-} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
                 _ms_fish_quote "${reply[2]}"; plugin_name=$REPLY
                 _ms_fish_quote "${reply[4]}"; plugin_sha=$REPLY
-                print -r -- "    _ms_fish_plugin_load $plugin_name $plugin_sha"
+                if [[ $name == node-nvm ]]; then
+                    print -r -- '    if not functions -q _ms_fish_mise_owns; or not _ms_fish_mise_owns node'
+                    print -r -- "      _ms_fish_plugin_load $plugin_name $plugin_sha"
+                    print -r -- '      if functions -q _ms_fish_mise_restore_autoload; _ms_fish_mise_restore_autoload nvm; end'
+                    print -r -- '    end'
+                else
+                    print -r -- "    _ms_fish_plugin_load $plugin_name $plugin_sha"
+                fi
             done < "${_ms_mod_dir[$name]}/fish.plugins"
         fi
         print -r -- '  end'

@@ -158,7 +158,25 @@ load-nvmrc
 set -e BASH_ENV
 @test "bash runs without BASH_ENV" (count (string match -- BASHENV <"$OPLOG")) -eq 0
 
-# 13. Missing nvm.sh: quiet, no hook, nothing spawned.
+# 13. Owned node removes the legacy PWD hook; empty tools or missing mise restore it.
+builtin cd "$HOME"
+set -l before (spawns)
+set -g _ms_opt_mise_tools node
+ms_stub mise 'exit 0'
+ms_module node-nvm >"$TEST_ROOT/out" 2>&1
+@test "owned node removes the nvm PWD hook" (functions -q _ms_fish_nvmrc_hook; echo $status) = 1
+@test "owned node startup spawns no legacy nvm" (spawns) = $before
+@test "owned node startup is quiet" ! -s "$TEST_ROOT/out"
+set -g _ms_opt_mise_tools ''
+ms_module node-nvm
+@test "empty mise tools restore the nvm PWD hook" (functions -q _ms_fish_nvmrc_hook; and echo yes) = yes
+command rm -f "$TEST_ROOT/bin/mise"
+set -g _ms_opt_mise_tools node
+ms_module node-nvm
+@test "missing mise restores the nvm PWD hook" (functions -q _ms_fish_nvmrc_hook; and echo yes) = yes
+set -g _ms_opt_mise_tools ''
+
+# 14. Missing nvm.sh: quiet, no hook, nothing spawned.
 builtin cd "$HOME"
 set -gx NVM_DIR "$TEST_ROOT/no-nvm"
 printf '' >"$OPLOG"

@@ -7,6 +7,26 @@ source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 _ms_verbose=0
 _ms_modules_discover
 integer issues=0
+mise_tools=${_ms_cfg_set[mise.tools]-${_ms_mod_optdef[mise.tools]-}}
+mise_version_files=${_ms_cfg_set[mise.version_files]-${_ms_mod_optdef[mise.version_files]-on}}
+typeset -a mise_tool_list=( ${=mise_tools} )
+integer mise_available=0 mise_owns_node=0 mise_owns_python=0
+whence -p -- mise >/dev/null 2>&1 && mise_available=1
+if [[ ${_ms_mod_enabled[mise]-0} == 1 ]] && (( mise_available )); then
+    (( ${mise_tool_list[(Ie)node]} )) && mise_owns_node=1
+    (( ${mise_tool_list[(Ie)python]} )) && mise_owns_python=1
+fi
+if [[ -n ${mise_tools//[[:space:]]/} ]] && (( ! mise_available )); then
+    print -r -- 'doctor: mise.tools is nonempty but mise is missing'
+    (( ++issues ))
+fi
+if (( mise_owns_python )) && [[ $mise_version_files == (on|1|yes|true) && -r $HOME/.python-version ]]; then
+    IFS= read -r mise_python_pin < "$HOME/.python-version"
+    if [[ $mise_python_pin == cpython-*-any-any-any ]]; then
+        print -r -- "doctor: $HOME/.python-version contains a uv Python pin; move or rewrite it for mise"
+        (( ++issues ))
+    fi
+fi
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 if [[ ! -r $HOME/.zshenv ]]; then
     print -r -- "doctor: missing stub: $HOME/.zshenv"
@@ -209,6 +229,9 @@ for name in "${_ms_mod_names[@]}"; do
       while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
         [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
+        if [[ $name == node-nvm && $registry == */fish.plugins && ${reply[2]} == nvm.fish ]] && (( mise_owns_node )); then
+            continue
+        fi
         plugin_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${reply[2]}@${reply[4]}
         if [[ ! -d $plugin_dir/.git ]] || [[ $(command git -C "$plugin_dir" rev-parse HEAD 2>/dev/null) != ${reply[4]} ]]; then
             print -r -- "doctor: missing plugin or incorrect pin: ${reply[2]} (run marksharc update)"

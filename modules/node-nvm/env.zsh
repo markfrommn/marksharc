@@ -35,9 +35,13 @@ _ms_nvm_default() {
 }
 
 if (( ${_ms_env_rebuild:-1} )); then
-    export NVM_DIR=${NVM_DIR:-$HOME/.nvm}
-    if (( ${+functions[_ms_path_add]} )) && _ms_nvm_default; then
-        _ms_path_add manager "$REPLY"
+    if (( ${+functions[_ms_mise_owns]} )) && _ms_mise_owns node; then
+        :
+    else
+        export NVM_DIR=${NVM_DIR:-$HOME/.nvm}
+        if (( ${+functions[_ms_path_add]} )) && _ms_nvm_default; then
+            _ms_path_add manager "$REPLY"
+        fi
     fi
 fi
 true

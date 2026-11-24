@@ -123,7 +123,10 @@ Modules and overlay configuration register `update <label> <command> [args...]` 
 installer paths and update executable paths beginning `./` resolve from the declaring
 module or overlay root. Missing update commands are skipped; other failures are reported
 after remaining steps run. `marksharc install` runs only an executable registered script.
-The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv` and `nvm`.
+The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv`, `nvm` and `mise`.
+
+For per-host Node, Go, Python, and Ruby ownership through mise, including startup behavior,
+fallback, compatibility commands, and migration, see [the mise guide](docs/mise.md).
 
 The same module and host conf files accept declarative environment lines. Values use shell-word
 quoting; `~` and `$NAME` are references, never command substitution. `when command`, `dir` and

@@ -398,6 +398,117 @@ Describe 'cross-shell contract: bash core'
     The status should be success
   End
 
+  mise_contract_fixture() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/.nvm/alias" \
+      "$HOME/.nvm/versions/node/v22.1.0/bin" "$HOME/.gvm/environments" \
+      "$HOME/.gvm/gos/go1.23.0/bin" "$HOME/.pyenv/bin" "$HOME/.pyenv/shims" \
+      "$TEST_ROOT/homebrew/bin"
+    printf '22\n' > "$HOME/.nvm/alias/default"
+    printf 'gvm_go_name=go1.23.0\n' > "$HOME/.gvm/environments/default"
+    printf '#!/bin/sh\nexit 0\n' > "$HOME/.gvm/gos/go1.23.0/bin/go"
+    printf '#!/bin/sh\nexit 0\n' > "$HOME/.pyenv/bin/pyenv"
+    chmod +x "$HOME/.gvm/gos/go1.23.0/bin/go" "$HOME/.pyenv/bin/pyenv"
+    MISE_DATA_DIR="$TEST_ROOT/mise data"
+    export MISE_DATA_DIR GOPATH="$HOME/.gvm/pkgsets/go1.23.0/global" GVM_OVERLAY_PREFIX="$GOPATH/overlay" gvm_go_name=go1.23.0 gvm_pkgset_name=global
+    mkdir -p "$MISE_DATA_DIR/shims"
+    cat > "$XDG_CONFIG_HOME/marksharc/config.conf" <<'EOF'
+module path
+module mise
+module node-nvm
+module go-gvm
+module python
+set mise.tools "node go python"
+EOF
+    printf 'path brew "%s"\n' "$TEST_ROOT/homebrew/bin" >> "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command mise 'printf "unexpected %s\n" "$*" >> "$OPLOG"; exit 99'
+    initial_path="$TEST_ROOT/bin:$HOME/.nvm/versions/node/v22.1.0/bin:$HOME/.gvm/gos/go1.23.0/bin:$HOME/.pyenv/shims:$PATH"
+  }
+
+  run_mise_zsh() {
+    env -i HOME="$HOME" PATH="$initial_path" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+      XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      MISE_DATA_DIR="$MISE_DATA_DIR" GOPATH="$GOPATH" GVM_OVERLAY_PREFIX="$GVM_OVERLAY_PREFIX" gvm_go_name="$gvm_go_name" gvm_pkgset_name="$gvm_pkgset_name" MARKSHARC_HOME="$MARKSHARC_ROOT" OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" \
+      zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh"; printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n" "$PATH" "$MISE_NOT_FOUND_AUTO_INSTALL" "$MISE_GO_SET_GOBIN" "$MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS" "${PYENV_ROOT-unset}" "${GOPATH-unset}" "${GVM_OVERLAY_PREFIX-unset}"' \
+      > "$TEST_ROOT/zsh" 2> "$TEST_ROOT/err"
+  }
+
+  run_mise_bash() {
+    env -i HOME="$HOME" PATH="$initial_path" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+      XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      MISE_DATA_DIR="$MISE_DATA_DIR" GOPATH="$GOPATH" GVM_OVERLAY_PREFIX="$GVM_OVERLAY_PREFIX" gvm_go_name="$gvm_go_name" gvm_pkgset_name="$gvm_pkgset_name" MARKSHARC_HOME="$MARKSHARC_ROOT" OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" \
+      BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" \
+      /bin/bash -c 'printf "%s\n%s\n%s\n%s\n%s\n%s\n%s\n" "$PATH" "$MISE_NOT_FOUND_AUTO_INSTALL" "$MISE_GO_SET_GOBIN" "$MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS" "${PYENV_ROOT-unset}" "${GOPATH-unset}" "${GVM_OVERLAY_PREFIX-unset}"' \
+      > "$TEST_ROOT/bash" 2> "$TEST_ROOT/err"
+  }
+
+  mise_case() {
+    mise_contract_fixture
+    run_mise_zsh || { cat "$TEST_ROOT/err"; return 1; }
+    run_mise_bash || { cat "$TEST_ROOT/err"; return 2; }
+    cmp -s "$TEST_ROOT/zsh" "$TEST_ROOT/bash" || { cat "$TEST_ROOT/zsh" "$TEST_ROOT/bash"; return 3; }
+    grep -F "$MISE_DATA_DIR/shims" "$TEST_ROOT/bash" >/dev/null || return 4
+    grep -F 'false' "$TEST_ROOT/bash" >/dev/null || return 5
+    grep -F 'node,go,python' "$TEST_ROOT/bash" >/dev/null || return 6
+    tail -n 2 "$TEST_ROOT/bash" | head -n 1 | grep -Fx 'unset' >/dev/null || return 7
+    if grep -F "$HOME/.nvm" "$TEST_ROOT/bash" >/dev/null ||
+       grep -F "$HOME/.gvm" "$TEST_ROOT/bash" >/dev/null ||
+       grep -F "$HOME/.pyenv" "$TEST_ROOT/bash" >/dev/null; then
+      cat "$TEST_ROOT/bash"; return 8
+    fi
+    [ ! -s "$OPLOG" ] || return 9
+    GOPATH="$HOME/.gvm/pkgsets/go1.23.0/global:$TEST_ROOT/custom go"
+    GVM_OVERLAY_PREFIX="$HOME/.gvm/pkgsets/go1.23.0/global/overlay"
+    run_mise_zsh || { cat "$TEST_ROOT/err"; return 10; }
+    run_mise_bash || { cat "$TEST_ROOT/err"; return 11; }
+    cmp -s "$TEST_ROOT/zsh" "$TEST_ROOT/bash" || { cat "$TEST_ROOT/zsh" "$TEST_ROOT/bash"; return 12; }
+    tail -n 2 "$TEST_ROOT/bash" | head -n 1 | grep -Fx "$TEST_ROOT/custom go" >/dev/null || return 13
+    tail -n 1 "$TEST_ROOT/bash" | grep -Fx 'unset' >/dev/null || return 14
+  }
+  It 'matches zsh mise shims, safe exports, and owned-only legacy path removal in Bash'
+    When run mise_case
+    The status should be success
+  End
+
+  mise_fallback_case() {
+    mise_contract_fixture
+    rm "$TEST_ROOT/bin/mise"
+    initial_path="$MISE_DATA_DIR/shims:$initial_path"
+    run_mise_zsh || { cat "$TEST_ROOT/err"; return 1; }
+    run_mise_bash || { cat "$TEST_ROOT/err"; return 2; }
+    cmp -s "$TEST_ROOT/zsh" "$TEST_ROOT/bash" || { cat "$TEST_ROOT/zsh" "$TEST_ROOT/bash"; return 3; }
+    grep -F "$HOME/.nvm/versions/node/v22.1.0/bin" "$TEST_ROOT/bash" >/dev/null || return 4
+    grep -F "$HOME/.gvm/gos/go1.23.0/bin" "$TEST_ROOT/bash" >/dev/null || return 5
+    grep -F "$HOME/.pyenv/shims" "$TEST_ROOT/bash" >/dev/null || return 6
+    if grep -F "$MISE_DATA_DIR/shims" "$TEST_ROOT/bash" >/dev/null; then return 7; fi
+  }
+  It 'matches the complete legacy Bash fallback when configured mise is missing'
+    When run mise_fallback_case
+    The status should be success
+  End
+
+  mise_child_fallback_case() {
+    mise_contract_fixture
+    env -i HOME="$HOME" PATH="$initial_path" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
+      XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+      MISE_DATA_DIR="$MISE_DATA_DIR" MISE_SHELL=zsh MISE_NODE_VERSION=20 __MISE_ORIG_PATH=/stale __MISE_SESSION=stub __MISE_DIFF=stub MARKSHARC_HOME="$MARKSHARC_ROOT" OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" \
+      BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" \
+      zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh";
+        # Bash 3.2 compares cache mtimes at whole-second resolution.
+        sleep 1
+        printf "module path\nmodule mise\nmodule node-nvm\nmodule go-gvm\nmodule python\nset mise.tools \"\"\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"; /bin/bash -c '\''printf "%s\n%s\n%s\n%s\n" "$PATH" "${MISE_NOT_FOUND_AUTO_INSTALL-unset}" "${MISE_SHELL-unset}" "${MISE_NODE_VERSION-unset}"'\' > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
+    grep -F "$HOME/.nvm/versions/node/v22.1.0/bin" "$TEST_ROOT/out" >/dev/null || return 2
+    grep -F "$HOME/.gvm/gos/go1.23.0/bin" "$TEST_ROOT/out" >/dev/null || return 3
+    grep -F "$HOME/.pyenv/shims" "$TEST_ROOT/out" >/dev/null || return 4
+    if grep -F "$MISE_DATA_DIR/shims" "$TEST_ROOT/out" >/dev/null; then return 5; fi
+    tail -n 1 "$TEST_ROOT/out" | grep -Fx 'unset' >/dev/null || return 6
+    tail -n 2 "$TEST_ROOT/out" | head -n 1 | grep -Fx 'unset' >/dev/null || return 7
+    tail -n 3 "$TEST_ROOT/out" | head -n 1 | grep -Fx 'unset' >/dev/null
+  }
+  It 'drops inherited shims and settings when a Bash child has empty tools'
+    When run mise_child_fallback_case
+    The status should be success
+  End
+
   first_inherited_case() {
     mkdir -p "$XDG_CONFIG_HOME/marksharc" "$HOME/first" "$HOME/virtualenv" "$HOME/manager"
     printf '%s\n' 'path first ~/first' 'path manager ~/manager' > "$XDG_CONFIG_HOME/marksharc/config.conf"

@@ -1,4 +1,37 @@
 # Native Bash PATH construction for generated environment directives.
+_ms_bash_mise_drop_activation_paths() {
+    local entry candidate oldifs=$IFS skip
+    local -a active=() inherited=() kept=()
+    IFS=: read -r -a active <<< "${MARKSHARC_MISE_ACTIVATION_PATHS-}"
+    IFS=: read -r -a inherited <<< "$PATH"
+    IFS=$oldifs
+    for entry in "${inherited[@]}"; do
+        skip=0
+        for candidate in "${active[@]}"; do
+            [[ $entry == "$candidate" ]] && skip=1
+        done
+        (( skip )) || kept+=("$entry")
+    done
+    IFS=:
+    PATH="${kept[*]}"
+    IFS=$oldifs
+    export PATH
+    unset MARKSHARC_MISE_ACTIVATION_PATHS
+}
+_ms_bash_mise_drop_shims() {
+    local entry oldifs=$IFS
+    local -a inherited=() kept=()
+    IFS=: read -r -a inherited <<< "$PATH"
+    IFS=$oldifs
+    for entry in "${inherited[@]}"; do
+        [[ $entry == "${MARKSHARC_MISE_SHIMS-}" ]] || kept+=("$entry")
+    done
+    IFS=:
+    PATH="${kept[*]}"
+    IFS=$oldifs
+    export PATH
+    unset MARKSHARC_MISE_SHIMS
+}
 # Indexed arrays keep this compatible with the system Bash on macOS.
 _ms_bash_add() {
     local tier=${1//[^A-Za-z0-9]/_} dir=$2
@@ -115,10 +148,12 @@ _ms_bash_start() {
     export -n MARKSHARC_SESSION
     _ms_first=() _ms_manager=() _ms_brew=() _ms_system=() _ms_user=() _ms_app=() _ms_local=() _ms_last=() _ms_module_bins=() _ms_extra_tiers=() _ms_extra_dirs=()
     _ms_bash_has_gvm=0
+    _ms_bash_mise_module_enabled=0
 }
 _ms_bash_module() {
     local name=$1 dir=$2 base
     if [[ $dir == "$MARKSHARC_HOME/modules/$name" ]]; then case $name in
+        mise) _ms_bash_mise_module_enabled=1 ;;
         path)
             _ms_system+=(/bin /usr/bin)
             _ms_bash_add system /sbin
@@ -143,14 +178,27 @@ _ms_bash_module() {
             case ${_ms_bash_pnpm-} in on|1|yes|true) _ms_bash_add user "${PNPM_HOME-}" ;; esac
             ;;
         python)
-            if [[ -f $HOME/.pyenv/bin/pyenv ]] && ! _ms_command_available uv; then
+            if declare -F _ms_mise_owns >/dev/null 2>&1 && _ms_mise_owns python; then
+                unset PYENV_ROOT
+            elif [[ -f $HOME/.pyenv/bin/pyenv ]] && ! _ms_command_available uv; then
                 export PYENV_ROOT=$HOME/.pyenv
                 _ms_bash_add manager "$PYENV_ROOT/shims"
                 _ms_bash_add manager "$PYENV_ROOT/bin"
             fi
             ;;
-        node-nvm) _ms_bash_nvm ;;
-        go-gvm) _ms_bash_gvm; _ms_bash_has_gvm=1 ;;
+        node-nvm)
+            if ! { declare -F _ms_mise_owns >/dev/null 2>&1 && _ms_mise_owns node; }; then
+                _ms_bash_nvm
+            fi
+            ;;
+        go-gvm)
+            if declare -F _ms_mise_owns >/dev/null 2>&1 && _ms_mise_owns go; then
+                _ms_bash_has_gvm=0
+            else
+                _ms_bash_gvm
+                _ms_bash_has_gvm=1
+            fi
+            ;;
     esac; fi
 }
 _ms_bash_module_bin() {

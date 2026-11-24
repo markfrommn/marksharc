@@ -49,6 +49,16 @@ if [[ -n ${MARKSHARC_HOME-} ]]; then
        ! _ms_bash_stale_dir "$MARKSHARC_HOME/modules" &&
        ! _ms_bash_stale_dir "${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}"; then
         source "$MARKSHARC_HOME/core/bash/path.bash"
+        if [[ ${MARKSHARC_MISE_ACTIVATION_PATHS+x} || ${MARKSHARC_MISE_SHIMS+x} || ${MARKSHARC_MISE_SETTINGS_ACTIVE+x} ]]; then
+            unset MARKSHARC_ENV MISE_SHELL MISE_NODE_VERSION MISE_GO_VERSION MISE_PYTHON_VERSION MISE_RUBY_VERSION
+            unset __MISE_ORIG_PATH __MISE_SESSION __MISE_DIFF
+        fi
+        _ms_bash_mise_drop_activation_paths
+        _ms_bash_mise_drop_shims
+        if [[ -n ${MARKSHARC_MISE_SETTINGS_ACTIVE-} ]]; then
+            unset MISE_NOT_FOUND_AUTO_INSTALL MISE_GO_SET_GOBIN MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS
+        fi
+        unset MARKSHARC_MISE_SETTINGS_ACTIVE
         # The renderer writes this host-specific file outside the repository.
         # shellcheck disable=SC1091
         source "$_ms_bash_cache/env.bash"

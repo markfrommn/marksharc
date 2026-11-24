@@ -121,6 +121,7 @@ Counts are Mac / sol.
 - starship as the only prompt.
 - atuin as the only history store, a `history` command over it, and a one-time import of the legacy history files.
 - Version managers: nvm with the `.nvmrc` hook, gvm with the `go.mod` hook, uv preferred over pyenv, pyenv as fallback. Paths for bun, pnpm, Go, and Rust.
+- An opt-in `mise` module takes over the node, Go, Python, and Ruby tools named by each host, with nvm, gvm, and pyenv preserved as the fallback.
 - zoxide, enabled.
 - System helpers: ssh-agent setup and cleanup, `fix-tmux`, X11 DISPLAY inference, docker helpers.
 - All seven ps helpers and the `ls` alias family, fixed and identical on both platforms.
@@ -148,7 +149,6 @@ Counts are Mac / sol.
 
 - A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm).
 - Full interactive bash.
-- An opt-in `mise` module that takes over node, Go, Python, and Ruby from nvm, gvm, and pyenv on the hosts that choose it (decided in DEV-62; fnm not pursued).
 - A coexist install mode that does not take over `ZDOTDIR`.
 - A generic `AGENTS.md` / `CLAUDE.md` for the public repo.
 - A Go helper binary for hot-path work.

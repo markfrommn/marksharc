@@ -40,7 +40,8 @@ if [[ -o login || -o interactive ]]; then _ms_zdot_ensure; fi
 # recomputes shell-local facts. Login shells and reloads always rebuild.
 _ms_env_id
 typeset -gi _ms_env_rebuild=1 _ms_render_recover=0
-if [[ -z ${_ms_force_rebuild-} && ! -o login && -n $_ms_env_id_value && ${MARKSHARC_ENV-} == $_ms_env_id_value ]]; then
+if [[ -z ${_ms_force_rebuild-} && ! -o login && -n $_ms_env_id_value && ${MARKSHARC_ENV-} == $_ms_env_id_value &&
+      ${+MARKSHARC_MISE_ACTIVATION_PATHS} == 0 && ${+MARKSHARC_MISE_SHIMS} == 0 && ${+MARKSHARC_MISE_SETTINGS_ACTIVE} == 0 ]]; then
     _ms_env_rebuild=0
     if ! _ms_render_cache_valid; then
         _ms_env_rebuild=1
@@ -63,6 +64,23 @@ if (( _ms_env_rebuild )); then
     fi
 fi
 _ms_render_load
+
+typeset -g _ms_mise_had_state=0
+(( ${+MARKSHARC_MISE_ACTIVATION_PATHS} || ${+MARKSHARC_MISE_SHIMS} || ${+MARKSHARC_MISE_SETTINGS_ACTIVE} )) && _ms_mise_had_state=1
+if (( ${+MARKSHARC_MISE_ACTIVATION_PATHS} )); then
+    typeset -ga _ms_mise_activation_paths=( ${(s.:.)MARKSHARC_MISE_ACTIVATION_PATHS} )
+    _ms_mise_drop_activation_paths
+fi
+[[ -z ${MARKSHARC_MISE_SHIMS-} ]] || _ms_mise_drop_shims
+if [[ -n ${MARKSHARC_MISE_SETTINGS_ACTIVE-} ]]; then
+    unset MISE_NOT_FOUND_AUTO_INSTALL MISE_GO_SET_GOBIN MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS
+fi
+unset MARKSHARC_MISE_SETTINGS_ACTIVE
+if (( _ms_mise_had_state )); then
+    unset MISE_SHELL MISE_NODE_VERSION MISE_GO_VERSION MISE_PYTHON_VERSION MISE_RUBY_VERSION
+    unset __MISE_ORIG_PATH __MISE_SESSION __MISE_DIFF
+fi
+unset _ms_mise_had_state
 
 # Modules that must see every other module's contribution (the path builder) register
 # a function here during the env phase; the finalizers run once, after the last module.

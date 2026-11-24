@@ -72,22 +72,26 @@ _ms_gvm_finalize() {
 }
 
 if (( ${_ms_env_rebuild:-1} )); then
-    if (( ${+functions[_ms_path_add]} )) && _ms_gvm_select; then
-        typeset -g _ms_gvm_root=${GVM_ROOT:-$HOME/.gvm} _ms_gvm_name=$REPLY
-        if [[ $MARKSHARC_SESSION == interactive ]]; then
-            # An interactive gvm activation sets GOPATH to the pkgset, so go install writes to
-            # its global/bin, which gvm puts on PATH before it exists: add it unchecked, with
-            # gvm's overlay and own bin directories.
-            _ms_path_add -f manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/bin"
-            _ms_path_add manager "$_ms_gvm_root/gos/$_ms_gvm_name/bin"
-            _ms_path_add -f manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/overlay/bin"
-            _ms_path_add manager "$_ms_gvm_root/bin"
-        else
-            # Agent and batch shells keep GOPATH at its default, so only existing directories.
-            _ms_path_add manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/bin" "$_ms_gvm_root/gos/$_ms_gvm_name/bin"
+    if (( ${+functions[_ms_mise_owns]} )) && _ms_mise_owns go; then
+        :
+    else
+        if (( ${+functions[_ms_path_add]} )) && _ms_gvm_select; then
+            typeset -g _ms_gvm_root=${GVM_ROOT:-$HOME/.gvm} _ms_gvm_name=$REPLY
+            if [[ $MARKSHARC_SESSION == interactive ]]; then
+                # An interactive gvm activation sets GOPATH to the pkgset, so go install writes to
+                # its global/bin, which gvm puts on PATH before it exists: add it unchecked, with
+                # gvm's overlay and own bin directories.
+                _ms_path_add -f manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/bin"
+                _ms_path_add manager "$_ms_gvm_root/gos/$_ms_gvm_name/bin"
+                _ms_path_add -f manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/overlay/bin"
+                _ms_path_add manager "$_ms_gvm_root/bin"
+            else
+                # Agent and batch shells keep GOPATH at its default, so only existing directories.
+                _ms_path_add manager "$_ms_gvm_root/pkgsets/$_ms_gvm_name/global/bin" "$_ms_gvm_root/gos/$_ms_gvm_name/bin"
+            fi
+            unset _ms_gvm_root _ms_gvm_name
         fi
-        unset _ms_gvm_root _ms_gvm_name
+        (( ${_ms_env_finalizers[(Ie)_ms_gvm_finalize]} )) || _ms_env_finalizers+=( _ms_gvm_finalize )
     fi
-    (( ${_ms_env_finalizers[(Ie)_ms_gvm_finalize]} )) || _ms_env_finalizers+=( _ms_gvm_finalize )
 fi
 true

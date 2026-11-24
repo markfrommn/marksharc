@@ -131,7 +131,7 @@ Describe 'bootstrap, update and installers'
     stub_command curl 'exit 42'
     ms_env
     local name result
-    for name in krew gvm wezterm-terminfo pyenv nvm; do
+    for name in krew gvm wezterm-terminfo pyenv nvm mise; do
       env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" install "$name" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
       result=$?
       [[ $result == 42 ]] || return 1
@@ -139,6 +139,49 @@ Describe 'bootstrap, update and installers'
   }
   It 'registers each public installer and propagates download failure'
     When run public_installers_case
+    The status should be success
+  End
+
+  mise_day2_case() {
+    ms_fixture_full
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    print -r -- 'module mise' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command brew 'cat "$3" > "$TEST_ROOT/brewfile"'
+    stub_command mise 'printf "%s\n" "$*" >> "$OPLOG"'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" bootstrap > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/brewfile") == *'brew "mise"'* ]] || { cat "$TEST_ROOT/brewfile"; return 2; }
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --list > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 3
+    [[ $(<"$TEST_ROOT/out") == *mise-tools* ]] || { cat "$TEST_ROOT/out"; return 4; }
+    : > "$OPLOG"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" update --only mise-tools --dry-run > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 5
+    [[ $(<"$TEST_ROOT/out") == *'mise upgrade'* && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 6; }
+  }
+  It 'registers the public mise package and update listing with a side-effect-free dry-run'
+    When run mise_day2_case
+    The status should be success
+  End
+
+  mise_installer_case() {
+    ms_fixture_full
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    print -r -- $'#!/bin/sh\nprintf "%s|%s" "$MISE_INSTALL_HELP" "$1" > "$TEST_ROOT/installer-env"' > "$TEST_ROOT/payload"
+    stub_command curl 'printf "%s\n" "$@" > "$TEST_ROOT/curl-args"; while [ "$1" != -o ]; do shift; done; cp "$TEST_ROOT/payload" "$2"; printf "%s" "$2" > "$TEST_ROOT/temp-path"'
+    print -r -- zsh-original > "$HOME/.zshrc"
+    print -r -- bash-original > "$HOME/.bashrc"
+    print -r -- profile-original > "$HOME/.profile"
+    cp "$HOME/.zshrc" "$TEST_ROOT/zshrc-original"
+    cp "$HOME/.bashrc" "$TEST_ROOT/bashrc-original"
+    cp "$HOME/.profile" "$TEST_ROOT/profile-original"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" install mise > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
+    [[ $(<"$TEST_ROOT/curl-args") == *https://mise.run* && $(<"$TEST_ROOT/installer-env") == '0|' ]] || return 2
+    [[ ! -e $(<"$TEST_ROOT/temp-path") ]] || return 3
+    cmp "$HOME/.zshrc" "$TEST_ROOT/zshrc-original" && cmp "$HOME/.bashrc" "$TEST_ROOT/bashrc-original" && cmp "$HOME/.profile" "$TEST_ROOT/profile-original"
+  }
+  It 'runs the mise installer from mise.run with profile edits disabled and cleans its download'
+    When run mise_installer_case
     The status should be success
   End
 

@@ -1,4 +1,7 @@
 # python module, init phase: uv is preferred; without it, pyenv's cached init output.
+if (( ${+functions[_ms_mise_owns]} )) && _ms_mise_owns python; then
+    return 0
+fi
 if have_command uv; then
     _ms_trace "uv found, preferring it to pyenv"
 elif [[ -f $HOME/.pyenv/bin/pyenv ]]; then

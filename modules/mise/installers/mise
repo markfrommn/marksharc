@@ -1,0 +1,6 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+tempfile=$(mktemp) || exit 1
+trap 'rm -f -- "$tempfile"' EXIT
+curl --fail --silent --show-error --location https://mise.run -o "$tempfile" || exit $?
+MISE_INSTALL_HELP=0 sh "$tempfile"

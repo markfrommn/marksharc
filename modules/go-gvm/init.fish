@@ -4,6 +4,13 @@
 # (functions/fish/gvm.fish) switches Go natively and runs every other subcommand under
 # bash. The default environment is never rewritten (no --default), and startup prints
 # nothing. The go.mod hook switches versions.
+if functions -q _ms_fish_mise_owns; and _ms_fish_mise_owns go
+    functions -e _ms_fish_gvm_hook
+    return 0
+end
+if functions -q _ms_fish_mise_restore_autoload
+    _ms_fish_mise_restore_autoload gvm
+end
 set -l _ms_gvm_root "$HOME/.gvm"
 set -q GVM_ROOT[1]; and test -n "$GVM_ROOT"; and set _ms_gvm_root "$GVM_ROOT"
 if test -f "$_ms_gvm_root/scripts/gvm"

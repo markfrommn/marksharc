@@ -1048,6 +1048,8 @@ on the Mac and sol is a manual acceptance step after merge.
 
 - On sol, an agent shell in a `.nvmrc` worktree gets that Node; the default Go beats Homebrew's `go` in every session class; doctor is clean; removing the option restores nvm, gvm, and pyenv.
 
+**Outcome:** Implemented in the `mise` module with per-tool ownership, safe exports, manager-tier shims, cached activation with path-independent cache keys, directory-change-only hooks, compatibility functions, full reload/deactivation cleanup, and native zsh, fish, and Bash behavior. Legacy managers stand aside only for owned tools and return on empty tools or missing mise. Doctor, installer, package, update, migration, and fish plugin integration are included. The [task plan](DEV-72-PLAN.md) records the behavior specs and live acceptance. `tests/check` passed with 486 zsh, 68 contract, 57 install, and 35 repository examples plus 582 fish assertions; the install E2E passed. Live zsh and fish checks selected the worktree Node and mise Go, restored legacy paths on fallback, and completed doctor with 0 issues and startup at 151.6 ms against the 500 ms budget.
+
 #### L4 — Coexist install mode (DEV-63)
 
 - **Repo:** marksharc
