@@ -80,8 +80,7 @@ jobs:
       - name: Fish unit suite
         run: tests/run-fish-units
 
-  # The Day 0 path on a clean account: install.sh from this checkout into a fresh HOME,
-  # then a login zsh and an interactive zsh must come up working. Needs only sh, zsh, git.
+  # Exercise Day 0 startup and uninstall in fresh and preconfigured homes.
   install-e2e:
     name: install e2e (${{ matrix.os }})
     strategy:
@@ -92,16 +91,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install zsh (Ubuntu)
+      - name: Install zsh and Fish (Ubuntu)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository -y ppa:fish-shell/release-4
           sudo apt-get update -q
-          sudo apt-get install -y -q zsh
+          sudo apt-get install -y -q zsh fish
+
+      - name: Install Fish (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
 
       - name: Tool versions
         run: |
           zsh --version
+          fish --version
           git --version
 
-      - name: Install into a fresh HOME and start shells
+      - name: Exercise install, shell startup and uninstall
         run: tests/e2e/install-e2e.sh "$GITHUB_WORKSPACE"

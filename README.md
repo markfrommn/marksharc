@@ -39,7 +39,7 @@ git clone https://github.com/markfrommn/marksharc.git
 sh marksharc/install.sh
 ```
 
-Then open a new terminal, or run `exec zsh -l` or `exec fish -l`.
+Then open a new terminal, or run `exec zsh -l`, `exec bash -l`, or `exec fish -l`.
 
 What it does:
 
@@ -51,21 +51,28 @@ What it does:
   links an existing directory instead; `--overlay <url>` clones one. An overlay that
   already exists is never modified, and a different one requested with `--overlay` is an error.
 - **Dotfiles.** Backs up `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin`,
-  `~/.zlogout`, `~/.bashrc` and `~/.bash_profile` in
+  `~/.zlogout`, `~/.bashrc`, `~/.bash_profile`, `~/.bash_login`, `~/.profile`
+  and `~/.login` in
   `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
   (symlinks are recorded by target), and writes zsh and Bash startup stubs. If the zsh core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
-  The installer also manages `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`
-  and leaves the user's `config.fish` untouched (`doctor` lists its lines so they can move into
-  the overlay).
+- **Fish.** Offers to back up the whole Fish configuration directory
+  (`${XDG_CONFIG_HOME:-~/.config}/fish`), including plugins and universal
+  variables, and replace it with only `conf.d/00-marksharc.fish`. The prompt
+  defaults to no. If you decline, the installer keeps your configuration and
+  adds the MarkSharc stub when its slot is available. If a custom file occupies
+  that slot, the installer warns and continues with zsh and Bash.
 - **Plugins.** Clones pinned plugins (fzf-tab, nvm.fish and fzf.fish) into
   `${XDG_CACHE_HOME:-~/.cache}/marksharc/plugins/`. Shell startup never fetches them. A
   failed fetch, when offline for example, leaves the install in place with a warning;
   `marksharc update` fetches them later. `--no-plugins` skips this step.
 - **Login shell.** It never runs `chsh`; it prints the command when your login shell is not zsh.
 
-`sh install.sh --dry-run` prints every action and changes nothing. Running the installer
-again is safe: it makes no new backup and does not touch the overlay.
+`sh install.sh --clobber` answers yes to optional cleanup. For the piped install,
+pass the flag as `| sh -s -- --clobber`. Without a terminal, optional cleanup
+defaults to no unless you pass `--clobber`. Add `--dry-run` to preview the
+actions without prompting or changing files. Reruns keep the original backups
+and the existing overlay.
 
 Day 1:
 
@@ -87,7 +94,9 @@ marksharc uninstall                # restore backed-up dotfiles and remove manag
 
 `marksharc uninstall --purge` also deletes the cache, the state and a clone made by the
 installer (it asks first; `--yes` answers). It never removes your overlay or a checkout you
-passed with `--home`.
+passed with `--home`. If you chose Fish cleanup, uninstall puts the original
+Fish directory back. It saves files created in the replacement directory beside
+the restored configuration.
 
 Sync uses each checkout's configured Git upstream. It reports dirty, ahead, diverged,
 detached or unavailable repositories without merging them. It finds the owning Git

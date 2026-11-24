@@ -8,6 +8,7 @@
 #   --home DIR       use DIR (a marksharc checkout) as the framework
 #   --overlay SRC    link a local directory, or git-clone a URL, as the overlay
 #   --dry-run        print every action and change nothing
+#   --clobber        assume yes to optional pre-install cleanup
 #   --no-plugins     do not fetch the pinned plugins (run "marksharc update" later)
 #
 # The framework is the checkout this script sits in, else a clone made into
@@ -18,31 +19,47 @@ set -eu
 
 REPO_DEFAULT=https://github.com/markfrommn/marksharc.git
 DRY=0
+CLOBBER=0
 PLUGINS=1
 FW_ARG=
 OVERLAY_ARG=
-DOTFILES=".zshenv .zshrc .zprofile .zlogin .zlogout .bashrc .bash_profile"
 BASH_DOTFILES=".bashrc .bash_profile"
+BASH_LEGACY=".bash_login .profile .login"
+DOTFILES=".zshenv .zshrc .zprofile .zlogin .zlogout $BASH_DOTFILES $BASH_LEGACY"
 STUB_MARK='# marksharc: managed stub'
 NL='
 '
 TMP_STUB=
 TMP_MANIFEST=
+fish_move_pending=0
+install_lock_held=0
 
 say() { printf 'marksharc: %s\n' "$*"; }
 die() { printf 'marksharc install: error: %s\n' "$*" >&2; exit 1; }
-cleanup() { rm -f -- "$TMP_STUB" "$TMP_MANIFEST"; }
+cleanup() {
+  rm -f -- "$TMP_STUB" "$TMP_MANIFEST"
+  if [ "$fish_move_pending" -eq 1 ] && [ "$(mf_get fish_backup)" != "$fish_backup" ]; then
+    if dest_present "$fish_backup/fish"; then
+      if ! mv -n -- "$fish_backup/fish" "$CONFIG_BASE/" || dest_present "$fish_backup/fish"; then
+        printf 'marksharc: the original Fish config is in %s\n' "$fish_backup/fish" >&2
+      fi
+    fi
+    rmdir -- "$fish_backup" 2>/dev/null || :
+  fi
+  [ "$install_lock_held" -eq 0 ] || rmdir -- "$install_lock"
+}
 trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--home DIR] [--overlay PATH|URL] [--dry-run] [--no-plugins]
+Usage: install.sh [--home DIR] [--overlay PATH|URL] [--dry-run] [--clobber] [--no-plugins]
 
   --home DIR        use DIR, a marksharc checkout, as the framework
   --overlay SRC     link a local directory, or git-clone a URL, as the overlay
                     (default: copy the template when no overlay exists)
   --dry-run         print every action and change nothing
+  --clobber         assume yes to optional pre-install cleanup
   --no-plugins      do not fetch the pinned plugins; "marksharc update" does it later
   -h, --help        show this help
 
@@ -61,6 +78,7 @@ while [ $# -gt 0 ]; do
     --overlay) [ $# -ge 2 ] && [ -n "$2" ] || die "--overlay needs a path or URL"; OVERLAY_ARG=$2; shift 2 ;;
     --overlay=*) OVERLAY_ARG=${1#--overlay=}; [ -n "$OVERLAY_ARG" ] || die "--overlay needs a path or URL"; shift ;;
     --dry-run|-n) DRY=1; shift ;;
+    --clobber) CLOBBER=1; shift ;;
     --no-plugins) PLUGINS=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1 (try --help)" ;;
@@ -88,6 +106,7 @@ xdg_dir XDG_CACHE_HOME "$HOME/.cache"; CACHE_BASE=$xd_value
 STATE_DIR=$STATE_BASE/marksharc
 CACHE_DIR=$CACHE_BASE/marksharc
 MANIFEST=$STATE_DIR/install.manifest
+install_lock=$STATE_BASE/.marksharc-install.lock
 # The overlay the core assumes when the stub names no MARKSHARC_CONFIG. It is judged against
 # ~/.config, not against $XDG_CONFIG_HOME: the old dotfiles that exported XDG_CONFIG_HOME are
 # moved aside, so a new shell cannot rely on it.
@@ -130,6 +149,10 @@ mf_get() {
   [ -f "$MANIFEST" ] || return 0
   awk -F= -v k="$1" '$1 == k { sub(/^[^=]*=/, ""); print; exit }' "$MANIFEST"
 }
+manifest_sum() {
+  if [ -f "$MANIFEST" ]; then cksum < "$MANIFEST"; fi
+}
+initial_manifest=$(manifest_sum) || die "could not read $MANIFEST"
 is_url() {
   case $1 in
     *://*) return 0 ;;
@@ -139,6 +162,25 @@ is_url() {
   return 1
 }
 dest_present() { [ -e "$1" ] || [ -L "$1" ]; }
+fish_cleanup_confirmed() {
+  if [ "$CLOBBER" -eq 1 ]; then return 0; fi
+  if [ "$DRY" -eq 1 ]; then
+    say "would ask whether to back up $FISH_DIR and install a clean Fish configuration (y/N)"
+    return 1
+  fi
+  prompt="Back up $FISH_DIR and install a clean MarkSharc Fish configuration? (y/N) "
+  if [ -t 0 ]; then
+    printf '%s' "$prompt"
+    IFS= read -r answer || return 1
+  elif ( : < /dev/tty ) 2>/dev/null; then
+    # The README's piped command uses stdin for script text.
+    printf '%s' "$prompt" > /dev/tty
+    IFS= read -r answer < /dev/tty || return 1
+  else
+    return 1
+  fi
+  case $answer in [Yy]|[Yy][Ee][Ss]) return 0 ;; *) return 1 ;; esac
+}
 
 # --- plan: framework --------------------------------------------------------
 self_dir=
@@ -206,18 +248,8 @@ fi
 
 # --- plan: dotfiles and stub ------------------------------------------------
 STUB=$HOME/.zshenv
-FISH_STUB=${CONFIG_BASE%/}/fish/conf.d/00-marksharc.fish
-fish_enabled=0
-if [ "$fw_action" = clone ] || [ -r "$FW/core/fish/marksharc.fish" ]; then
-  fish_enabled=1
-  if dest_present "$FISH_STUB"; then
-    [ -f "$FISH_STUB" ] && [ ! -L "$FISH_STUB" ] || die "$FISH_STUB is not a regular managed stub"
-    IFS= read -r fish_first < "$FISH_STUB" || :
-    case $fish_first in "$STUB_MARK"*) ;; *) die "$FISH_STUB already exists and is not a marksharc stub" ;; esac
-  fi
-  old_fish_stub=$(mf_get fish_stub)
-  [ -z "$old_fish_stub" ] || [ "$old_fish_stub" = "$FISH_STUB" ] || die "fish stub moved from $old_fish_stub; uninstall before changing XDG_CONFIG_HOME"
-fi
+FISH_DIR=${CONFIG_BASE%/}/fish
+FISH_STUB=$FISH_DIR/conf.d/00-marksharc.fish
 stub_text() {
   printf '%s\n' "$STUB_MARK (install.sh); do not edit. Remove with: marksharc uninstall"
   printf 'MARKSHARC_HOME=%s\n' "$(shq "$FW")"
@@ -271,77 +303,153 @@ stub_is_ours() {
   case $first_line in "$STUB_MARK"*) return 0 ;; esac
   return 1
 }
+
+# A moved Fish tree must not take the framework, overlay or installer state with it.
+check_fish_overlap() {
+  fish_physical=$(physpath "$FISH_DIR") || fish_physical=$FISH_DIR
+  for protected in "$HOME" "$FW" "$CONFIG_DIR" "$STATE_DIR" "$STATE_DIR/backup" "$STATE_DIR/replaced" \
+    "$(mf_get backup)" "$CACHE_DIR" "$ov_src"; do
+    case $protected in /*) ;; *) continue ;; esac
+    parent=$protected
+    # Check ancestors as well as the endpoint. An overlay symlink inside Fish
+    # can point outside the tree but still become unreachable when it moves.
+    while [ -n "$parent" ]; do
+      [ "$parent" != "$FISH_DIR" ] || die "cannot clean Fish: $FISH_DIR contains $protected"
+      if [ -d "$parent" ]; then
+        physical=$(physpath "$parent") || die "could not resolve $parent"
+        case $physical in "$fish_physical"|"$fish_physical"/*) die "cannot clean Fish: $FISH_DIR contains $protected" ;; esac
+      fi
+      parent=${parent%/*}
+    done
+  done
+}
+
+fish_enabled=0
+fish_clean=0
+fish_backup=$(mf_get fish_backup)
+fish_backup_stub_sum=$(mf_get fish_backup_stub_sum)
+old_fish_stub=$(mf_get fish_stub)
+old_fish_sum=$(mf_get fish_stub_sum)
+[ -z "$old_fish_stub" ] || [ "$old_fish_stub" = "$FISH_STUB" ] ||
+  die "fish stub moved from $old_fish_stub; uninstall before changing XDG_CONFIG_HOME"
+if [ -n "$fish_backup" ]; then
+  case $fish_backup in "${CONFIG_BASE%/}"/.marksharc-fish-backup.*) ;; *) die "the Fish backup is outside the current XDG_CONFIG_HOME" ;; esac
+  if [ "${fish_backup%/*}" != "${CONFIG_BASE%/}" ] ||
+    [ ! -d "$fish_backup" ] || [ -L "$fish_backup" ] || ! dest_present "$fish_backup/fish"; then
+    die "the original Fish configuration is missing from $fish_backup; finish uninstall or recover the backup before reinstalling"
+  fi
+fi
+if [ "$fw_action" = clone ] || [ -r "$FW/core/fish/marksharc.fish" ]; then
+  fish_enabled=1
+  fish_slot_unavailable=0
+  fish_legacy=0
+  if dest_present "$FISH_DIR"; then
+    if [ -L "$FISH_DIR" ] || [ ! -d "$FISH_DIR" ] ||
+      [ -L "$FISH_DIR/conf.d" ] ||
+      { dest_present "$FISH_DIR/conf.d" && [ ! -d "$FISH_DIR/conf.d" ]; } ||
+      { dest_present "$FISH_STUB" && ! stub_is_ours "$FISH_STUB"; }; then
+      fish_slot_unavailable=1
+      fish_legacy=1
+    else
+      extras=$(cd -- "$FISH_DIR" && find . ! -path . ! -path ./conf.d ! -path ./conf.d/00-marksharc.fish -prune -print) ||
+        die "could not inspect the existing Fish configuration at $FISH_DIR"
+      [ -z "$extras" ] || fish_legacy=1
+    fi
+  fi
+  if [ "$fish_legacy" -eq 1 ] && [ -z "$fish_backup" ] && fish_cleanup_confirmed; then
+    check_fish_overlap
+    fish_clean=1
+    if stub_is_ours "$FISH_STUB"; then
+      if [ -L "$FISH_DIR" ] || [ -L "$FISH_DIR/conf.d" ]; then
+        die "move the managed Fish stub out of the symlinked configuration before cleaning it"
+      fi
+      fish_backup_stub_sum=${old_fish_sum:-unknown}
+    fi
+  elif [ "$fish_slot_unavailable" -eq 1 ]; then
+    say "warning: skipping Fish because $FISH_STUB is unavailable; leaving the existing Fish configuration in place"
+    fish_enabled=0
+  fi
+fi
+
 backup_files=
 backup_links=
+cleanup_only=
+backup_candidates=
+original_backup=$(mf_get backup)
+matches_original() {
+  if [ -L "$HOME/$1" ]; then
+    grep -Fxq "link=$1=$(readlink "$HOME/$1")" "$MANIFEST"
+  elif [ -f "$HOME/$1" ] && [ -n "$original_backup" ] &&
+    [ -f "$original_backup/$1" ] && [ ! -L "$original_backup/$1" ]; then
+    grep -Fxq "file=$1" "$MANIFEST" && cmp -s "$HOME/$1" "$original_backup/$1"
+  else
+    return 1
+  fi
+}
 if stub_is_ours; then
   mode=update
+  backup_candidates=$BASH_LEGACY
 else
   mode=fresh
   # Backups from an earlier install are only recorded in the manifest: rebuilding it now would
   # drop them (and a later uninstall --purge would delete them), so stop before any write.
-  if [ -f "$MANIFEST" ] && grep -Eq '^(backup|file|link)=' "$MANIFEST"; then
-    die "an earlier install moved your original dotfiles into $(mf_get backup), but $STUB is no longer the marksharc stub; installing again would lose that record. Run \"$(mf_get framework)/bin/marksharc uninstall\" first (move a replaced $STUB aside so the original can come back). If you already restored the files yourself, delete $MANIFEST and run this again."
+  if [ -f "$MANIFEST" ] && grep -Eq '^(backup|file|link|fish_backup)=' "$MANIFEST"; then
+    backup_hint=${original_backup:-${fish_backup:-$MANIFEST}}
+    die "an earlier install recorded backups at $backup_hint, but $STUB is no longer the marksharc stub. Run \"$(mf_get framework)/bin/marksharc uninstall\" first to restore the originals. If it reports a conflicting $STUB, move that file aside and retry."
   fi
-  for n in $DOTFILES; do
-    if [ -L "$HOME/$n" ]; then
-      backup_links="$backup_links $n"
-    elif [ -f "$HOME/$n" ]; then
-      backup_files="$backup_files $n"
-    elif [ -e "$HOME/$n" ]; then
-      die "$HOME/$n is neither a regular file nor a symlink; move it aside and re-run"
-    fi
-  done
+  backup_candidates=$DOTFILES
 fi
 
 # A pre-Bash manifest retains its original backup and adds the two Bash files.
-bash_upgrade=0
 old_bash_sum=$(mf_get bash_stub_sum)
 if [ "$mode" = update ] && [ "$(mf_get bash_stubs)" != 1 ]; then
-  bash_upgrade=1
-  for n in $BASH_DOTFILES; do
-    if [ -L "$HOME/$n" ]; then
-      backup_links="$backup_links $n"
-    elif [ -f "$HOME/$n" ]; then
-      backup_files="$backup_files $n"
-    elif [ -e "$HOME/$n" ]; then
-      die "$HOME/$n is neither a regular file nor a symlink; move it aside and re-run"
-    fi
-  done
-fi
-if [ "$mode" = update ] && [ "$bash_upgrade" = 0 ]; then
+  backup_candidates="$BASH_DOTFILES $backup_candidates"
+elif [ "$mode" = update ]; then
   for n in $BASH_DOTFILES; do
     if dest_present "$HOME/$n" && ! stub_is_ours "$HOME/$n"; then
-      original_backup=$(mf_get backup)
-      if [ -f "$HOME/$n" ] && [ ! -L "$HOME/$n" ] &&
-        grep -Fxq "file=$n" "$MANIFEST" && [ -f "$original_backup/$n" ] &&
-        cmp -s "$HOME/$n" "$original_backup/$n"; then
-        continue
-      fi
-      if [ -L "$HOME/$n" ] && grep -Fxq "link=$n=$(readlink "$HOME/$n")" "$MANIFEST"; then
-        continue
-      fi
+      matches_original "$n" && continue
       die "$HOME/$n is no longer the managed stub; move it aside before reinstalling"
     fi
   done
 fi
-if [ "$bash_upgrade" = 1 ]; then
-  original_backup=$(mf_get backup)
-  if [ -n "$original_backup" ]; then
-    for n in $backup_files $backup_links; do
-      if dest_present "$original_backup/$n"; then
-        if [ -f "$HOME/$n" ] && [ ! -L "$HOME/$n" ] &&
-          [ -f "$original_backup/$n" ] && [ ! -L "$original_backup/$n" ] &&
-          cmp -s "$HOME/$n" "$original_backup/$n"; then
-          continue
-        fi
-        die "backup already exists for $HOME/$n at $original_backup/$n; reconcile it before upgrading"
-      fi
-    done
+for n in $backup_candidates; do
+  path=$HOME/$n
+  dest_present "$path" || continue
+  if [ "$mode" = update ] && [ -f "$MANIFEST" ] &&
+    { grep -Fxq "file=$n" "$MANIFEST" || grep -q "^link=[.]${n#.}=" "$MANIFEST"; }; then
+    matches_original "$n" || die "$path differs from the original backup; move it aside before reinstalling"
+    cleanup_only="$cleanup_only $n"
+  elif [ -L "$path" ]; then
+    target=$(readlink "$path" && printf x) || die "could not read the link $path"
+    target=${target%x}
+    case ${target%"$NL"} in *"$NL"*) die "the link $path has a newline in its target; move it aside before reinstalling" ;; esac
+    backup_links="$backup_links $n"
+  elif [ -f "$path" ]; then
+    backup_files="$backup_files $n"
+  else
+    die "$path is neither a regular file nor a symlink; move it aside and re-run"
   fi
-fi
+  # A retry can encounter a copy made before the manifest was published.
+  if [ -n "$original_backup" ] && dest_present "$original_backup/$n"; then
+    if [ ! -L "$path" ] && [ -f "$original_backup/$n" ] &&
+      [ ! -L "$original_backup/$n" ] && cmp -s "$path" "$original_backup/$n"; then
+      continue
+    fi
+    die "backup already exists for $path at $original_backup/$n; reconcile it before upgrading"
+  fi
+done
 
 # --- act --------------------------------------------------------------------
-if [ "$DRY" -eq 1 ]; then say "dry run: nothing will be changed"; fi
+if [ "$DRY" -eq 1 ]; then
+  say "dry run: nothing will be changed"
+else
+  mkdir -p -- "$STATE_BASE"
+  mkdir -m 700 -- "$install_lock" 2>/dev/null ||
+    die "another install or uninstall may be running; could not acquire $install_lock"
+  install_lock_held=1
+  current_manifest=$(manifest_sum) || die "could not read $MANIFEST"
+  [ "$current_manifest" = "$initial_manifest" ] || die "the install manifest changed; re-run the installer"
+fi
 
 # 1. framework
 case $fw_action in
@@ -353,6 +461,12 @@ case $fw_action in
       mkdir -p -- "$DATA_BASE"
       git clone --quiet -- "$REPO" "$FW" || die "git clone $REPO failed"
       valid_fw "$FW" || die "the clone at $FW does not look like a marksharc checkout"
+      if [ ! -r "$FW/core/fish/marksharc.fish" ]; then
+        fish_enabled=0
+        fish_clean=0
+        fish_backup_stub_sum=$(mf_get fish_backup_stub_sum)
+        say "warning: skipping Fish because the framework clone has no Fish startup script"
+      fi
     fi
     ;;
   reuse) say "framework: reusing the existing clone at $FW (not updated)" ;;
@@ -392,30 +506,38 @@ case $ov_action in
   *) say "overlay: keeping the existing overlay at $CONFIG_DIR" ;;
 esac
 
-# 3. backup (fresh installs only; a re-run never makes a new backup)
-backup=
-if [ "$mode" = fresh ] || [ "$bash_upgrade" = 1 ]; then
-  if [ -n "$backup_files$backup_links" ]; then
-    if [ "$bash_upgrade" = 1 ]; then backup=$(mf_get backup); fi
-    if [ -z "$backup" ]; then
-      stamp=$(date +%Y%m%dT%H%M%S)
-      backup=$STATE_DIR/backup/$stamp
-      [ ! -e "$backup" ] || backup=$backup-$$
-    fi
-    if [ "$DRY" -eq 1 ]; then
-      say "would back up$backup_files$backup_links from $HOME into $backup"
-    else
-      mkdir -p -- "$STATE_DIR/backup"
-      chmod 700 "$STATE_DIR" "$STATE_DIR/backup"
-      [ -d "$backup" ] || mkdir -m 700 -- "$backup"
-      for n in $backup_files; do cp -p -- "$HOME/$n" "$backup/$n"; done
-      say "backed up$backup_files$backup_links into $backup"
-    fi
+# 3. Back up newly covered dotfiles before changing the originals.
+backup=$original_backup
+if [ -n "$backup_files$backup_links" ]; then
+  if [ -z "$backup" ]; then
+    stamp=$(date +%Y%m%dT%H%M%S)
+    backup=$STATE_DIR/backup/$stamp
+    if dest_present "$backup"; then backup=$backup-$$; fi
+  fi
+  if [ "$DRY" -eq 1 ]; then
+    say "would back up$backup_files$backup_links from $HOME into $backup"
   else
-    say "no existing zsh dotfiles to back up"
+    mkdir -p -- "$STATE_DIR/backup"
+    chmod 700 "$STATE_DIR" "$STATE_DIR/backup"
+    [ -d "$backup" ] || mkdir -m 700 -- "$backup"
+    for n in $backup_files; do
+      dest_present "$backup/$n" || cp -p -- "$HOME/$n" "$backup/$n"
+    done
+    say "backed up$backup_files$backup_links into $backup"
   fi
 else
-  say "the stub is already ours; no new backup"
+  say "no new zsh or Bash dotfiles to back up"
+fi
+
+if [ "$fish_clean" -eq 1 ]; then
+  if [ "$DRY" -eq 1 ]; then
+    say "would back up $FISH_DIR beside the Fish configuration directory"
+  else
+    fish_backup=$(mktemp -d "${CONFIG_BASE%/}/.marksharc-fish-backup.XXXXXX")
+    fish_move_pending=1
+    mv -- "$FISH_DIR" "$fish_backup/fish" || die "could not back up $FISH_DIR"
+    say "backed up the Fish configuration into $fish_backup/fish"
+  fi
 fi
 
 # 4. the manifest and the stub
@@ -433,26 +555,31 @@ write_manifest() {
   if [ "$fish_enabled" -eq 1 ]; then
     printf 'fish_stub=%s\n' "$FISH_STUB"
     printf 'fish_stub_sum=%s\n' "$fish_sum"
+  elif [ -n "$old_fish_stub" ]; then
+    printf 'fish_stub=%s\n' "$old_fish_stub"
+    printf 'fish_stub_sum=%s\n' "$old_fish_sum"
   fi
+  [ -z "$fish_backup" ] || printf 'fish_backup=%s\n' "$fish_backup"
+  [ -z "$fish_backup_stub_sum" ] || printf 'fish_backup_stub_sum=%s\n' "$fish_backup_stub_sum"
   printf 'bash_stubs=1\n'
   printf 'bash_stub_sum=%s\n' "$bash_sum"
-  if [ "$mode" = fresh ]; then
-    [ -z "$backup" ] || printf 'backup=%s\n' "$backup"
-    for n in $backup_files; do printf 'file=%s\n' "$n"; done
-    for n in $backup_links; do printf 'link=%s=%s\n' "$n" "$(readlink "$HOME/$n")"; done
-  elif [ -f "$MANIFEST" ]; then
-    grep -E '^(backup|file|link)=' "$MANIFEST" || :
-    if [ "$bash_upgrade" = 1 ]; then
-      [ -z "$backup" ] || [ -n "$(mf_get backup)" ] || printf 'backup=%s\n' "$backup"
-      for n in $backup_files; do printf 'file=%s\n' "$n"; done
-      for n in $backup_links; do printf 'link=%s=%s\n' "$n" "$(readlink "$HOME/$n")"; done
-    fi
+  [ -z "$backup" ] || printf 'backup=%s\n' "$backup"
+  if [ "$mode" = update ] && [ -f "$MANIFEST" ]; then
+    grep -E '^(file|link)=' "$MANIFEST" || :
   fi
+  for n in $backup_files; do printf 'file=%s\n' "$n"; done
+  for n in $backup_links; do printf 'link=%s=%s\n' "$n" "$(readlink "$HOME/$n")"; done
 }
 new_stub=$(stub_text; printf x); new_stub=${new_stub%x}
 new_sum=$(printf '%s' "$new_stub" | cksum_of)
 fish_text=$(fish_stub_text; printf x); fish_text=${fish_text%x}
 fish_sum=$(printf '%s' "$fish_text" | cksum_of)
+fish_current=1
+if [ "$fish_enabled" -eq 1 ] &&
+  { [ "$fish_clean" -eq 1 ] || ! stub_is_ours "$FISH_STUB" ||
+    [ "$(cat "$FISH_STUB"; printf x)" != "$fish_text"x ]; }; then
+  fish_current=0
+fi
 bash_stub=$(bash_stub_text; printf x); bash_stub=${bash_stub%x}
 bash_sum=$(printf '%s' "$bash_stub" | cksum_of)
 bash_current=1
@@ -481,37 +608,23 @@ manifest_current=0
 if [ -f "$MANIFEST" ] && [ "$(cat "$MANIFEST"; printf x)" = "$new_manifest"x ]; then manifest_current=1; fi
 
 if [ "$DRY" -eq 1 ]; then
-  if [ "$fish_enabled" -eq 1 ]; then say "would write the fish stub $FISH_STUB"; fi
+  if [ "$fish_current" -eq 0 ]; then say "would write the fish stub $FISH_STUB"; fi
   if [ "$stub_edited" -eq 1 ]; then say "would keep a copy of the edited stub in $replaced_copy"; fi
   if [ "$stub_current" -eq 1 ]; then say "the stub $STUB is up to date"; else say "would write the stub $STUB"; fi
   if [ "$bash_current" -eq 0 ]; then say "would write the Bash startup stubs in $HOME"; fi
   if [ "$manifest_current" -eq 0 ]; then say "would write the manifest $MANIFEST"; fi
-  for n in $backup_files $backup_links; do
+  for n in $backup_files $backup_links $cleanup_only; do
     [ "$n" = .zshenv ] || say "would remove $HOME/$n (kept in the backup)"
   done
 else
   mkdir -p -- "$STATE_DIR"
-  if [ "$fish_enabled" -eq 1 ]; then
-    mkdir -p -- "${FISH_STUB%/*}"
-    if [ ! -f "$FISH_STUB" ] || [ "$(cat "$FISH_STUB"; printf x)" != "$fish_text"x ]; then
-      if [ -f "$FISH_STUB" ] && [ "$(cksum_of < "$FISH_STUB")" != "$(mf_get fish_stub_sum)" ]; then
-        mkdir -p -- "$STATE_DIR/replaced"
-        chmod 700 "$STATE_DIR/replaced"
-        cp -p -- "$FISH_STUB" "$STATE_DIR/replaced/fish.$stamp_now.$$"
-      fi
-      TMP_STUB=$FISH_STUB.tmp.$$
-      printf '%s' "$fish_text" > "$TMP_STUB"
-      mv -f -- "$TMP_STUB" "$FISH_STUB"
-      TMP_STUB=
-      say "wrote the fish stub $FISH_STUB"
-    fi
-  fi
   if [ "$manifest_current" -eq 0 ]; then
     TMP_MANIFEST=$STATE_DIR/.install.manifest.$$
     printf '%s' "$new_manifest" > "$TMP_MANIFEST"
     mv -f -- "$TMP_MANIFEST" "$MANIFEST"
     TMP_MANIFEST=
   fi
+  fish_move_pending=0
   if [ "$stub_current" -eq 1 ]; then
     say "the stub $STUB is up to date"
   else
@@ -523,12 +636,13 @@ else
     fi
     TMP_STUB=$HOME/.zshenv.marksharc.$$
     printf '%s' "$new_stub" > "$TMP_STUB"
+    [ ! -L "$STUB" ] || rm -f -- "$STUB"
     mv -f -- "$TMP_STUB" "$STUB"
     TMP_STUB=
     say "wrote the stub $STUB"
   fi
   # The stub is in place and everything it replaces is backed up: clear the rest.
-  for n in $backup_files $backup_links; do
+  for n in $backup_files $backup_links $cleanup_only; do
     case $n in .zshenv|.bashrc|.bash_profile) ;; *) rm -f -- "$HOME/$n" ;; esac
   done
   for n in $BASH_DOTFILES; do
@@ -548,6 +662,22 @@ else
     mv -f -- "$TMP_STUB" "$HOME/$n"
     TMP_STUB=
   done
+  if [ "$fish_current" -eq 0 ]; then
+    mkdir -p -- "${FISH_STUB%/*}"
+    if dest_present "$FISH_STUB"; then
+      stub_is_ours "$FISH_STUB" || die "$FISH_STUB appeared during installation; leaving it in place"
+      if [ "$(cksum_of < "$FISH_STUB")" != "$old_fish_sum" ]; then
+        mkdir -p -- "$STATE_DIR/replaced"
+        chmod 700 "$STATE_DIR/replaced"
+        cp -p -- "$FISH_STUB" "$STATE_DIR/replaced/fish.$stamp_now.$$"
+      fi
+    fi
+    TMP_STUB=$FISH_STUB.tmp.$$
+    printf '%s' "$fish_text" > "$TMP_STUB"
+    mv -f -- "$TMP_STUB" "$FISH_STUB"
+    TMP_STUB=
+    say "wrote the fish stub $FISH_STUB"
+  fi
 fi
 
 # 5. plugin pins: fetched here and by "marksharc update", never at startup (spec 6.8). A fetch
@@ -591,7 +721,8 @@ fi
 # --- done -------------------------------------------------------------------
 if [ "$DRY" -eq 1 ]; then
   say "dry run complete"
-elif [ "$mode" = update ] && [ "$stub_current" -eq 1 ] && [ "$bash_current" -eq 1 ] && [ "$manifest_current" -eq 1 ]; then
+elif [ "$mode" = update ] && [ "$stub_current" -eq 1 ] && [ "$bash_current" -eq 1 ] &&
+  [ "$fish_current" -eq 1 ] && [ "$manifest_current" -eq 1 ] && [ -z "$cleanup_only" ]; then
   say "already installed; nothing to change"
 else
   say "installed. Open a new terminal, or run: exec zsh -l"
