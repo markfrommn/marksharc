@@ -992,13 +992,13 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 
 - `modules/mise` (order 29) with options `tools`, `version_files`, `compat`, `auto_install`, `set_gobin`, and `hook`.
 - Env phase: the shim directory in the `manager` tier in every session class, `MISE_*` exports from the options, and inherited nvm/gvm entries dropped for owned tools.
-- Init phase: cached `mise activate zsh`; optional `nvm` and `gvm` translation functions.
+- Init phase: cached `mise activate zsh` with the hook on directory change only by default (`hook chpwd`: mise's `precmd` hook removed, a wrapper refreshes after `mise shell`, `use` and similar, `cd .` picks up a hand-edited config; `hook prompt` keeps mise's per-prompt hook; `hook off` uses shims only); optional `nvm` and `gvm` translation functions.
 - `node-nvm`, `go-gvm`, and the pyenv branch of `python` stand aside for owned tools, including on reload.
 - Doctor checks: mise missing for a non-empty `mise.tools`; a uv-format `~/.python-version` when python is owned.
 
 **Tests**
 
-- Temporary-HOME specs with a stub `mise`: empty `tools` changes nothing; stand-aside and fallback; session classes; stale-entry removal; compat translations; exports.
+- Temporary-HOME specs with a stub `mise`: empty `tools` changes nothing; `hook chpwd` leaves no mise `precmd` hook, and the wrapper refreshes after `mise shell` and `mise use`; stand-aside and fallback; session classes; stale-entry removal; compat translations; exports.
 
 **Done when**
 

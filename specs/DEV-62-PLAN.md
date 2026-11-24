@@ -71,6 +71,7 @@ From the documentation (2026-11) and the trial:
 | `mise activate zsh` (generating the init text; cacheable) | 23 ms |
 | `mise hook-env` in a plain, `.nvmrc` or `go.mod` directory | 29–30 ms |
 | `precmd` hook with nothing changed | 18–23 ms per prompt |
+| `precmd` hook with `MISE_HOOK_ENV_CHPWD_ONLY=1` | about 27 ms per prompt: the hook still runs `mise` |
 | `chpwd` hook, interactive, legacy modules off | about 30 ms per `cd` (61 ms for a pair) |
 | `node --version`: direct / through the shim | 5 ms / 33 ms |
 | `go version`: direct / through the shim | 8 ms / 32 ms |
@@ -100,6 +101,13 @@ Interplay with the framework:
   Long-lived parents (a tmux or herdr server) carry such entries. The module must put mise's
   directory in the `manager` tier and drop legacy manager entries for tools it owns; real mise
   installs are preferred to `mise link`.
+- **Directory-change-only activation.** `hook_env.chpwd_only` does not remove the per-prompt cost:
+  the `precmd` hook still runs `mise`. Removing `_mise_hook_precmd` from `precmd_functions`
+  after sourcing the activation does. Prompts then cost nothing, the `chpwd` hook still switches
+  versions on `cd`, and `cd .` picks up an edited `.nvmrc` or `mise.toml` (zsh runs `chpwd` hooks for
+  `cd .`; verified). Without the prompt hook, `mise shell node@22` and `mise use` take effect only at
+  the next hook run, so the module wraps the activation's `mise` function to run `_mise_hook` after
+  those commands.
 - **`~/.python-version`.** sol has `~/.python-version` with uv's pin format
   `cpython-3.13-any-any-any`; mise read it as a Python request and reported it missing.
   Enabling Python version files needs a check against uv's pins.
@@ -118,7 +126,11 @@ Operator decisions, 2026-11-24:
    session class, so an agent working in a worktree gets that project's version. The cost is
    about 27 ms per tool call.
 3. **Interactive shells add cached activation** (`_ms_init_cached mise mise activate zsh`) for
-   real `bin` directories, `mise shell` and `[env]`.
+   real `bin` directories, `mise shell` and `[env]`. **The hook runs on directory change only by
+   default** (option `hook`, default `chpwd`; operator, after review of the per-prompt cost): the
+   module removes mise's `precmd` hook, so prompts cost nothing and each `cd` costs about 30 ms. A
+   wrapper refreshes after `mise shell`, `use` and similar commands. To pick up a config file edited
+   by hand, run `cd .`. `hook prompt` keeps mise's own per-prompt hook; `hook off` uses shims only.
 4. **Tools in scope:** node, go, python (replacing the pyenv fallback only; uv stays preferred)
    and ruby (new; no legacy module).
 5. **Muscle memory:** thin `nvm` and `gvm` functions behind an option translate the common

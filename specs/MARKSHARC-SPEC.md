@@ -473,7 +473,7 @@ A host has two checkouts: the framework and the overlay (plus any private module
 | `go-gvm` | MVP | gvm activation, `go.mod` hook, consistent `GOROOT` | gvm blocks |
 | `python` | MVP | uv preferred, pyenv fallback | pyenv/uv block |
 | `bun`, `pnpm`, `rust`, `go` | MVP | Paths and env | Assorted lines |
-| `mise` | Later | Opt-in owner of the tools named in `mise.tools` (node, go, python, ruby): shim directory in the `manager` tier in every session class, cached `mise activate` in interactive shells, `MISE_*` settings from options, optional `nvm` and `gvm` translation functions. The owned tools' legacy modules stand aside; without mise they run as before | `node-nvm`, `go-gvm`, and pyenv, per tool, when enabled |
+| `mise` | Later | Opt-in owner of the tools named in `mise.tools` (node, go, python, ruby): shim directory in the `manager` tier in every session class, cached `mise activate` in interactive shells (run on directory change by default, not at every prompt), `MISE_*` settings from options, optional `nvm` and `gvm` translation functions. The owned tools' legacy modules stand aside; without mise they run as before | `node-nvm`, `go-gvm`, and pyenv, per tool, when enabled |
 | `ssh-agent` | MVP | Agent discovery and cache under the state dir, `clean-ssh-agents` | `setup-ssh-agent`, `clean-ssh-agents` |
 | `x11` | MVP | DISPLAY inference; mux-aware in Modernization | `setup-x11-display` |
 | `docker` | MVP | `cleanup-docker`, `fix-docker-socket`, container detection | Same names |
