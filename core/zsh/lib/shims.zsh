@@ -18,8 +18,7 @@ _ms_provider_read() {
 
 _ms_shims_render() {
     emulate -L zsh
-    local stage=$1 dir file pname name row session state pid socket collie='' module output
-    local -a rows
+    local stage=$1 dir file pname name row session socket collie='' module output
     for module in $_ms_plan; do
         case $module in
             cc-providers)
@@ -43,12 +42,11 @@ _ms_shims_render() {
                     local -a candidates=( "$HOME"/.config/**/collie-ctl.sh(N-.x) )
                     collie=${candidates[1]-}
                 fi
-                output=$(command herdr session list) || return 1
-                rows=( "${(@f)output}" )
-                for row in "${rows[@]:1}"; do
-                    [[ -n ${row//[[:space:]]/} ]] || continue
-                    read -r session state pid socket <<< "$row"
-                    [[ $session =~ '^[A-Za-z0-9_.-]+$' && -n $socket ]] || { print -ru2 'Unsupported Herdr session row'; return 1; }
+                output=$("$MARKSHARC_HOME/modules/mux/bin/marksharc-mux" sessions herdr) || return 1
+                for row in "${(@f)output}"; do
+                    [[ -n $row ]] || continue
+                    session=${row%%$'\t'*}
+                    socket=${row#*$'\t'}
                     name=herdr-$session
                     [[ ! -e $stage/$name ]] || return 1
                     print -rl -- '#!/bin/zsh -f' "exec herdr session attach ${(q)session} \"\$@\"" > "$stage/$name" || return 1

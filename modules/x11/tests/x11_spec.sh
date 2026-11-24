@@ -1,6 +1,8 @@
 Describe 'x11 DISPLAY bookkeeping'
   x11_case() {
     emulate -L zsh
+    local MARKSHARC_HOME=$MARKSHARC_ROOT
+    source "$MARKSHARC_HOME/core/zsh/lib/directives.zsh"
     local tool
     # Any probe or delay would be logged.
     for tool in sleep ping w tty; do

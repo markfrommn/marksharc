@@ -12,6 +12,7 @@ fixture_setup() {
   TEST_ROOT=$(CDPATH='' cd -- "$TEST_ROOT" && pwd -P)
   export TEST_ROOT HOME="$TEST_ROOT/home" ZDOTDIR="$TEST_ROOT/home/zsh" OPLOG="$TEST_ROOT/operations"
   export XDG_CONFIG_HOME="$HOME/config" XDG_CACHE_HOME="$HOME/cache" XDG_DATA_HOME="$HOME/data" XDG_STATE_HOME="$HOME/state"
+  export XDG_RUNTIME_DIR="$HOME/run"
   mkdir -p "$HOME" "$ZDOTDIR" "$TEST_ROOT/bin"
   : > "$OPLOG"
   if [ -n "${REAL_FISH:-}" ]; then
@@ -26,7 +27,8 @@ fixture_setup() {
     # shellcheck disable=SC2016 # $* and $OPLOG expand when the stub runs
     stub_command "$tool" 'printf "FORBIDDEN %s\n" "'"$tool"' $*" >> "$OPLOG"; exit 99'
   done
-  unset SSH_AUTH_SOCK SSH_AGENT_PID TMUX NVM_DIR BASH_ENV ENV HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_PANE_ID WEZTERM_PANE HC_TERMINAL_ID
+  stub_command launchctl 'exit 1'
+  unset SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION SSH_TTY TMUX TMUX_PANE NVM_DIR BASH_ENV ENV HERDR_BIN_PATH HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_PANE_ID WEZTERM_PANE HC_TERMINAL_ID
 }
 fixture_teardown() { cd /; rm -rf -- "$TEST_ROOT"; }
 iecho() { :; }

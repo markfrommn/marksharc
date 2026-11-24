@@ -2,7 +2,7 @@ Describe 'literal terminal titles'
   title_case() {
     emulate -L zsh
     load_mfn titles set-title
-    local TERM=xterm
+    local TERM=xterm MARKSHARC_HOME=$MARKSHARC_ROOT
     local actual=$(set-title 'two words $HOME %n' window combined)
     [[ $actual == $'\e]0;combined\a\e]2;window\a\e]1;two words $HOME %n\a' ]] || return 1
     TERM=tmux
@@ -16,12 +16,12 @@ Describe 'literal terminal titles'
     cat > "$TEST_ROOT/title-script" <<'DATA'
 fpath=( "$MARKSHARC_ROOT/modules/titles/functions/zsh" $fpath )
 autoload -Uz set-title chdir-set-title
+MARKSHARC_HOME=$MARKSHARC_ROOT
 cwf() { return 1; }
-set-title() { print -r -- "$1"; }
 chdir-set-title
 DATA
-    local label=$(SHLVL=0 /bin/zsh -df "$TEST_ROOT/title-script")
-    [[ $label == detached-* ]] || { print -r -- "$label"; return 1; }
+    local label=$(TERM=xterm SHLVL=0 /bin/zsh -df "$TEST_ROOT/title-script")
+    [[ $label == $'\e]1;detached-'*$'\a' ]] || { print -r -- "$label"; return 1; }
   }
   It 'labels detached repositories without remotes'
     When run label_case
