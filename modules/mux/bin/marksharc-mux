@@ -1,0 +1,48 @@
+#!/bin/zsh -f
+emulate -L zsh
+
+mux_dir=${0:A:h:h}
+framework=${mux_dir:h:h}
+
+# Adapters receive their operation and arguments. A failed optional CLI cannot stop another
+# active adapter from receiving titles.
+mux_adapter() { source "$mux_dir/adapters/$1.zsh" "${@:2}"; }
+
+mux_detect() {
+    local file adapter
+    active=()
+    for file in "$mux_dir"/adapters/*.zsh(N); do
+        adapter=${${file:t}%.zsh}
+        [[ $adapter != plain ]] || continue
+        mux_adapter "$adapter" detect && active+=( "$adapter" )
+    done
+    (( $#active )) || { mux_adapter plain detect && active=( plain ); }
+    return 0
+}
+
+typeset -a active
+case ${1-} in
+    detect)
+        mux_detect
+        (( $#active == 0 )) || print -rl -- "${active[@]}"
+        ;;
+    set_titles)
+        mux_detect
+        for adapter in "${active[@]}"; do
+            [[ $adapter != plain || ${7:-1} == 1 ]] || continue
+            mux_adapter "$adapter" set_titles "${2//[[:cntrl:]]/}" "${3//[[:cntrl:]]/}" \
+                "${4//[[:cntrl:]]/}" "${5//[[:cntrl:]]/}" "${6:-marksharc}" || true
+        done
+        ;;
+    terminal_title) mux_adapter plain terminal_title "${@:2}" ;;
+    sessions)
+        [[ ${2-} =~ '^[a-z][a-z-]*$' && -f $mux_dir/adapters/$2.zsh ]] || exit 2
+        mux_adapter "$2" sessions
+        ;;
+    refresh_env)
+        source "$framework/core/zsh/lib/directives.zsh" || exit 1
+        source "$mux_dir/lib/refresh.zsh" || exit 1
+        mux_refresh "${2:-all}"
+        ;;
+    *) print -ru2 -- 'Usage: marksharc-mux {detect|set_titles|refresh_env|sessions}'; exit 2 ;;
+esac

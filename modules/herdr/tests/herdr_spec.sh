@@ -2,7 +2,7 @@ Describe 'herdr session wrappers and completion'
   completion_case() {
     emulate -L zsh
     ms_fixture
-    ms_copy_module herdr
+    ms_copy_module herdr mux
     cat > "$TEST_ROOT/bin/herdr" <<'DATA'
 #!/bin/sh
 case "$*" in

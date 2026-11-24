@@ -132,6 +132,7 @@ printf '%s\n' "$HERDR_SOCKET_PATH" "$1" > "$HOME/collie"
 DATA
     chmod +x "$TEST_ROOT/bin/herdr" "$TEST_ROOT/bin/collie"
     source "$MARKSHARC_ROOT/core/zsh/lib/shims.zsh"
+    local MARKSHARC_HOME=$MARKSHARC_ROOT
     typeset -a _ms_plan=(herdr)
     _ms_shims_render "$TEST_ROOT/stage" || return 1
     /bin/bash -c '"$1" "$2"' _ "$TEST_ROOT/stage/collie-demo" 'a b;$(touch BAD)' || return 2

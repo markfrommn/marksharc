@@ -784,6 +784,8 @@ Live package provisioning and the updater cutover on the Mac and sol remain unve
 
 **Notes:** Session attach shims depend on P3.3; if P3.3 has not landed, keep the generated functions and convert later.
 
+Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux adapters](../docs/MUX-ADAPTERS.md).
+
 #### P3.6 — Interactive upgrades (DEV-54)
 
 - **Repo:** marksharc

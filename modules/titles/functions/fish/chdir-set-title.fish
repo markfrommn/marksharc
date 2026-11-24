@@ -1,10 +1,12 @@
 # chdir-set-title: label the tab (and herdr workspace and pane) from the working directory,
-# the git repository and branch, and the cwf session name. Skipped inside a herdr core
-# terminal, in nested shells (SHLVL other than 1), and while chdir_set_title_skip is set.
+# the git repository and branch, and the cwf session name.
 function chdir-set-title --description 'Set tab and pane titles from the working directory'
-    test -z "$HC_TERMINAL_ID"; or return 0
-    test "$SHLVL" = 1; or return 0
     test -z "$chdir_set_title_skip"; or return 0
+    set -l mux_command "$MARKSHARC_HOME/modules/mux/bin/marksharc-mux"
+    if test "$SHLVL" != 1
+        set -l active (command "$mux_command" detect)
+        test -n "$active"; and test "$active" != plain; or return 0
+    end
 
     # The last two directories stay informative without being verbose; in a worktree the
     # repository name takes the top line.
@@ -59,22 +61,6 @@ function chdir-set-title --description 'Set tab and pane titles from the working
     end
     test -z "$cwf_sname"; or set tabprint "$cwf_sname"
 
-    # herdr first: it may itself run inside wezterm.
-    if test -n "$HERDR_TAB_ID"
-        if type -q herdr
-            set -l source_name fish-chdir
-            herdr workspace report-metadata "$HERDR_WORKSPACE_ID" --source "$source_name" --token topname="$topprint-rm" >/dev/null 2>&1
-            herdr workspace report-metadata "$HERDR_WORKSPACE_ID" --source "$source_name" --token subname="$subprint" >/dev/null 2>&1
-            herdr workspace rename "$HERDR_WORKSPACE_ID" "$topprint" >/dev/null 2>&1
-            herdr tab rename "$HERDR_TAB_ID" "$tabprint" >/dev/null 2>&1
-            herdr pane rename "$HERDR_PANE_ID" "$paneprint" >/dev/null 2>&1
-        end
-    else if test -n "$WEZTERM_PANE"
-        if type -q wezterm
-            wezterm cli set-tab-title "$tabprint"
-        end
-    else
-        set-title "$tabprint"
-    end
-    return 0
+    command "$mux_command" set_titles \
+        "$topprint" "$tabprint" "$paneprint" "$subprint" fish-chdir "$SHLVL"
 end

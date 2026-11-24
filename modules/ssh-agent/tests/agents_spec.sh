@@ -81,6 +81,7 @@ DATA
     cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
 #!/bin/sh
 if [ "$1" != -l ]; then echo ADD >> "$OPLOG"; exit 9; fi
+[ "$SSH_AUTH_SOCK" = "$HOME/agent space" ] || exit 2
 case "$SSH_TEST_MODE" in stale) exit 2;; empty) exit 1;; esac
 exit 0
 DATA
@@ -203,7 +204,7 @@ DATA
     export MARKSHARC_HOST MARKSHARC_SESSION SSH_AUTH_SOCK SSH_AGENT_PID
     cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
 #!/bin/sh
-exit 0
+[ "$SSH_AUTH_SOCK" = "$HOME/agent space" ] || exit 2
 DATA
     cat > "$TEST_ROOT/bin/ssh-agent" <<'DATA'
 #!/bin/sh

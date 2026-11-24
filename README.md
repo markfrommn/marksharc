@@ -193,6 +193,7 @@ set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a sessi
 
 - [Developing marksharc](docs/DEVELOPING.md)
 - [Tests](tests/README.md)
+- [Multiplexer titles, forwarding, and adapters](docs/MUX-ADAPTERS.md)
 - [Specification](specs/MARKSHARC-SPEC.md) and [plan](specs/MARKSHARC-PLAN.md)
 
 ## License

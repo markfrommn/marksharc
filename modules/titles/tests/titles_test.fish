@@ -85,7 +85,7 @@ set -l herdr_log (cat "$TEST_ROOT/herdr")
 @test "herdr is told the sub directory as pane (spaces kept)" "$herdr_log[5]" = "pane rename pane1 sub dir/"
 @test "herdr gets topname and subname metadata" "$herdr_log[1]|$herdr_log[2]" = "workspace report-metadata ws1 --source fish-chdir --token topname=the repo-rm|workspace report-metadata ws1 --source fish-chdir --token subname=proj dir/sub dir"
 set -l others (cat "$TEST_ROOT/wezterm")
-@test "herdr is preferred over wezterm and set-title" (count $others) -eq 0 -a -z "$out"
+@test "nested WezTerm gets the same branch, with no plain title" "$others" = 'cli set-tab-title --pane-id 7 -- main' -a -z "$out"
 cd "$TEST_ROOT/plain dir/one/two/three/four"
 set -e WEZTERM_PANE
 reset_titles
@@ -106,32 +106,36 @@ if test -d /sys/class/net
     set herdr_log (cat "$TEST_ROOT/herdr")
     @test "a path with three slashes splits one directory above two" "$herdr_log[2]|$herdr_log[3]" = "workspace report-metadata ws1 --source fish-chdir --token subname=sys|workspace rename ws1 class/net"
 end
-set -e HERDR_TAB_ID
+set -e HERDR_TAB_ID HERDR_PANE_ID HERDR_WORKSPACE_ID
 set -gx WEZTERM_PANE 7
 cd "$HOME/work/proj dir/sub dir"
 reset_titles
 set out (title_shell 1)
-@test "wezterm gets the tab title" "$(cat "$TEST_ROOT/wezterm")" = "cli set-tab-title main"
+@test "wezterm gets the tab title" "$(cat "$TEST_ROOT/wezterm")" = 'cli set-tab-title --pane-id 7 -- main'
 @test "wezterm is preferred over set-title" -z "$out"
 
 # Skip rules.
 cd "$TEST_ROOT"
 set -gx HC_TERMINAL_ID core1
+ms_stub hc 'printf "%s\n" "$*" >>"$TEST_ROOT/hc"'
 reset_titles
-@test "a herdr core terminal is skipped" -z "$(title_all 1)"
+title_shell 1 >/dev/null
+@test "a herdr core terminal is labeled while nested in WezTerm" (cat "$TEST_ROOT/hc") = "label core1 marksharc.workspace="(path basename (path dirname "$PWD"))"/"(path basename "$PWD")" marksharc.tab=$PWD marksharc.pane=$PWD"
 set -e HC_TERMINAL_ID
-@test "a nested shell (SHLVL 2) is skipped" -z "$(title_all 2)"
+set -e WEZTERM_PANE
+reset_titles
+@test "a nested plain shell (SHLVL 2) is skipped" -z "$(title_all 2)"
 set -gx chdir_set_title_skip yes
 @test "chdir_set_title_skip suppresses the title" -z "$(title_all 1)"
 set -e chdir_set_title_skip
 @test "the title is set again without a skip" -n "$(title_all 1)"
 
-# A missing herdr or wezterm is not an error and prints nothing.
+# A missing herdr or wezterm falls back to the terminal.
 command rm "$TEST_ROOT/bin/herdr" "$TEST_ROOT/bin/wezterm"
 set -gx HERDR_TAB_ID tab1
-@test "a missing herdr is quiet" -z "$(title_shell 1 2>&1)"
+@test "a missing herdr falls back to the plain title" "$(tab_of (title_shell 1))" = "$PWD"
 set -e HERDR_TAB_ID
-@test "a missing wezterm is quiet" -z "$(title_shell 1 2>&1)"
+@test "a missing wezterm falls back to the plain title" "$(tab_of (title_shell 1))" = "$PWD"
 set -e WEZTERM_PANE
 
 # The hook and fish_title. Replace the title function with a counter first.

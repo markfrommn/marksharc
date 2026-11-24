@@ -1,6 +1,6 @@
-# Shorthand to fix ssh-agent under tmux: re-import the client environment.
-if test -n "$TMUX" ; then
-    eval $(tmux show-env -s)
+# Compatibility entry point for the forwarded environment under tmux.
+if [[ -n $TMUX ]]; then
+    refresh-env client
 else
-    echo "Not in tmux"
+    print -r -- 'Not in tmux'
 fi
