@@ -65,6 +65,20 @@ same capability in a different way. *Not applicable* means the module has no mea
 | zoxide | supported | Cached `zoxide init fish`. |
 | zsh-options | not applicable | zsh `setopt` set. |
 
+## Writing fish module code
+
+- `init.fish` is sourced inside a function: use `set -g`/`set -gx` for anything that must persist,
+  and define event handlers (`--on-variable PWD`) there, not in autoload files.
+- Call `_ms_fish_track_functions NAME` before defining a function over one of fish's own (`fish_title`,
+  `man`, `history`), so a reload that disables the module can put fish's back.
+- Never `functions -e` a name you expect to autoload later: fish then refuses to autoload it for
+  the rest of the session. Fish may also embed its functions in the binary, so copy fish's
+  function (`functions -c`) rather than sourcing `$__fish_data_dir/functions/*.fish`.
+- Fish has no `$prefix_$var` indirection; use `set -l name prefix_$var` and `$name`.
+- Test PATHs keep `/bin` (macOS has `bash` and `cat` only there) and use `touch -t`, not `touch -d`.
+- fishtape skips, without counting, an `@test` whose expression errors; `run-fish-units` therefore
+  fails on any fish error in its output.
+
 ## Retiring the old fish configuration
 
 The old configuration (`config/fish` in mark-desktop-files) and fisher are no longer needed.
