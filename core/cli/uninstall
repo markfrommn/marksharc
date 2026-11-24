@@ -48,24 +48,30 @@ done < "$manifest"
 stub=$HOME/.zshenv
 stub_mark='# marksharc: managed stub'
 stub_is_ours() {
-    local first
-    [[ -f $stub && ! -L $stub ]] || return 1
-    IFS= read -r first < "$stub" || :
+    local first check=${1:-$stub}
+    [[ -f $check && ! -L $check ]] || return 1
+    IFS= read -r first < "$check" || :
     [[ $first == "$stub_mark"* ]]
 }
 
 typeset -a problems=()
+fish_stub=${mf[fish_stub]-}
+fish_config_base=${${XDG_CONFIG_HOME:-$HOME/.config}%/}
+[[ -n $fish_config_base ]] || fish_config_base=/
+if [[ -n $fish_stub && $fish_stub != "${fish_config_base%/}/fish/conf.d/00-marksharc.fish" ]]; then
+    problems+=( "fish stub $fish_stub is outside the current XDG_CONFIG_HOME; restore the install-time XDG_CONFIG_HOME" )
+fi
 backup=${mf[backup]-}
 typeset -a names=( $files $linknames )
 for name in $names; do
-    [[ $name == (.zshenv|.zshrc|.zprofile|.zlogin|.zlogout) ]] || problems+=( "the manifest names an unexpected file: $name" )
+    [[ $name == (.zshenv|.zshrc|.zprofile|.zlogin|.zlogout|.bashrc|.bash_profile) ]] || problems+=( "the manifest names an unexpected file: $name" )
 done
 for name in $files; do
     [[ -n $backup && -f $backup/$name ]] || problems+=( "the backup copy of $name is missing (looked in ${backup:-no backup directory})" )
 done
 for name in $names; do
     if [[ -e $HOME/$name || -L $HOME/$name ]]; then
-        if [[ $name == .zshenv ]] && stub_is_ours; then continue; fi
+        if [[ $name == (.zshenv|.bashrc|.bash_profile) ]] && stub_is_ours "$HOME/$name"; then continue; fi
         problems+=( "$HOME/$name exists and is not the marksharc stub; move it aside so the original can be restored" )
     fi
 done
@@ -116,6 +122,19 @@ if (( purge && ! yes )); then
 fi
 
 # --- act -------------------------------------------------------------------------
+if [[ -n $fish_stub && -f $fish_stub && ! -L $fish_stub ]]; then
+    IFS= read -r fish_first < "$fish_stub" || :
+    if [[ $fish_first == "$stub_mark"* ]]; then
+        cur=$(command cksum < "$fish_stub")
+        cur=${(j: :)${=cur}}
+        if [[ $cur != "${mf[fish_stub_sum]-}" ]]; then
+            saved=$fish_stub.marksharc-removed
+            [[ -e $saved || -L $saved ]] && saved=$saved.$$
+            command cp -p -- "$fish_stub" "$saved" || die "could not save the edited fish stub to $saved"
+        fi
+        command rm -f -- "$fish_stub"
+    fi
+fi
 if stub_is_ours; then
     # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
     # file. The fingerprint recorded at install time tells an edit from the stub as written.
@@ -129,6 +148,19 @@ if stub_is_ours; then
     fi
     command rm -f -- "$stub"
 fi
+for name in .bashrc .bash_profile; do
+    stub=$HOME/$name
+    stub_is_ours || continue
+    cur=$(command cksum < "$stub")
+    cur=${(j: :)${=cur}}
+    if [[ $cur != "${mf[bash_stub_sum]-}" ]]; then
+        saved=$stub.marksharc-removed
+        [[ -e $saved || -L $saved ]] && saved=$saved.$$
+        command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
+    fi
+    command rm -f -- "$stub"
+done
+stub=$HOME/.zshenv
 restored=()
 for name in $files; do
     command cp -p -- "$backup/$name" "$HOME/$name" || die "could not restore $HOME/$name (the backup is in $backup)"
@@ -147,7 +179,12 @@ if (( purge )); then
     # Copies of hand-edited stubs that install re-runs kept in the state directory would go with
     # it: move them next to the restored files first.
     for saved in "$state"/replaced/*(N.); do
-        dest=$HOME/.zshenv.marksharc-replaced.${${saved:t}#zshenv.}
+        name=${saved:t}
+        case $name in
+            bashrc.*) dest=$HOME/.bashrc.marksharc-replaced.${name#bashrc.} ;;
+            bash_profile.*) dest=$HOME/.bash_profile.marksharc-replaced.${name#bash_profile.} ;;
+            *) dest=$HOME/.zshenv.marksharc-replaced.${name#zshenv.} ;;
+        esac
         [[ -e $dest || -L $dest ]] && dest=$dest.$$
         command cp -p -- "$saved" "$dest" || die "could not keep $saved; the purge was not carried out"
         print -r -- "marksharc: kept an earlier edited stub as $dest (merge any lines you still need)."

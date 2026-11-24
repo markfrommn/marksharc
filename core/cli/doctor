@@ -28,6 +28,28 @@ else
         fi
     fi
 fi
+manifest=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/install.manifest
+fish_stub= fish_sum= bash_sum=
+if [[ -r $manifest ]]; then
+    while IFS= read -r line; do
+        case $line in
+            fish_stub=*) fish_stub=${line#fish_stub=} ;;
+            fish_stub_sum=*) fish_sum=${line#fish_stub_sum=} ;;
+            bash_stub_sum=*) bash_sum=${line#bash_stub_sum=} ;;
+        esac
+    done < "$manifest"
+fi
+bash_sum=${(j: :)${=bash_sum}}
+if [[ -n $fish_stub ]]; then
+    fish_config=${${XDG_CONFIG_HOME:-$HOME/.config}%/}
+    if [[ $fish_stub != "$fish_config/fish/conf.d/00-marksharc.fish" || ! -f $fish_stub || -L $fish_stub ]]; then
+        print -r -- "doctor: missing or unmanaged fish stub: $fish_stub"
+        (( ++issues ))
+    elif [[ -n $fish_sum && ${(j: :)${=$(command cksum < "$fish_stub")}} != "${(j: :)${=fish_sum}}" ]]; then
+        print -r -- "doctor: modified fish stub: $fish_stub"
+        (( ++issues ))
+    fi
+fi
 if [[ -L $config && ! -e $config ]]; then
     print -r -- "doctor: broken link: $config"
     (( ++issues ))
@@ -45,18 +67,49 @@ if [[ ! -r $zdot/.version || $(<"$zdot/.version") != $_ms_zdot_version ]]; then
     print -r -- "doctor: stale generated stub version: $zdot/.version"
     (( ++issues ))
 fi
+print_dotfile_lines() {
+    local file=$1 foreign_line
+    integer line_no=0
+    [[ -r $file ]] || return
+    while IFS= read -r foreign_line || [[ -n $foreign_line ]]; do
+        (( ++line_no ))
+        print -r -- "  $line_no: $foreign_line"
+    done < "$file"
+}
+if [[ -n $bash_sum ]]; then
+    for bash_stub in "$HOME/.bashrc" "$HOME/.bash_profile"; do
+        if [[ ! -f $bash_stub || -L $bash_stub ]]; then
+            print -r -- "doctor: missing or unmanaged bash stub: $bash_stub"
+            [[ ! -L $bash_stub ]] || print_dotfile_lines "$bash_stub"
+            (( ++issues ))
+        else
+            actual_sum=$(command cksum < "$bash_stub")
+            actual_sum=${(j: :)${=actual_sum}}
+            if [[ $actual_sum != "$bash_sum" ]]; then
+                print -r -- "doctor: modified bash stub: $bash_stub"
+                print_dotfile_lines "$bash_stub"
+                (( ++issues ))
+            fi
+        fi
+    done
+fi
 for dotfile in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.zlogin" "$HOME/.zlogout" "$HOME/.bashrc" "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"; do
     if [[ -e $dotfile || -L $dotfile ]]; then
-        print -r -- "doctor: foreign dotfile: $dotfile"
-        if [[ -r $dotfile ]]; then
-            integer line_no=0
-            while IFS= read -r foreign_line || [[ -n $foreign_line ]]; do
-                (( ++line_no ))
-                print -r -- "  $line_no: $foreign_line"
-            done < "$dotfile"
+        if [[ $dotfile == "$HOME/.bashrc" && -n $bash_sum ]]; then
+            continue
         fi
+        print -r -- "doctor: foreign dotfile: $dotfile"
+        print_dotfile_lines "$dotfile"
         (( ++issues ))
     fi
+done
+# fisher is retired: marksharc pins the fish plugins it uses (spec 6.8).
+fish_dir=${${XDG_CONFIG_HOME:-$HOME/.config}%/}/fish
+for fisher_file in "$fish_dir/fish_plugins" "$fish_dir/functions/fisher.fish"; do
+    [[ -e $fisher_file || -L $fisher_file ]] || continue
+    print -r -- "doctor: fisher leftover (marksharc pins its fish plugins): $fisher_file"
+    [[ $fisher_file != */fish_plugins ]] || print_dotfile_lines "$fisher_file"
+    (( ++issues ))
 done
 typeset -A path_seen=()
 typeset -a inspected_path=( "${path[@]}" )
@@ -138,9 +191,22 @@ for name in "${_ms_mod_names[@]}"; do
             fi
         done
     fi
-    registry=${_ms_mod_dir[$name]}/zsh.plugins
-    [[ -r $registry ]] || continue
-    while IFS= read -r line || [[ -n $line ]]; do
+    if [[ $name == cc-providers && ${_ms_mod_enabled[$name]-0} == 1 ]]; then
+        provider_dir=${_ms_cfg_set[cc-providers.dir]-${_ms_mod_optdef[cc-providers.dir]-}}
+        [[ -n $provider_dir ]] || provider_dir=$config/providers
+        provider_files=( "$provider_dir"/*.conf(N-.) )
+        legacy_providers=( "$provider_dir"/*.provider(N-.) )
+        if (( ${#provider_files} == 0 )) && { (( ${#legacy_providers} > 0 )) || [[ ${_ms_cfg_enabled[$name]-} == 1 || -n ${_ms_cfg_set[cc-providers.dir]-} ]]; }; then
+            print -r -- "doctor: cc-providers: no .conf provider files in $provider_dir (see docs/write-once.md)"
+            (( ++issues ))
+        elif (( ${#legacy_providers} > 0 )); then
+            print -r -- "doctor: cc-providers: legacy .provider files in $provider_dir (see docs/write-once.md)"
+            (( ++issues ))
+        fi
+    fi
+    for registry in "${_ms_mod_dir[$name]}/zsh.plugins" "${_ms_mod_dir[$name]}/fish.plugins"; do
+      [[ -r $registry ]] || continue
+      while IFS= read -r line || [[ -n $line ]]; do
         _ms_words "$line" || continue
         [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
         plugin_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${reply[2]}@${reply[4]}
@@ -148,7 +214,8 @@ for name in "${_ms_mod_names[@]}"; do
             print -r -- "doctor: missing plugin or incorrect pin: ${reply[2]} (run marksharc update)"
             (( ++issues ))
         fi
-    done < "$registry"
+      done < "$registry"
+    done
 done
 budget=${_ms_cfg_set[doctor.startup_ms]-500}
 [[ $budget == <-> ]] || budget=500

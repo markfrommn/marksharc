@@ -9,12 +9,13 @@ HOME, or call real services.
 
 ```sh
 tests/check                                   # everything CI runs
-tests/lint                                    # zsh -n, shellcheck, fish --no-execute
+tests/lint                                    # zsh -n, shellcheck, fish syntax and indentation
 tests/run-tests --shell zsh spec/zsh          # zsh units
 tests/run-tests --shell sh spec/contract      # cross-shell startup contract
 tests/run-tests --shell sh spec/install       # install.sh, uninstall and the end-to-end install
 tests/e2e/install-e2e.sh <checkout>           # install into a fresh HOME and start shells
 tests/run-tests --shell sh spec/repo          # runner, lint and repository checks
+tests/run-fish-units                          # fishtape units: modules/*/tests/*_test.fish, tests/fish/
 SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 ```
 
@@ -23,7 +24,17 @@ SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 commit, then put it on PATH or set `SHELLSPEC_BIN`. The wrapper finds the
 runner before it replaces HOME, then starts it with an explicit environment:
 `PATH`, a throwaway `HOME` and XDG directories, `MARKSHARC_ROOT` (this
-checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
+checkout), `REAL_GIT`, `REAL_FISH`, `PYTHON` and `TERM=dumb`. Fixtures create
+a private launcher for the selected fish executable so it remains available
+after PATH is restricted.
+
+`run-fish-units` requires fishtape at the version in [`fishtape.pin`](fishtape.pin)
+(3.0.1). Check out the pinned commit and set `FISHTAPE_FUNC` to its
+`functions/fishtape.fish`. The wrapper starts fish with `PATH`, a throwaway `HOME`
+and XDG directories, `TMPDIR`, `MARKSHARC_ROOT`, `REAL_GIT` and `TERM=dumb`.
+fishtape runs each test file in its own fish process. Files source
+`fish/support/helpers.fish` (`ms_fixture`, `ms_stub`, `ms_module`, `ms_cleanup`)
+for a private HOME, stubs first on PATH, and loud stubs for network and service commands.
 
 ## Layout
 
@@ -33,13 +44,15 @@ checkout), `REAL_GIT`, `PYTHON` and `TERM=dumb`.
 | `lint` | Static checks for every tracked or new shell file |
 | `check` | Lint plus both suites, as CI runs them |
 | `shellspec.pin` | ShellSpec version, commit and source used locally and in CI |
+| `run-fish-units`, `fishtape.pin` | fishtape runner wrapper and its pin |
+| `fish/`, `fish/support/helpers.fish` | Core fish units and the shared fish fixture |
 | `spec/spec_helper.sh`, `spec/support/fixtures.sh` | Per-example sandbox and shared helpers (`stub_command`, `git_fixture`, `run_bounded`, `file_mode`) |
 | `support/function-safe-check.py` | Static check that file-scope declarations in sourced zsh files say `-g`; run by `spec/zsh/function_safe_spec.sh` |
 | `support/pty_socket.py` | OS fixture support only: a PTY child supervisor and a Unix socket binder |
 | `e2e/install-e2e.sh` | Reusable end-to-end check: install a checkout into a fresh HOME, start login and interactive zsh shells, uninstall; needs only sh, zsh and git (python3 adds a terminal step); also run by CI on macOS and Ubuntu |
 | `spec/zsh/` | Specs run with `--shell zsh` |
 | `spec/install/` | Specs run with `--shell sh`: `install.sh`, `marksharc uninstall`, the end-to-end script and lint coverage, in a temporary HOME with local bare repositories |
-| `spec/contract/` | Contract suite run with `--shell sh`: launches the real zsh core (bash and fish join in their phases) and proves quiet startup, environment availability, idempotent re-source and writes confined to cache/state |
+| `spec/contract/` | Contract suite run with `--shell sh`: launches the zsh and Bash cores and checks quiet startup, environment availability, cache recovery and inheritance |
 | `spec/repo/` | Specs run with `--shell sh`: the harness itself and repository rules |
 
 ## Contract inventory
@@ -61,6 +74,7 @@ this table to cover every module.
 | Core | Cached tool init: hit/miss keys, symlink resolution, missing/failing tools, unwritable cache, empty output, fixed PATH | `spec/zsh/core_cache_spec.sh` |
 | Core | `cs`/`li` reload: rebuild, trace, session kept, edit pickup | `spec/zsh/core_reload_spec.sh` |
 | Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
+| Bash environment | Rendered Bash syntax, PATH and export parity, late guards, manager paths, agent markers, inheritance and cache recovery | `spec/contract/bash_spec.sh` |
 | Core | Modern host facts, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
 | Core | Agent/batch quiet on the full tree; gvm selection without forks | `spec/zsh/core_agent_spec.sh` |
 | Startup | Mode matrix quiet/reload; greeting opt-in; offline pinned plugin and cached completion; cached init reuse; installer failure propagation | `spec/zsh/startup_spec.sh` |
@@ -78,18 +92,20 @@ this table to cover every module.
 | ssh-agent | Cache in the state dir, one-time migration from the legacy path, insecure source/state parents refused, probing, parsing, cleanup | `spec/zsh/modules/ssh-agent/agents_spec.sh` |
 | x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
-| mux | fix-tmux re-imports the tmux client environment (ssh-agent fix) | `spec/zsh/modules/mux/mux_spec.sh` |
+| mux | Adapter contracts, nested title updates, tmux reattach and bounded forwarding recovery | `spec/zsh/modules/mux/`, `modules/mux/tests/mux_test.fish` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
-| herdr | Session wrappers from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh` |
+| herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
-| cc-providers | Provider files linked from the option/overlay directory | `spec/zsh/modules/cc-providers/providers_spec.sh` |
+| cc-providers | Data-only provider files, secret-free executable shims, bash invocation and private cache | `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
-| cwf | cwf-new creation checks, unmanaged copies, post-create hook point and copy-exclude, codegraph reindex gate; render generates real zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| cwf | cwf-new executable creation checks, unmanaged copies, executable post-create hooks and copy-exclude; render generates zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| Commands | Encoded caller-state directives, hostile values, state wrappers and private staged shims | `spec/zsh/directives_spec.sh`, `spec/zsh/render_spec.sh` |
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
 | cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |
 | Installer | Fresh install from a checkout: stub, template overlay, manifest, first declarative render; paths with spaces, quotes and dollars survive; non-default MARKSHARC_CONFIG named in the stub | `spec/install/installer_spec.sh` |
 | Installer | Existing zsh dotfiles (regular files, symlinks, a foreign `~/.zshenv`) backed up privately and recorded; idempotent re-run keeps the original backup | `spec/install/installer_spec.sh` |
+| Bash installer | Fresh and upgraded installs preserve regular and symlinked startup files, edited stubs and interrupted retries | `spec/install/installer_spec.sh`, `spec/install/rerun_spec.sh`, `spec/install/uninstall_spec.sh` |
 | Installer | `--dry-run` prints every action and writes nothing; framework from `--home`, own checkout or a clone (reused, never pulled); `--overlay` path, URL, conflict and existing overlay; zsh, git and zsh version checked before any write; chsh hint only; runs under dash | `spec/install/installer_spec.sh` |
 | Installer | A re-run that finds recorded backups but no stub of ours stops before any write (deleted or replaced stub), naming the backup; a hand-edited stub is copied to the state dir before it is rewritten (and next to the restored file on uninstall); MARKSHARC_CONFIG judged against ~/.config with XDG defaults, unset or non-default, and warnings for the other XDG variables; trailing slashes stripped; a checkout's bin/marksharc acts on its own framework | `spec/install/rerun_spec.sh` |
 | Installer | Plugin pins cloned into the cache at the pinned commit; `--no-plugins` skips and names `marksharc update`; dry run only reports; an unreachable pin warns and the install completes | `spec/install/plugins_spec.sh` |
@@ -98,6 +114,7 @@ this table to cover every module.
 | Stub fallback | Missing, unreadable, failing or unparsable core: minimal PATH, exactly one stderr line, clean stdout, batch, login, agent and PTY | `spec/zsh/fallback_spec.sh` |
 | CLI | usage, unknown commands, version (VERSION plus git describe), reload explanation, module list statuses, enable/disable edits (template lines, explicit lists, host override, symlinked config.conf, refusals) | `spec/zsh/core_cli_spec.sh` |
 | Sync | Local bare remotes, deleted upstreams, configured upstream and host-overridden extra repos, linked overlay owner and deduplication, dirty/ahead/diverged/offline and failed status checks, plugin pins, cache invalidation and minimal update | `spec/zsh/sync_spec.sh` |
+| Day 0 and Day 2 | Package rendering, safe bundle input, update selection, failure continuation, ordering and installer registry | `spec/zsh/day2_spec.sh` |
 | Notify | Local fetch without merge, deleted upstreams and host overrides, later PTY notice and sync, failed-check throttle, concurrent workers, killed-lock-holder and stale-result recovery, batch and agent exclusion | `spec/zsh/notify_spec.sh` |
 | Doctor | Stub checksums and generated stubs, broken links, missing commands only for modules named in the overlay, plugin pins with the update hint, dirty repos and host overrides, foreign lines, duplicate PATH, environment ID, and PTY startup budget and timeout with notify suppressed | `spec/zsh/doctor_spec.sh` |
 | Core | `marksharc` function: quiet and verbose reload in the current shell, delegation, absent in batch and agent; bin/ on PATH in every class | `spec/zsh/core_cli_spec.sh` |
@@ -105,3 +122,8 @@ this table to cover every module.
 | Function-safe modules | File-scope declarations in module env/init files, core files and overlay hooks say -g (`tests/support/function-safe-check.py`; fixture covers function, anonymous-function, `function name()`, here-string, case-arm and `builtin`/`command` forms); the env phase ends with `true`; `marksharc reload` and `cs` leave the same globals, PS1 and history settings, and after markers are planted in module scratch variables (and PS1 exported) no reload path leaves a marker or an exported PS1 (this spec fails against the pre-`-g` modules) | `spec/zsh/function_safe_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |
+| Fish contract | Shared environment and PATH, session classification, inherited render ID, reload (including unloading a disabled module's functions), native modules and plugin loading, safe caller-state directives | `spec/contract/fish_render_spec.sh`, `spec/contract/fish_plugin_spec.sh`, `spec/contract/fish_directives_spec.sh` |
+| Fish units | Init cache (hit, miss, key change, empty, failing and missing tool, -P), `marksharc` completion | `fish/cache_test.fish`, `fish/completions_test.fish` |
+| Fish modules | Native fish behaviour per module: nav, ps, titles, mux, x11, docker, greeting, command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin, history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent, git-worktree | `modules/<name>/tests/<name>_test.fish` (run by `run-fish-units`) |
+| Doctor (fish) | Unchanged, modified, missing and symlinked fish stub; foreign `config.fish` lines; fisher leftovers | `spec/zsh/doctor_spec.sh` |
+| Fish runner | Pinned-version check, scrubbed environment, default discovery, workspace removal | `spec/repo/fish_runner_spec.sh` |

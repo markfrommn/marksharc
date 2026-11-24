@@ -1,0 +1,7 @@
+[[ -n $SSH_AUTH_SOCK && -S $SSH_AUTH_SOCK && -O $SSH_AUTH_SOCK ]] || return 1
+local timer=${commands[gtimeout]:-${commands[timeout]-}}
+local -a probe=( ssh-add -l )
+[[ -z $timer ]] || probe=( "$timer" -k 0.1 0.5 "${probe[@]}" )
+SSH_AUTH_SOCK="$SSH_AUTH_SOCK" command "${probe[@]}" >/dev/null 2>&1
+local result=$?
+(( result == 0 || result == 1 ))

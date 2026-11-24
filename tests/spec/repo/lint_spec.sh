@@ -16,7 +16,7 @@ Describe 'tests/lint'
   }
   # Each checker stub logs its arguments and fails for any path containing "bad".
   stub_checkers() {
-    for checker in zsh shellcheck fish; do
+    for checker in zsh shellcheck fish fish_indent; do
       stub_command "$checker" 'printf "%s\n" "'"$checker"' $*" >> "$OPLOG"; case "$*" in *bad*) exit 1;; esac'
     done
   }
@@ -30,6 +30,7 @@ Describe 'tests/lint'
 shellcheck -x -s bash c.bash
 zsh -n core/a.zsh
 fish --no-execute d.fish
+fish_indent --check d.fish
 shellcheck -x -s sh script
 zsh -n tool"
   End

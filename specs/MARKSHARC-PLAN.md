@@ -649,8 +649,9 @@ contract 4/4, install 46/46, repository 26/26, and fresh-HOME install e2e. Indep
 quality review is clean after all findings were fixed and re-reviewed; stack-check passes.
 Final matched 30-round warm-start medians improved from 55.63 to 43.34 ms batch and from
 130.54 to 121.16 ms interactive. The real cwf shell-integration contract passes through
-render and cached init. Hosted macOS/Ubuntu CI and install e2e pass. Live Mac/sol
-parity and real herdr completion remain unverified beyond hermetic fixtures and stubs.
+render and cached init. Hosted macOS/Ubuntu CI and install e2e pass. The operator
+confirmed the live before-and-after PATH and environment comparison on Mac and sol.
+The operator approved skipping live `herdr completion zsh` verification.
 
 #### P3.2 — Bash environment parity (DEV-50)
 
@@ -674,6 +675,16 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 **Done when**
 
 - Claude Code and Codex started with `SHELL=/bin/bash` see the same PATH and tool env as zsh.
+
+**Outcome:** Implemented in [PR #9](https://github.com/markfrommn/marksharc/pull/9).
+The Bash emitter and loaders share the renderer's module and overlay
+inputs with zsh. The installer records and restores both Bash startup files, including
+when upgrading a zsh-only install. `agent.bash_env` enables the noninteractive hook.
+The cross-shell contract exercises the installed Bash profile, the hook and inherited
+startup. Agent launches are represented by child-shell stubs. The independent review
+and stack-check pass. Local checks cover 422 zsh examples with one platform skip,
+30 contract, 52 install and 26 repository examples. The [implementation CI run](https://github.com/markfrommn/marksharc/actions/runs/45140522192)
+passed the full suites and install e2e on macOS and Ubuntu.
 
 #### P3.3 — Write-once commands and shims (DEV-51)
 
@@ -702,6 +713,12 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 - Every listed command works from zsh and from `bash -c`.
 - The old functions are removed.
 
+**Outcome:** Implemented in [PR #8](https://github.com/markfrommn/marksharc/pull/8), awaiting human
+merge. DEV-51 delivers write-once commands, caller-state directives, executable hooks, data-only
+providers and private generated shims. Local checks and hosted macOS/Ubuntu checks and install e2e
+pass; [the task plan](DEV-51-PLAN.md) records validation and migration details. Live external service
+contracts remain unverified beyond stubs and disposable repositories.
+
 #### P3.4 — Bootstrap, unified update, and explicit installers (DEV-52)
 
 - **Repo:** marksharc
@@ -729,6 +746,15 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 
 - A new macOS host and a new Ubuntu host come up from zero with `install.sh` and `marksharc bootstrap`.
 - `marksharc update` replaces `do_updates.sh` on the Mac and sol.
+
+The [task plan](DEV-52-PLAN.md) records the framework and overlay verification. The personal
+bundles and legacy entry points live in `mark-desktop-files`. The overlay cutover follows the
+framework delivery, and DEV-59 removes the retired script paths.
+
+**Outcome:** The framework is implemented in [PR #11](https://github.com/markfrommn/marksharc/pull/11).
+Hosted macOS and Ubuntu checks passed. Apply the companion overlay after deploying the framework.
+Live package provisioning and the updater cutover on the Mac and sol remain unverified.
+[Companion overlay PR #19](https://github.com/markfrommn/mark-desktop-files/pull/19)
 
 #### P3.5 — Multiplexer adapters and mux-aware X11 (DEV-53)
 
@@ -759,6 +785,8 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 - DISPLAY is correct after re-attaching a forwarded session.
 
 **Notes:** Session attach shims depend on P3.3; if P3.3 has not landed, keep the generated functions and convert later.
+
+Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux adapters](../docs/MUX-ADAPTERS.md).
 
 #### P3.6 — Interactive upgrades (DEV-54)
 
@@ -841,6 +869,7 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 - **Repo:** marksharc
 - **Estimate:** 5
 - **Depends on:** P3.1 (DEV-49)
+- **Task plan:** [DEV-57-PLAN.md](DEV-57-PLAN.md)
 
 **Goal:** Give fish the same foundation as zsh.
 
@@ -860,6 +889,10 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 
 - A fish session on the Mac has the same PATH and env as zsh.
 
+**Outcome:** Implemented in [PR #10](https://github.com/markfrommn/marksharc/pull/10).
+The hosted macOS and Ubuntu checks pass the shared environment and startup contracts.
+Native fish module migration and legacy config retirement remain in P4.2.
+
 #### P4.2 — Fish modules and retirement of the old fish config (DEV-58)
 
 - **Repo:** marksharc
@@ -874,6 +907,10 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 - Call write-once commands through applier wrappers.
 - Add completions.
 - Replace `test_parity.py` with fishtape units.
+- Preserve doctor detection of foreign `config.fish` while recognizing only the
+  installer-owned `conf.d/00-marksharc.fish` stub by its manifest checksum. Add
+  fixtures for unchanged, modified, missing, and foreign fish files when changing
+  fish installation or retirement behavior.
 - Publish a parity table in the docs.
 - Remove the fisher dependency.
 
@@ -886,6 +923,11 @@ parity and real herdr completion remain unverified beyond hermetic fixtures and 
 
 - The parity table marks every MVP module as supported, native-equivalent, or not applicable.
 - Fish is usable for a normal working day on the Mac and sol.
+
+**Outcome:** Implemented in [PR #13](https://github.com/markfrommn/marksharc/pull/13); task plan
+[DEV-58-PLAN.md](DEV-58-PLAN.md). [docs/fish.md](../docs/fish.md) holds the parity table and the
+retirement steps. The hosted macOS and Ubuntu checks pass, including the fishtape units. Daily use
+on the Mac and sol is a manual acceptance step after merge.
 
 ### Phase 6: Cleanup
 

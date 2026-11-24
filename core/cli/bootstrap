@@ -1,0 +1,63 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc bootstrap'; exit 2; }
+source "$MARKSHARC_HOME/core/cli/day2-lib.zsh"
+typeset -a brew_lines=() apt_packages=() dnf_packages=()
+_day2_allow_missing=1
+_day2_directive() {
+    [[ $1 == package ]] || return 0
+    (( $# == 3 )) || { print -ru2 -- 'bootstrap: invalid package directive'; return 1; }
+    local value=$3
+    case $2 in
+        brew|cask)
+            [[ $2 == cask && $MARKSHARC_OS != darwin ]] && return 0
+            [[ $value != *$'\n'* && $value != *$'\r'* && -n $value ]] || return 1
+            value=${value//\\/\\\\}; value=${value//\"/\\\"}; value=${value//\#/\\#}
+            brew_lines+=( "$2 \"$value\"" ) ;;
+        apt|dnf)
+            [[ $value =~ '^[A-Za-z0-9][A-Za-z0-9+_.:@/-]*$' ]] || { print -ru2 -- "bootstrap: invalid package: $value"; return 1; }
+            if [[ $2 == apt ]]; then apt_packages+=( "$value" ); else dnf_packages+=( "$value" ); fi ;;
+        *) print -ru2 -- "bootstrap: unknown manager: $2"; return 1 ;;
+    esac
+}
+_day2_collect || exit 1
+typeset bundle line manager
+for bundle in "$config"/packages/*.Brewfile(N-.); do
+    [[ $bundle == *.darwin.Brewfile && $MARKSHARC_OS != darwin || $bundle == *.linux.Brewfile && $MARKSHARC_OS != linux ]] && continue
+    while IFS= read -r line || [[ -n $line ]]; do
+        [[ -z ${line//[[:space:]]/} || $line == \#* ]] && continue
+        if [[ $line =~ '^[[:space:]]*(brew|cask)[[:space:]]+"([^"\\]*)"[[:space:]]*$' ]]; then
+            _day2_directive package "$match[1]" "$match[2]" || exit 1
+        else
+            print -ru2 -- "bootstrap: invalid bundle line in $bundle"; exit 1
+        fi
+    done < "$bundle"
+done
+if [[ $MARKSHARC_OS == linux ]]; then
+    for manager in apt dnf; do
+        for bundle in "$config"/packages/*.$manager(N-.); do
+            while IFS= read -r line || [[ -n $line ]]; do
+                [[ -z $line || $line == \#* ]] && continue
+                _day2_directive package "$manager" "$line" || exit 1
+            done < "$bundle"
+        done
+    done
+fi
+if (( $#brew_lines )); then
+    if (( ! $+commands[brew] )); then print -ru2 -- 'bootstrap: brew not found'; exit 1; fi
+    file=$(mktemp "${TMPDIR:-/tmp}/marksharc-brew.XXXXXXXX") || exit 1
+    trap 'rm -f -- "$file"' EXIT
+    print -r -l -- "${brew_lines[@]}" > "$file"
+    brew bundle --file "$file" || exit $?
+fi
+if [[ $MARKSHARC_OS == linux ]]; then
+    for manager in apt dnf; do
+        if [[ $manager == apt ]]; then packages=( "${apt_packages[@]}" ); else packages=( "${dnf_packages[@]}" ); fi
+        (( $#packages )) || continue
+        if (( ! $+commands[$manager] )); then print -r -- "bootstrap: skipping unavailable manager: $manager"; continue; fi
+        print -r -- "sudo $manager install ${(j: :)${(@q)packages}}"
+        print -n -- 'Run this command? [y/N] '
+        read -r answer || answer=
+        if [[ $answer == [yY] || $answer == [yY][eE][sS] ]]; then sudo "$manager" install "${packages[@]}" || exit $?; fi
+    done
+fi

@@ -229,6 +229,11 @@ marksharc/
 
 The author's overlay starts with three private modules: `convoy` (work roots, org list, repo-specific `cwf-new` hooks), `site-bac` (Plesk and BAC aliases, `gbac*` helpers), and `mark-tools` (sandcat, gam, envman).
 
+Bootstrap reads `packages/*.Brewfile` as package data. Each entry is a `brew "name"` or
+`cask "name"` declaration. The `.darwin.Brewfile` and `.linux.Brewfile` suffixes select
+one platform, and casks apply only on macOS. On Linux, `packages/*.apt` and
+`packages/*.dnf` list one package per line.
+
 ### 6.4 Module contract
 
 A module is a directory. Every file is optional except `module.conf`.
@@ -281,8 +286,8 @@ Module and overlay files (`module.conf`, `config.conf`, `hosts/*.conf`):
 | `plugin <name> <git-url> <sha> [shell <s>] [kind source\|fpath]` | Pin a third-party plugin (6.8). |
 | `completion <cmd> <generator…>` | Generate a completion file into the cache at render time. |
 | `package <manager> <name>` | Declare a package for `bootstrap` (`brew`, `cask`, `apt`, `dnf`). |
-| `update <label> <command…>` | Register a step for `marksharc update`. |
-| `installer <name> <script>` | Register an explicit installer for `marksharc install`. |
+| `update <label> <command…>` | Register an argv-based step for `marksharc update`. A command path beginning with `./` resolves relative to its module directory or the overlay root. |
+| `installer <name> <script>` | Register an executable for `marksharc install`. Relative paths resolve from the module directory or the overlay root. |
 | `module <name> [off]` | Enable or disable a module (overlay only). |
 | `set <module>.<key> <value>` | Set an option (overlay only). |
 | `tiers <tier>…` | Override PATH tier order (overlay only). |
@@ -338,6 +343,9 @@ The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global 
 The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a matching value skips the export and PATH work and only recomputes shell-local facts. Login shells and explicit reloads always rebuild.
 
 `ZDOTDIR` takeover is deliberate: it keeps installer edits to `~/.zshrc` from changing the shell silently. `marksharc doctor` lists foreign lines found in `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, and `~/.config/fish/config.fish` so each can become a module or an overlay line.
+An installer-managed Bash stub whose checksum matches the install manifest is
+accepted. A missing, symlinked, or modified recorded Bash stub is reported.
+The fish `config.fish` remains separate from the managed `conf.d` stub.
 
 ### 6.7 PATH composition
 
@@ -437,12 +445,19 @@ A host has two checkouts: the framework and the overlay (plus any private module
 | Command | Purpose |
 |---|---|
 | `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up and write the stubs, fetch the plugin pins (`--no-plugins` skips; a failed fetch warns and leaves the install in place), render. |
-| `marksharc bootstrap` | Install packages declared by enabled modules and overlay bundles. Generates a Brewfile for Homebrew on macOS and Linux; prints and confirms apt or dnf commands that need sudo. |
-| `marksharc update` | One updater: sync, plugin pins, then each module's `update` steps (brew, codex, codegraph, collie, herdr-core, …). `--list`, `--only <label>`, `--dry-run`. Replaces `bin/do_updates.sh` and all startup-time pulls. |
+| `marksharc bootstrap` | Install packages declared by enabled modules for the current OS and by overlay bundles. Generate a temporary Brewfile for Homebrew on macOS and Linux. Print apt or dnf commands and require confirmation before invoking sudo. |
+| `marksharc update` | Sync repositories, refresh plugin pins, run module and overlay steps, and render. Continue after individual failures and report each step's result. `--list` lists the steps, `--only <label>` selects one, and `--dry-run` prints commands without running them. Replaces `bin/do_updates.sh` and all startup-time pulls. |
 | `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |
 | `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
+
+Doctor reports legacy `.provider` files for an enabled `cc-providers` module
+and reports an empty provider directory when the module or directory is
+explicitly configured. An unused default provider directory stays optional.
+
+The update runner validates its step labels and arguments once before execution. Configuration
+changes fetched by sync apply to the next invocation.
 
 ## 7. Module catalog
 

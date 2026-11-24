@@ -288,19 +288,13 @@ DATA
     emulate -L zsh
     export TMPDIR="$TEST_ROOT/tmp"
     mkdir "$TMPDIR"
-    mktemp() { [[ $1 == -d ]] && command mktemp -d "$TEST_ROOT/krew.XXXXXX" || command mktemp "$TEST_ROOT/install.XXXXXX"; }
     local before=$PWD helper
-    curl() { return 42; }
-    load_mfn go-gvm
-    for helper in install-gvm install-wezterm-terminfo install-krew; do
-      case $helper in
-        install-wezterm-terminfo) load_mfn wezterm "$helper";;
-        install-krew) load_mfn cloud "$helper";;
-      esac
+    stub_command curl 'exit 42'
+    for helper in "$MARKSHARC_ROOT/modules/go-gvm/installers/gvm" "$MARKSHARC_ROOT/modules/wezterm/installers/wezterm-terminfo" "$MARKSHARC_ROOT/modules/cloud/installers/krew"; do
       "$helper" > "$TEST_ROOT/out" 2>&1
       [[ $? == 42 && $PWD == $before ]] || return 1
     done
-    local -a leftovers=( "$TEST_ROOT"/krew.*(ND) "$TEST_ROOT"/install.*(ND) )
+    local -a leftovers=( "$TMPDIR"/*(ND) )
     [[ $#leftovers == 0 ]]
   }
   It 'propagates explicit installer failures and removes temporary artifacts'

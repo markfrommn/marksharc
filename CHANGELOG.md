@@ -5,8 +5,32 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fish is a daily-driver shell: modules carry `init.fish`, `functions/fish` and
+  `completions/fish` (nav, ls, ps, titles, mux, x11, docker, greeting,
+  command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin,
+  history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent,
+  git-worktree), tool init is cached, `marksharc` has fish completions, and
+  [docs/fish.md](docs/fish.md) publishes the parity table. `gvm use` works natively in
+  fish, so fish-gvm and bass are no longer needed.
+- `doctor` reports fisher leftovers so a host can drop fisher, and accepts an
+  unchanged fish stub whatever spacing `cksum` prints.
+- Fish units run under fishtape 3.0.1 (`tests/run-fish-units`, pinned in
+  `tests/fishtape.pin`) in `tests/check` and CI.
+- Interactive fish no longer prints fish's welcome text unless `fish_greeting` is set.
+
 ### Fixed
 
+- `marksharc reload` in fish now finishes its own work: the entry point's final `return`
+  used to end the reload early, leaving the session marked as reloading. A reload that
+  disables a module also removes the hooks, wrappers and key bindings its `init.fish` added.
+
+- Bash environment rendering and startup stubs provide PATH and tool exports to Bash
+  sessions. `set agent.bash_env on` enables the noninteractive Bash hook for agents.
+
+### Fixed
+
+- `doctor` recognizes unchanged installer-managed Bash startup files, reports
+  modified or missing files, and identifies provider configuration that needs migration.
 - Interactive zsh startup on the Mac drops from about 5 s to under 1 s: `node-nvm`
   and `go-gvm` load nvm and gvm on first use instead of at startup. The env phase
   already puts the default node and Go on PATH, and `go-gvm` sets `GOPATH` and
@@ -19,10 +43,6 @@ All notable changes to this project are recorded here. The format follows
   enabled by default and skips itself (for example `herdr` on a host with only
   the herdr app). It reports a startup that outlives `doctor.startup_timeout_ms`
   (default 5000) as timed out instead of failed.
-- `setup-cc-providers` run by hand reports the commands it defined, the provider
-  files it skipped, or that it found no provider files and where it looked.
-  Startup calls it with `-q` and stays quiet.
-
 - zsh startup on Debian/Ubuntu: the distro-global `compinit` no longer runs
   (`skip_global_compinit` is set in the env phase), so non-tty and agent shells
   no longer abort at startup; the completion module now runs `compinit -i`, so
@@ -31,6 +51,15 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- `marksharc bootstrap`, declarative package bundles, selectable update steps and
+  explicit installers for krew, gvm, WezTerm terminfo, pyenv and nvm. Updates
+  report each result and continue after failures.
+- Fish startup loads a rendered environment, pinned plugins, caller-state
+  commands, and current-shell reload. The installer manages a fish conf.d stub.
+- Write-once workflow, SSH-agent and Docker commands run as module executables.
+  zsh wrappers apply caller-state directives; provider and session shims are generated
+  in the private host cache and can be called from child shells. Provider files and
+  workflow hooks migrate as described in `docs/write-once.md`.
 - `marksharc render`: declarative module and overlay `env`, `path`, `alias` and
   `completion` directives, with `when` guards, per-host cached `env.zsh`, generated
   completions, render ids and stale-input reload. Overlay `tiers` lines customize

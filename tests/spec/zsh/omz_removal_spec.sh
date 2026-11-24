@@ -198,7 +198,7 @@ DATA
     git_log_stub
     load_mfn completion-fzf-tab
     zsh-plugin-update || return 1
-    [[ $(<"$OPLOG") != *'clone --no-checkout'* ]] || return 2
+    [[ $(<"$OPLOG") != *"clone --no-checkout https://github.com/Aloxaf/fzf-tab $root"* ]] || return 2
     [[ $(<"$OPLOG") == *"-C $root checkout --detach $FZF_TAB_SHA"* ]]
   }
   It 'checks out the pin on an existing clone without recloning'

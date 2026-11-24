@@ -30,12 +30,35 @@ case "$1 $2" in
 esac
 DATA
     chmod +x "$TEST_ROOT/bin/docker"
-    load_mfn docker cleanup-docker
-    cleanup-docker > "$TEST_ROOT/out" 2>&1 || return 1
+    bash -c '"$MARKSHARC_ROOT/modules/docker/bin/cleanup-docker"' > "$TEST_ROOT/out" 2>&1 || return 1
     [[ $(<"$OPLOG") == $'kill aaa\nrm ccc' ]] || { cat "$OPLOG"; return 2; }
   }
   It 'cleanup-docker kills running and removes stopped containers through docker only'
     When run cleanup_case
+    The status should be success
+  End
+  socket_case() {
+    emulate -L zsh
+    local script=$TEST_ROOT/fix-docker-socket
+    sed "s|/var/run/docker.sock|$HOME/docker.sock|" "$MARKSHARC_ROOT/modules/docker/bin/fix-docker-socket" > "$script" || return 1
+    chmod +x "$script"
+    cat > "$TEST_ROOT/bin/sudo" <<'DATA'
+#!/bin/sh
+printf '%s\n' "$*" >> "$OPLOG"
+DATA
+    cat > "$TEST_ROOT/bin/stat" <<'DATA'
+#!/bin/sh
+printf '%s\n' other
+DATA
+    chmod +x "$TEST_ROOT/bin/sudo" "$TEST_ROOT/bin/stat"
+    bash -c '"$1"' _ "$script" > "$TEST_ROOT/out" 2>&1
+    [[ $? != 0 && $(<"$TEST_ROOT/out") == *'Docker socket missing'* && ! -s $OPLOG ]] || return 2
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/docker.sock" || return 3
+    bash -c '"$1"' _ "$script" > "$TEST_ROOT/out" 2>&1 || return 4
+    [[ $(<"$OPLOG") == "chgrp docker $HOME/docker.sock" ]]
+  }
+  It 'validates a disposable socket and delegates its group change through sudo'
+    When run socket_case
     The status should be success
   End
 End

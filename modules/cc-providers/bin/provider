@@ -1,0 +1,27 @@
+#!/bin/zsh -f
+emulate -L zsh
+# Capture exported values before lexer locals and result parameters can shadow them.
+zmodload zsh/parameter || exit 1
+typeset -A _ms_provider_environment=()
+for _ms_provider_snapshot_name in "${(@k)parameters}"; do
+    if [[ ${parameters[$_ms_provider_snapshot_name]} == *export* ]]; then
+        _ms_provider_environment[$_ms_provider_snapshot_name]=${(P)_ms_provider_snapshot_name}
+    fi
+done
+_ms_provider_home=$1 _ms_provider_file=$2 _ms_provider_mode=$3
+shift 3
+source "$_ms_provider_home/core/zsh/lib/modules.zsh" || exit 1
+source "$_ms_provider_home/core/zsh/lib/shims.zsh" || exit 1
+_ms_provider_read "$_ms_provider_file" || exit 1
+typeset -a _ms_provider_env=()
+for _ms_provider_key _ms_provider_value in "${(@kv)_ms_provider_values}"; do
+    _ms_provider_env+=( "$_ms_provider_key=$_ms_provider_value" )
+done
+case $_ms_provider_mode in
+    claude*) exec env "${_ms_provider_env[@]}" claude "$@" ;;
+    models*)
+        [[ -n ${_ms_provider_values[MODELS_URL]-} ]] || { print -ru2 'Provider has no MODELS_URL'; exit 1; }
+        setopt pipefail
+        command curl --fail --silent --show-error "${_ms_provider_values[MODELS_URL]}" -H "Authorization: Bearer ${_ms_provider_values[ANTHROPIC_AUTH_TOKEN]-}" | command jq '.data[] .id'
+        ;;
+esac

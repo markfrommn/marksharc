@@ -1,1 +1,1 @@
-setup-x11-display || true
+setup-x11-display --startup || true

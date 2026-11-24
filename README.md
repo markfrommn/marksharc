@@ -8,8 +8,9 @@ Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer and the `marksharc` command are in place. fish and bash wiring
-> and the full module updater come in later releases.
+> installer, Bash environment, and `marksharc` bootstrap, update, and install commands
+> are in place. Fish runs every module natively; see [docs/fish.md](docs/fish.md)
+> for the parity table and how to retire an old fish configuration and fisher.
 
 ## Requirements
 
@@ -19,7 +20,8 @@ checkout stays read-only on every host.
 - bash 5.x (environment only)
 - git
 
-Day-to-day shell use needs only the native shell. The `marksharc` command needs zsh.
+The `marksharc` command uses zsh. Fish also uses it to refresh the environment
+cache after changes to the framework or overlay.
 
 ## Install
 
@@ -37,7 +39,7 @@ git clone https://github.com/markfrommn/marksharc.git
 sh marksharc/install.sh
 ```
 
-Then open a new terminal, or run `exec zsh -l`.
+Then open a new terminal, or run `exec zsh -l` or `exec fish -l`.
 
 What it does:
 
@@ -48,11 +50,15 @@ What it does:
   `${XDG_CONFIG_HOME:-~/.config}/marksharc` when nothing is there. `--overlay <path>`
   links an existing directory instead; `--overlay <url>` clones one. An overlay that
   already exists is never modified, and a different one requested with `--overlay` is an error.
-- **Dotfiles.** Moves `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin` and
-  `~/.zlogout` into `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
-  (symlinks are recorded by target), and writes a small `~/.zshenv` stub. If the core
+- **Dotfiles.** Backs up `~/.zshenv`, `~/.zshrc`, `~/.zprofile`, `~/.zlogin`,
+  `~/.zlogout`, `~/.bashrc` and `~/.bash_profile` in
+  `${XDG_STATE_HOME:-~/.local/state}/marksharc/backup/<timestamp>/`
+  (symlinks are recorded by target), and writes zsh and Bash startup stubs. If the zsh core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
-- **Plugins.** Clones the pinned plugins (fzf-tab) into
+  The installer also manages `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`
+  and leaves the user's `config.fish` untouched (`doctor` lists its lines so they can move into
+  the overlay).
+- **Plugins.** Clones pinned plugins (fzf-tab, nvm.fish and fzf.fish) into
   `${XDG_CACHE_HOME:-~/.cache}/marksharc/plugins/`. Shell startup never fetches them. A
   failed fetch, when offline for example, leaves the install in place with a warning;
   `marksharc update` fetches them later. `--no-plugins` skips this step.
@@ -67,12 +73,16 @@ Day 1:
 marksharc module list              # enabled, disabled and skipped modules
 marksharc module disable <name>    # edits config.conf in your overlay
 marksharc reload                   # apply it in this shell (--verbose to trace)
-marksharc render                   # refresh cached env and generated completions
+marksharc render                   # refresh cached env, completions and command shims
+marksharc bootstrap                # install declared packages
 marksharc sync                     # fast-forward safe checkouts and refresh pins
 marksharc doctor                   # report local health
-marksharc update                   # sync, plugin pins and declarative render
+marksharc update                   # sync, plugin pins and module update steps
+marksharc update --list            # list available step labels
+marksharc update --only <label>    # run one step; --dry-run previews commands
+marksharc install <name>           # run a registered explicit installer
 marksharc version
-marksharc uninstall                # restore the backed-up dotfiles, remove the stub
+marksharc uninstall                # restore backed-up dotfiles and remove managed stubs
 ```
 
 `marksharc uninstall --purge` also deletes the cache, the state and a clone made by the
@@ -99,6 +109,22 @@ a module enabled by default skips itself when its command is absent.
 
 An assignment in `hosts/<hostname>.conf` replaces the global `sync.repos` list.
 
+Bootstrap consumes `package brew|cask|apt|dnf <name>` directives from enabled modules
+and overlay configuration. Homebrew must already be installed to process brew packages;
+the command writes a temporary Brewfile and runs `brew bundle`. On Linux it prints each
+apt or dnf command and asks before invoking sudo. An empty selection needs no manager.
+Overlay `packages/*.Brewfile` files accept data-only `brew "name"` and `cask "name"`
+lines; `*.darwin.Brewfile` and `*.linux.Brewfile` apply only on the named platform.
+Files ending `.apt` or `.dnf` contain one package name per line. Comments and blank
+lines are allowed. Bootstrap rejects arbitrary Ruby and package-manager flags.
+
+Modules and overlay configuration register `update <label> <command> [args...]` and
+`installer <name> <script>`. Arguments are parsed as data, not shell code. Relative
+installer paths and update executable paths beginning `./` resolve from the declaring
+module or overlay root. Missing update commands are skipped; other failures are reported
+after remaining steps run. `marksharc install` runs only an executable registered script.
+The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv` and `nvm`.
+
 The same module and host conf files accept declarative environment lines. Values use shell-word
 quoting; `~` and `$NAME` are references, never command substitution. `when command`, `dir` and
 `file` guards run in the next shell, while `os` and `host` guards are settled by `render`.
@@ -110,12 +136,41 @@ alias ll "ls -lA" when command ls
 tiers "manager brew system user app local"
 ```
 
-`marksharc render` writes the per-host cached `env.zsh` and generated completions. Startup refreshes
-stale env without running generators; install, update and explicit reload also refresh completions.
+`marksharc render` writes per-host `env.zsh`, `env.bash` and `env.fish` in the cache,
+along with generated completions and command shims.
+Startup refreshes stale env without running generators; install, update and explicit reload refresh
+the generated artifacts. Render again after adding or removing a provider or Herdr session.
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
 its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
-An eligible interactive shell starts a detached fetch when the last check is older
+Module commands and generated provider and session shims are on PATH in zsh and fish sessions and
+are inherited by child processes, including `bash -c`. Native wrappers apply caller-state changes
+for commands such as `cwf-new` in either shell. See the
+[write-once command and provider migration guide](docs/write-once.md) for configuration and hooks.
+
+## Bash and agents
+
+Bash login and interactive shells load the MarkSharc environment from the installed stubs.
+For noninteractive Bash processes started by agents, opt in through the overlay:
+
+```text
+set agent.bash_env on
+```
+
+Run `marksharc reload`, or start a new zsh session, then launch the agent:
+
+```sh
+SHELL=/bin/bash claude
+SHELL=/bin/bash codex
+```
+
+The option exports `BASH_ENV` so Bash loads the environment in `bash -c`. It is off by
+default. Enabling it replaces an existing `BASH_ENV` value for children. A child of an
+already configured shell also inherits its environment. Re-run the
+installer to add the Bash stubs to an existing installation. `marksharc uninstall` restores
+the original startup files from the recorded backup.
+
+An eligible interactive zsh shell starts a detached fetch when the last check is older
 than `sync.check_hours` (12 hours by default). A later interactive shell prints a
 notice when the cached result is behind. The fetch does not merge or update plugins;
 set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a session.
@@ -138,6 +193,7 @@ set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a sessi
 
 - [Developing marksharc](docs/DEVELOPING.md)
 - [Tests](tests/README.md)
+- [Multiplexer titles, forwarding, and adapters](docs/MUX-ADAPTERS.md)
 - [Specification](specs/MARKSHARC-SPEC.md) and [plan](specs/MARKSHARC-PLAN.md)
 
 ## License

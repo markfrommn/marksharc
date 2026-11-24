@@ -1,0 +1,10 @@
+#!/usr/bin/env zsh
+emulate -L zsh
+local socket=/var/run/docker.sock
+[[ -S $socket ]] || { print -ru2 'Docker socket missing'; return 1; }
+if [[ $(uname -s) == Darwin ]]; then
+    [[ $(command stat -f %Sg "$socket") == docker ]] && return 0
+else
+    [[ $(command stat -c %G "$socket") == docker ]] && return 0
+fi
+sudo chgrp docker "$socket"

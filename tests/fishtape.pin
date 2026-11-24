@@ -1,0 +1,4 @@
+# fishtape pin for tests/run-fish-units and CI. One directive per line.
+version 3.0.1
+commit 21ccd8c0742b2549093fe5918b0bd565dd43a9ba
+source https://github.com/jorgebucaran/fishtape.git

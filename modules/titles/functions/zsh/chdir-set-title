@@ -1,18 +1,19 @@
 # Skip all of this if we are in a subshell
 
-if [[ -n $HC_TERMINAL_ID ]]; then return 0; fi
 if [ "$ZSH_SUBSHELL" != "0" ]; then
-    return 0
-fi
-
-# And - for now - skip it all if we are not the primary shell
-if [ "$SHLVL" != "1" ]; then
     return 0
 fi
 
 # And provide a way for our own scripts to skip the hook
 if [ -n "$chdir_set_title_skip" ]; then
     return 0
+fi
+
+local mux_command="$MARKSHARC_HOME/modules/mux/bin/marksharc-mux"
+if [[ $SHLVL != 1 ]]; then
+    case $("$mux_command" detect) in
+        ''|plain) return 0 ;;
+    esac
 fi
 
 # We want the last two dirs of path to be informative but not too verbose, particularly for worktrees as it will show the repo
@@ -53,7 +54,6 @@ local topprint="$dirname"
 local subprint="$toppath"
 local tabprint="$normpwd"
 local paneprint="$normpwd"
-local agentprint="$dirname"
 
 # See if we have a session name
 cwf_sname=$(cwf session name 2>/dev/null)
@@ -72,27 +72,9 @@ if git rev-parse --is-inside-work-tree >& /dev/null ; then
     subprint="$dirname"
     tabprint="$git_branch"
     paneprint="${git_path:-$dirname}"
-    agentprint="$dirname"
 fi
 
 [[ -z $cwf_sname ]] || tabprint=$cwf_sname
 
-# Various ways and cases to get the tab/pane title
-
-# We check for herdr first as we might be in herdr in wezterm
-if [ -n "$HC_TERMINAL_ID" ]; then
-    # We are running under herdr core
-    true
-elif [ -n "$HERDR_TAB_ID" ]; then
-    # We are running under herdr TUI
-    #herdr pane report-metadata "$HERDR_PANE_ID" --source "$source_name" --token agent="$agentprint" >& /dev/null
-    herdr workspace report-metadata "$HERDR_WORKSPACE_ID" --source "$source_name" --token topname="${topprint}-rm" >& /dev/null
-    herdr workspace report-metadata "$HERDR_WORKSPACE_ID" --source "$source_name" --token subname="${subprint}" >& /dev/null
-    herdr workspace rename "$HERDR_WORKSPACE_ID" "${topprint}" >& /dev/null
-    herdr tab rename "$HERDR_TAB_ID" "${tabprint}" >& /dev/null
-    herdr pane rename "$HERDR_PANE_ID" "${paneprint}" >& /dev/null
-elif [ -n "$WEZTERM_PANE" ]; then
-    wezterm cli set-tab-title "${tabprint}"
-else
-    set-title "${tabprint}"
-fi
+"$mux_command" set_titles \
+    "$topprint" "$tabprint" "$paneprint" "$subprint" "$source_name" "$SHLVL"

@@ -1,4 +1,70 @@
 Describe 'SSH agent state and cleanup'
+  executable_no_ssh_case() {
+    emulate -L zsh
+    rm -rf "$HOME/.ssh"
+    bash -c '"$MARKSHARC_ROOT/modules/ssh-agent/bin/setup-ssh-agent"' > "$TEST_ROOT/out" 2>&1
+    [[ $? == 0 && ! -s "$TEST_ROOT/out" && ! -s "$OPLOG" ]]
+  }
+  It 'skips discovery without an SSH directory when invoked from bash'
+    When run executable_no_ssh_case
+    The status should be success
+  End
+  bash_directive_case() {
+    emulate -L zsh
+    mkdir -p "$HOME/.ssh"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/agent % space"
+    cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
+#!/bin/sh
+exit 0
+DATA
+    cat > "$TEST_ROOT/bin/ps" <<'DATA'
+#!/bin/sh
+exit 1
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ps"
+    local directives="$TEST_ROOT/directives"
+    : > "$directives"
+    SSH_AUTH_SOCK="$HOME/agent % space" SSH_AGENT_PID=999999999 MARKSHARC_HOST=fixture \
+      MARKSHARC_DIRECTIVES="$directives" bash -c '"$1"' _ "$MARKSHARC_ROOT/modules/ssh-agent/bin/setup-ssh-agent" || return 1
+    [[ $(<"$directives") == "setenv"$'\t'"SSH_AUTH_SOCK"$'\t'"$HOME/agent %25 space"$'\nunsetenv\tSSH_AGENT_PID' ]]
+  }
+  It 'emits safe directives for a verified socket from bash'
+    When run bash_directive_case
+    The status should be success
+  End
+  interactive_case() {
+    emulate -L zsh
+    mkdir -p "$HOME/.ssh"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/agent space"
+    cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
+#!/bin/sh
+if [ "$1" = -l ]; then exit 1; fi
+echo ADD >> "$OPLOG"
+exit "${ADD_STATUS:-0}"
+DATA
+    cat > "$TEST_ROOT/bin/ps" <<'DATA'
+#!/bin/sh
+exit 1
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ps"
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    load_mfn ssh-agent setup-ssh-agent
+    PATH="$MARKSHARC_ROOT/modules/ssh-agent/bin:$PATH"
+    export SSH_AUTH_SOCK="$HOME/agent space" SSH_AGENT_PID=999999999 MARKSHARC_HOST=fixture ADD_STATUS="$1"
+    local MARKSHARC_SESSION=interactive
+    typeset +x MARKSHARC_SESSION
+    setup-ssh-agent > "$TEST_ROOT/out" 2>&1
+    local rc=$?
+    [[ $rc == "$1" && $(<"$OPLOG") == ADD && $SSH_AUTH_SOCK == "$HOME/agent space" && -z ${SSH_AGENT_PID-} ]]
+  }
+  It 'passes unexported interactive session context to key loading'
+    When run interactive_case 0
+    The status should be success
+  End
+  It 'applies completed discovery even when key loading fails'
+    When run interactive_case 17
+    The status should be success
+  End
   agent_case() {
     emulate -L zsh
     local mode=$1
@@ -6,17 +72,45 @@ Describe 'SSH agent state and cleanup'
     "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/agent space"
     export SSH_AUTH_SOCK="$HOME/agent space"
     local MARKSHARC_HOST=fixture state="$XDG_STATE_HOME/marksharc/ssh-agent"
-    load_mfn ssh-agent
-    local MARKSHARC_SESSION=batch
-    ssh-add() { [[ $1 == -l ]] || { print ADD >> "$OPLOG"; return 9; }; return ${probe_status:-0}; }
-    ssh-agent() { print START >> "$OPLOG"; return 8; }
-    kill() { print -r -- "SIGNAL:$*" >> "$OPLOG"; }
-    pssu() { print '123 ssh-agent'; }
+    load_mfn ssh-agent setup-ssh-agent
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    PATH="$MARKSHARC_ROOT/modules/ssh-agent/bin:$PATH"
+    export MARKSHARC_HOST MARKSHARC_SESSION SSH_AUTH_SOCK SSH_AGENT_PID
+    export MARKSHARC_SESSION=batch
+    export SSH_TEST_MODE=$mode
+    cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
+#!/bin/sh
+if [ "$1" != -l ]; then echo ADD >> "$OPLOG"; exit 9; fi
+[ "$SSH_AUTH_SOCK" = "$HOME/agent space" ] || exit 2
+case "$SSH_TEST_MODE" in stale) exit 2;; empty) exit 1;; esac
+exit 0
+DATA
+    cat > "$TEST_ROOT/bin/ssh-agent" <<'DATA'
+#!/bin/sh
+if [ "$SSH_TEST_MODE" = created-external ]; then
+  printf 'SSH_AUTH_SOCK="%s/agent space"; export SSH_AUTH_SOCK;\n' "$HOME"
+  exit 0
+fi
+echo START >> "$OPLOG"
+exit 8
+DATA
+    cat > "$TEST_ROOT/bin/ps" <<'DATA'
+#!/bin/sh
+if [ "$1" = -u ]; then printf '123 ssh-agent\n456 ssh-agent\n789 launchd\n'; exit; fi
+case "$4" in uid=) id -u;; comm=|args=) if [ "$2" = 789 ]; then echo launchd; else echo ssh-agent; fi;; esac
+DATA
+    cat > "$TEST_ROOT/bin/lsof" <<'DATA'
+#!/bin/sh
+if [ "$3" = 123 ]; then printf 'n%s/agent space\n' "$HOME"; else printf 'n%s/other socket\n' "$HOME"; fi
+DATA
+    cat > "$TEST_ROOT/bin/kill" <<'DATA'
+#!/bin/sh
+printf 'SIGNAL:%s\n' "$*" >> "$OPLOG"
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ssh-agent" "$TEST_ROOT/bin/ps" "$TEST_ROOT/bin/lsof" "$TEST_ROOT/bin/kill"
     case $mode in
       forwarded|empty|wrong-pid|cached|cached-external|created-external)
-        [[ $mode == empty ]] && local probe_status=1
         if [[ $mode == *external ]]; then
-          unfunction ssh-add
           cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
 #!/bin/sh
 if [ "$1" = -l ] && [ "$SSH_AUTH_SOCK" = "$HOME/agent space" ]; then exit 0; else exit 2; fi
@@ -25,7 +119,6 @@ DATA
         fi
         if [[ $mode == created-external ]]; then
           unset SSH_AUTH_SOCK
-          ssh-agent() { print -r -- "SSH_AUTH_SOCK=${(q)HOME}/agent\ space; export SSH_AUTH_SOCK;"; }
         fi
         [[ $mode != wrong-pid ]] || SSH_AGENT_PID=999999999
         setup-ssh-agent > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 1; }
@@ -42,13 +135,8 @@ DATA
       verified-cleanup)
         "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/other socket"
         SSH_AGENT_PID=123
-        ps() {
-          if [[ $1 == -u ]]; then print '123 ssh-agent'; print '456 ssh-agent'; print '789 launchd'; return; fi
-          case $4 in uid=) print -r -- "$EUID";; comm=|args=) [[ $2 == 789 ]] && print launchd || print ssh-agent;; esac
-        }
-        lsof() { [[ $3 == 123 ]] && print -r -- "n$HOME/agent space" || print -r -- "n$HOME/other socket"; }
-        clean-ssh-agents > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 7; }
-        [[ $(<"$OPLOG") == 'SIGNAL:-- 456' ]] || { cat "$OPLOG"; return 8; };;
+        bash -c 'clean-ssh-agents' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 7; }
+        [[ $(<"$OPLOG") == 'SIGNAL:456' ]] || { cat "$OPLOG"; return 8; };;
       bad-cache)
         unset SSH_AUTH_SOCK SSH_AGENT_PID
         mkdir -p -m 700 "$state"
@@ -56,7 +144,6 @@ DATA
         setup-ssh-agent > "$TEST_ROOT/out" 2>&1
         [[ ! -e "$HOME/INJECTED" && $(<"$OPLOG") == START ]] || return 5;;
       stale)
-        local probe_status=2
         setup-ssh-agent > "$TEST_ROOT/out" 2>&1
         [[ $? != 0 && $(<"$OPLOG") == START ]] || return 6;;
     esac
@@ -64,7 +151,7 @@ DATA
   state_dir_case() {
     emulate -L zsh
     source "$MARKSHARC_ROOT/core/zsh/lib/util.zsh"
-    load_mfn ssh-agent _ms_agent_state_dir
+    fpath=( "$MARKSHARC_ROOT/modules/ssh-agent/lib" $fpath ); autoload -Uz _ms_agent_state_dir
     local base="$XDG_STATE_HOME" outside="$HOME/outside"
     mkdir -p "$outside"
     local before=$(file_mode "$outside")
@@ -91,7 +178,7 @@ DATA
   It 'creates the state directory private and idempotently'
     state_create_case() {
       emulate -L zsh
-      load_mfn ssh-agent _ms_agent_state_dir
+      fpath=( "$MARKSHARC_ROOT/modules/ssh-agent/lib" $fpath ); autoload -Uz _ms_agent_state_dir
       _ms_agent_state_dir || return 1
       local dir=$REPLY
       [[ $dir == "$XDG_STATE_HOME/marksharc/ssh-agent" && $(file_mode "$dir") == 700 ]] || return 2
@@ -110,10 +197,21 @@ DATA
     "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/agent space"
     print -r -- "SSH_AUTH_SOCK=${(q)HOME}/agent\\ space; export SSH_AUTH_SOCK" > "$old"
     chmod 600 "$old"
-    local MARKSHARC_SESSION=batch MARKSHARC_HOST=fixture
-    load_mfn ssh-agent
-    ssh-add() { return 0; }
-    ssh-agent() { print START >> "$OPLOG"; return 8; }
+    export MARKSHARC_SESSION=batch MARKSHARC_HOST=fixture
+    load_mfn ssh-agent setup-ssh-agent
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    PATH="$MARKSHARC_ROOT/modules/ssh-agent/bin:$PATH"
+    export MARKSHARC_HOST MARKSHARC_SESSION SSH_AUTH_SOCK SSH_AGENT_PID
+    cat > "$TEST_ROOT/bin/ssh-add" <<'DATA'
+#!/bin/sh
+[ "$SSH_AUTH_SOCK" = "$HOME/agent space" ] || exit 2
+DATA
+    cat > "$TEST_ROOT/bin/ssh-agent" <<'DATA'
+#!/bin/sh
+echo START >> "$OPLOG"
+exit 8
+DATA
+    chmod +x "$TEST_ROOT/bin/ssh-add" "$TEST_ROOT/bin/ssh-agent"
     case $mode in
       new-exists)
         mkdir -p -m 700 "$state"

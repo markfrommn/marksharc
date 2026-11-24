@@ -1,0 +1,51 @@
+# Discover an existing service without starting one. REPLY is empty when none is usable.
+emulate -L zsh
+local socket runtime=${XDG_RUNTIME_DIR:-/run/user/$EUID}
+local -aU candidates=()
+REPLY=''
+
+if [[ ${1-} == --forwarded ]] && (( $+commands[timeout] || $+commands[gtimeout] )); then
+    local forwarded=''
+    candidates=( "${TMPDIR:-/tmp}"/ssh-*/agent.*(N=) )
+    local -a owned=()
+    for socket in "${candidates[@]}"; do
+        [[ -O $socket && -O ${socket:h} ]] && owned+=( "$socket" )
+    done
+    # A partial scan cannot rule out multiple clients. Limit the total probe time.
+    (( $#owned <= 8 )) || owned=()
+    for socket in "${owned[@]}"; do
+        SSH_AUTH_SOCK="$socket" _ms_agent_probe || continue
+        if [[ -n $forwarded ]]; then
+            forwarded=''
+            break
+        fi
+        forwarded=$socket
+    done
+    if [[ -n $forwarded ]]; then
+        REPLY=$forwarded
+        return 0
+    fi
+fi
+
+candidates=()
+if [[ $(command uname -s) == Darwin ]]; then
+    if (( $+commands[launchctl] )); then
+        socket=$(command launchctl getenv SSH_AUTH_SOCK 2>/dev/null)
+        if SSH_AUTH_SOCK="$socket" _ms_agent_probe; then
+            REPLY=$socket
+            return 0
+        fi
+    fi
+    candidates=( /var/run/com.apple.launchd.*/Listeners(N) )
+    # launchctl identifies the login's listener. A glob cannot disambiguate two logins.
+    (( $#candidates == 1 )) || return 1
+else
+    candidates=( "$runtime/openssh_agent" )
+fi
+for socket in "${candidates[@]}"; do
+    if SSH_AUTH_SOCK="$socket" _ms_agent_probe; then
+        REPLY=$socket
+        return 0
+    fi
+done
+return 1

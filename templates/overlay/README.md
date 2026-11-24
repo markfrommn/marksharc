@@ -9,6 +9,7 @@ lives here.
 | `config.conf` | Module selection and options plus declarative `env`, `path`, `alias` and `tiers` lines |
 | `hosts/<short-host-name>.conf` | Per-host additions and overrides, read after `config.conf` |
 | `modules/<name>/` | Private modules, same contract as the public ones |
+| `packages/` | Optional Brewfile fragments and apt/dnf package lists |
 | `local/post.zsh` | Native zsh run at the end of interactive startup |
 
 Useful commands:
@@ -24,5 +25,9 @@ Native zsh in `local/post.zsh` and in private modules runs both at startup and i
 `marksharc` function on `marksharc reload`. Declare file-scope variables with `-g`
 (`typeset -g name=value`); a bare `typeset` would be function-local on reload. Declarations
 inside your own functions are unaffected.
+
+Set `agent.bash_env` to `on` in `config.conf` to export the Bash startup hook to
+noninteractive child shells. Start a new zsh session or run `marksharc reload` after
+changing it.
 
 Keep this directory in your own git repository to sync it between hosts.

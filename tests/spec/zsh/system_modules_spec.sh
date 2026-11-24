@@ -21,12 +21,11 @@ Describe 'system and workflow modules through the real tree'
     cat > "$XDG_CONFIG_HOME/marksharc/modules/demo-work/init.zsh" <<'DATA'
 [[ -n $_ms_opt_git_worktree_roots ]] || _ms_opt_git_worktree_roots="/work/one /work/two"
 [[ -n $_ms_opt_git_worktree_orgs ]] || _ms_opt_git_worktree_orgs="org-one org-two"
-demo-cwf-new-hook() { :; }
 typeset -gaU cwf_new_post_create_hooks cwf_new_copy_exclude
 cwf_new_post_create_hooks=( demo-cwf-new-hook ${cwf_new_post_create_hooks:#demo-cwf-new-hook} )
 cwf_new_copy_exclude+=( 'demo:.env' )
 DATA
-    ms_pty _ms_fs_root="$TEST_ROOT/fs" -dic 'for f in gwt-clean git-managed git-unmanaged git_managed_arr_core repo-sync cwf-new fix-tmux run-fish clean-ssh-agents setup-ssh-agent cleanup-docker fix-docker-socket chdir-set-title set-title install-krew install-wezterm-terminfo setup-herdr-sessions setup-cc-providers; do [[ $(whence -w $f) == *function ]] || print -r -- "MISSING:$f"; done; print -r -- "HOOKS:${(j:,:)chpwd_functions} SKIP:${chdir_set_title_skip-unset}"; print -r -- "OPT:${_ms_opt_git_worktree_roots}|${_ms_opt_git_worktree_orgs}"; print -r -- "CWFHOOK:${(j:,:)cwf_new_post_create_hooks} ${(j:,:)cwf_new_copy_exclude}"; exit' || return 1
+    ms_pty _ms_fs_root="$TEST_ROOT/fs" -dic 'for f in gwt-clean git-managed git-unmanaged git_managed_arr_core cwf-new fix-tmux run-fish setup-ssh-agent chdir-set-title set-title; do [[ $(whence -w $f) == *function ]] || print -r -- "MISSING:$f"; done; for f in repo-sync clean-ssh-agents cleanup-docker fix-docker-socket; do whence -p "$f" >/dev/null || print -r -- "MISSING:$f"; done; print -r -- "HOOKS:${(j:,:)chpwd_functions} SKIP:${chdir_set_title_skip-unset}"; print -r -- "OPT:${_ms_opt_git_worktree_roots}|${_ms_opt_git_worktree_orgs}"; print -r -- "CWFHOOK:${(j:,:)cwf_new_post_create_hooks} ${(j:,:)cwf_new_copy_exclude}"; exit' || return 1
     local out=$(<"$TEST_ROOT/out")
     [[ $out != *MISSING:* && $out != *'not found'* && $out != *'no such'* ]] || { print -r -- "$out"; return 2; }
     [[ $out == *'HOOKS:'*chdir-set-title*' SKIP:unset'* ]] || { print -r -- "$out"; return 3; }
@@ -57,7 +56,7 @@ DATA
     # environment and tool modules: completion (70) before herdr (78) and cwf (79), the
     # 90-99 band last (titles 90, x11 91, ssh-agent 93), greeting (94) after ssh-agent.
     # The author's private modules (convoy, mark-tools, site-bac) never load in this repo.
-    want=( cc-providers completion herdr cwf titles x11 ssh-agent greeting ); got=()
+    want=( completion cwf titles x11 ssh-agent greeting ); got=()
     for m in $seen; do (( ${want[(Ie)$m]} )) && got+=( $m ); done
     [[ ${(j: :)got} == ${(j: :)want} ]] || { print -r -- "init got: ${(j: :)got}"; return 3; }
     # Nothing loads after greeting: it is the last init of the tree.

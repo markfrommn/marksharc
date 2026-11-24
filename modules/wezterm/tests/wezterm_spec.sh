@@ -4,8 +4,7 @@ Describe 'wezterm module'
     printf '#!/bin/sh\nprintf "%%s\\n" "curl $*" >> "$OPLOG"\nexit 22\n' > "$TEST_ROOT/bin/curl"
     printf '#!/bin/sh\nprintf "%%s\\n" "tic $*" >> "$OPLOG"\n' > "$TEST_ROOT/bin/tic"
     chmod +x "$TEST_ROOT/bin/curl" "$TEST_ROOT/bin/tic"
-    load_mfn wezterm install-wezterm-terminfo
-    install-wezterm-terminfo > "$TEST_ROOT/out" 2>&1
+    "$MARKSHARC_ROOT/modules/wezterm/installers/wezterm-terminfo" > "$TEST_ROOT/out" 2>&1
     [[ $? == 22 && $(<"$OPLOG") == curl* && $(<"$OPLOG") != *tic* ]]
   }
   It 'stops on a failed download without compiling anything'

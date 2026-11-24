@@ -1,0 +1,2 @@
+emulate -L zsh
+_ms_run_with_directives "$MARKSHARC_HOME/modules/mux/bin/marksharc-mux" refresh_env "${1:-all}"

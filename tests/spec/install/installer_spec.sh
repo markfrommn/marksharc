@@ -3,6 +3,92 @@
 Describe 'install.sh'
   installer="$MARKSHARC_ROOT/install.sh"
 
+  fish_stub_case() {
+    fake_fw "$TEST_ROOT/fw"
+    mkdir -p "$XDG_CONFIG_HOME/fish" "$TEST_ROOT/fw/core/fish"
+    : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
+    printf 'user config\n' > "$XDG_CONFIG_HOME/fish/config.fish"
+    inst --home "$TEST_ROOT/fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    stub="$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
+    [ -f "$stub" ] || return 2
+    [ "$(cat "$XDG_CONFIG_HOME/fish/config.fish")" = 'user config' ] || return 3
+    grep -Fq 'core/fish/marksharc.fish' "$stub" || return 4
+    before=$(cksum "$stub")
+    inst --home "$TEST_ROOT/fw" --no-plugins || return 5
+    [ "$(cksum "$stub")" = "$before" ]
+  }
+  It 'installs an idempotent fish stub without touching fish config'
+    When run fish_stub_case
+    The status should be success
+  End
+
+  fish_quote_case() {
+    fw="$TEST_ROOT/fw 'dollar\$ and \\ slash"
+    fake_fw "$fw"
+    mkdir -p "$fw/core/fish"
+    printf 'printf "%%s\\n" "$MARKSHARC_HOME"\n' > "$fw/core/fish/marksharc.fish"
+    inst --home "$fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    result=$(fish --no-config -c 'source "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"') || return 2
+    [ "$result" = "$fw" ] || { printf 'expected <%s> got <%s>\n' "$fw" "$result"; cat "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"; return 3; }
+  }
+  It 'preserves quotes, dollar signs, and backslashes in the fish framework path'
+    When run fish_quote_case
+    The status should be success
+  End
+
+  fish_collision_case() {
+    fake_fw "$TEST_ROOT/fw"
+    mkdir -p "$XDG_CONFIG_HOME/fish/conf.d" "$TEST_ROOT/fw/core/fish"
+    : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
+    printf 'foreign\n' > "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
+    inst --home "$TEST_ROOT/fw" --no-plugins && return 1
+    [ "$(cat "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish")" = foreign ] || return 2
+    [ ! -e "$HOME/.zshenv" ]
+  }
+  It 'refuses a foreign fish stub before writing'
+    When run fish_collision_case
+    The status should be success
+  End
+
+  bash_install_case() {
+    fake_fw "$TEST_ROOT/fw"
+    printf 'original bash rc\n' > "$HOME/.bashrc"
+    printf 'original profile\n' > "$HOME/profile-target"
+    ln -s profile-target "$HOME/.bash_profile"
+    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
+    [ -f "$HOME/.bashrc" ] && [ ! -L "$HOME/.bash_profile" ] || return 2
+    head -n 1 "$HOME/.bashrc" | grep -q '^# marksharc: managed stub' || return 3
+    head -n 1 "$HOME/.bash_profile" | grep -q '^# marksharc: managed stub' || return 4
+    grep -qx 'file=.bashrc' "$XDG_STATE_HOME/marksharc/install.manifest" || return 5
+    grep -qx 'link=.bash_profile=profile-target' "$XDG_STATE_HOME/marksharc/install.manifest" || return 6
+  }
+  It 'backs up existing Bash files and installs both Bash stubs'
+    When run bash_install_case
+    The status should be success
+  End
+
+  bash_upgrade_case() {
+    fake_fw "$TEST_ROOT/fw"
+    printf 'original zsh rc\n' > "$HOME/.zshrc"
+    inst --home "$TEST_ROOT/fw" || return 1
+    # Recreate the manifest and HOME state of an earlier zsh-only install.
+    sed '/^bash_stubs=/d; /^bash_stub_sum=/d' "$XDG_STATE_HOME/marksharc/install.manifest" > "$TEST_ROOT/legacy"
+    cp "$TEST_ROOT/legacy" "$XDG_STATE_HOME/marksharc/install.manifest"
+    rm "$HOME/.bashrc" "$HOME/.bash_profile"
+    printf 'original bash rc\n' > "$HOME/.bashrc"
+    ln -s target "$HOME/.bash_profile"
+    inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 2; }
+    [ "$(cat "$(backup_dir)/.zshrc")" = 'original zsh rc' ] || return 3
+    [ "$(cat "$(backup_dir)/.bashrc")" = 'original bash rc' ] || return 4
+    grep -qx 'link=.bash_profile=target' "$XDG_STATE_HOME/marksharc/install.manifest" || return 5
+    inst --home "$TEST_ROOT/fw" || return 6
+    [ "$(cat "$(backup_dir)/.bashrc")" = 'original bash rc' ]
+  }
+  It 'upgrades a zsh-only install without losing the earlier backup'
+    When run bash_upgrade_case
+    The status should be success
+  End
+
   fresh_case() {
     fake_fw "$TEST_ROOT/fw"
     # With the XDG variables at their defaults the stub names no MARKSHARC_CONFIG.
