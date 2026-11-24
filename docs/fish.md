@@ -55,16 +55,19 @@ same capability in a different way. *Not applicable* means the module has no mea
 | pager | supported | `PAGER`, `LESS`, `MANPATH`, coloured `man`, coloured `diff`, `diffcp`. |
 | path | supported | Same tiers and order as zsh. |
 | pnpm | supported | `PNPM_HOME` and path. |
-| prompt-starship | supported | Cached `starship init fish`. |
-| ps | supported | `pss`, `pssj`, `psj`, `pssu`, `pssuj`, `psuj`, `psju` over one implementation. |
+| prompt-starship | supported | Cached `starship init fish`; `prompt-starship.config` selects a file or the bundled `rich` preset. |
+| ps | supported | `pss`, `pssj`, `psj`, `pssu`, `pssuj`, `psuj`, `psju` over one implementation.; procs draws the selection when installed (`ps.procs`). |
 | python | supported | uv preferred; else pyenv shims and cached `pyenv init - fish`. |
 | rust | supported | Cargo bin in the user tier. |
 | ssh-agent | supported | `setup-ssh-agent` once per shell; `clean-ssh-agents` on PATH. |
+| theme | supported | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include, fzf defaults and previews (fzf.fish directory preview with eza). |
 | titles | supported | PWD hook, `chdir-set-title`, `set-title`; `fish_title` prints nothing so the tab title stands. |
 | wezterm | supported | Terminfo installer runs from any shell. |
 | x11 | supported | `setup-x11-display`, silent at startup. |
 | zoxide | supported | Cached `zoxide init fish`. |
 | zsh-options | not applicable | zsh `setopt` set. |
+| zsh-autosuggestions | native-equivalent | fish suggests from its own history natively. |
+| zsh-syntax-highlighting | native-equivalent | fish highlights the command line natively. |
 
 ## Writing fish module code
 

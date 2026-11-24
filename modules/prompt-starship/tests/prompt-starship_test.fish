@@ -40,4 +40,27 @@ set -gx PATH $saved_path
 @test "a missing starship breaks nothing" $st -eq 0
 @test "a missing starship prints nothing" ! -s "$TEST_ROOT/out"
 
+# prompt-starship.config: a bundled preset name or a file; only this module's value is removed.
+ms_stub starship 'exit 0'
+set -e STARSHIP_CONFIG
+set -g _ms_fish_reloading 1
+set -g _ms_opt_prompt_starship_config rich
+ms_module prompt-starship
+@test "a preset name selects the bundled preset" "$STARSHIP_CONFIG" = "$MARKSHARC_ROOT/modules/prompt-starship/presets/rich.toml"
+@test "STARSHIP_CONFIG is exported" (set -S STARSHIP_CONFIG | string match -q '*exported*'; and echo yes) = yes
+set -g _ms_opt_prompt_starship_config nosuch
+ms_module prompt-starship
+@test "an unknown preset leaves STARSHIP_CONFIG unset" (set -q STARSHIP_CONFIG; and echo set; or echo unset) = unset
+printf 'x = 1\n' >"$HOME/my.toml"
+set -g _ms_opt_prompt_starship_config '~/my.toml'
+ms_module prompt-starship
+@test "a ~ path selects that file" "$STARSHIP_CONFIG" = "$HOME/my.toml"
+set -g _ms_opt_prompt_starship_config ''
+ms_module prompt-starship
+@test "an empty option removes the value this module set" (set -q STARSHIP_CONFIG; and echo set; or echo unset) = unset
+set -gx STARSHIP_CONFIG /user.toml
+ms_module prompt-starship
+@test "a value the module did not set is kept" "$STARSHIP_CONFIG" = /user.toml
+set -e _ms_fish_reloading _ms_opt_prompt_starship_config STARSHIP_CONFIG
+
 ms_cleanup

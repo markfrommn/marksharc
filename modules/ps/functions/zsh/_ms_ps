@@ -5,30 +5,49 @@
 # filtered in the shell with an extended regular expression (several patterns are
 # alternatives), so no grep process exists to match itself; the header line is always
 # kept and the ps invocation's own line is dropped. No pattern lists everything.
+#
+# With procs installed and the ps.procs option on, ps still selects the processes and
+# procs draws them: the selected PIDs become procs keywords (a number matches a PID
+# exactly), and the job view adds the parent, process group and state columns. All
+# processes with no pattern is plain procs; when nothing is selected nothing is printed.
 emulate -L zsh
 local scope=$1 view=$2 out line selfcmd pat rc
-local -a args lines
+local -a args lines pids procs_args
+integer use_procs=0
 shift 2
+[[ ${_ms_opt_ps_procs-on} == (on|1|yes|true) ]] && (( ${+commands[procs]} )) && use_procs=1
 if [[ $scope == all ]]; then args=( ax ); else args=( x ); fi
 if [[ $view == jobs ]]; then
     args+=( -o pid,ppid,pgid,tpgid,stat,tty,user,command )
+    procs_args=( --insert Ppid --insert Pgid --insert State )
 else
     args+=( -o pid,ppid,user,stat,etime,command )
 fi
 if (( $# == 0 )); then
-    command ps "${args[@]}"
-    return
+    if (( ! use_procs )); then
+        command ps "${args[@]}"
+        return
+    elif [[ $scope == all ]]; then
+        command procs "${procs_args[@]}"
+        return
+    fi
+else
+    pat=${(j:|:)@}
+    # [[ =~ ]] reports a bad expression on stderr and returns 1, like "no match": probe first.
+    rc=$({ [[ x =~ $pat ]] } 2>&1)
+    if [[ -n $rc ]]; then print -ru2 -- "ps: invalid pattern: $pat"; return 2; fi
 fi
-pat=${(j:|:)@}
-# [[ =~ ]] reports a bad expression on stderr and returns 1, like "no match": probe first.
-rc=$({ [[ x =~ $pat ]] } 2>&1)
-if [[ -n $rc ]]; then print -ru2 -- "ps: invalid pattern: $pat"; return 2; fi
 out=$(command ps "${args[@]}") || return $?
 selfcmd="ps ${(j: :)args}"
 lines=( "${(@f)out}" )
-print -r -- "${lines[1]}"
+(( use_procs )) || print -r -- "${lines[1]}"
 for line in "${(@)lines[2,-1]}"; do
     [[ $line == *"$selfcmd" ]] && continue
-    [[ $line =~ $pat ]] && print -r -- "$line"
+    [[ -z $pat || $line =~ $pat ]] || continue
+    if (( use_procs )); then pids+=( ${${=line}[1]} ); else print -r -- "$line"; fi
 done
+if (( use_procs && $#pids )); then
+    command procs "${procs_args[@]}" --or "${pids[@]}"
+    return
+fi
 return 0

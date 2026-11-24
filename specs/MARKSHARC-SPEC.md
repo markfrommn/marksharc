@@ -374,7 +374,7 @@ The builder records the entries it manages. On reload it drops managed directori
 
 ### 6.8 Plugins
 
-There is no plugin manager. A `plugin` directive names a git URL and a commit. `install.sh` and `marksharc update` clone or check out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`. A missing clone is skipped silently and reported by `doctor`. The plugin loader never touches the network; the separate notify fetch is the exception described in 6.14.
+There is no plugin manager. A `plugin` directive names a git URL and a commit. `install.sh` and `marksharc update` clone or check out pins into `~/.cache/marksharc/plugins/<name>@<sha>/`. At startup a loader of about 30 lines sources the plugin entry file or adds the directory to `fpath`; each plugin module's `init.zsh` calls the core `_ms_plugins_load <module>` for its own `zsh.plugins` registry, so a plugin module does not depend on another being enabled. A missing clone is skipped silently and reported by `doctor`. The plugin loader never touches the network; the separate notify fetch is the exception described in 6.14.
 
 The same directive serves fish: the fish loader adds the plugin's `functions` and `completions` directories and sources its `conf.d` files. This replaces fisher for the plugins marksharc depends on.
 
@@ -390,7 +390,7 @@ Planned plugins: fzf-tab (MVP); zsh-autosuggestions and zsh-syntax-highlighting 
 
 ### 6.10 Caching, reload, and verbosity
 
-- `_ms_init_cached <tool> <command…>` stores the output of `starship init zsh`, `atuin init zsh`, `zoxide init zsh`, `brew shellenv`, and similar, keyed on the binary's path and mtime, and sources the file. It replaces `_mdf_init_once`.
+- `_ms_init_cached [-x <NAME>] <tool> <command…>` stores the output of `starship init zsh`, `atuin init zsh`, `zoxide init zsh`, `brew shellenv`, and similar, keyed on the binary's path and mtime, and sources the file. With `-x` it caches the output as the value of the exported variable NAME instead (`vivid generate` prints an `LS_COLORS` value). It replaces `_mdf_init_once`.
 - `marksharc reload` re-renders if inputs changed, then rebuilds env and re-runs init in the current shell. `cs` and `li` are aliases for `marksharc reload --verbose`.
 - Startup prints nothing by default. `MARKSHARC_VERBOSE=1` or `--verbose` prints the module trace, skipped modules with reasons, PATH tiers, and per-module timings. Install hints move to `doctor`.
 - The `greeting` module (fortune) is opt-in and runs only in interactive sessions.
@@ -484,8 +484,8 @@ changes fetched by sync apply to the next invocation.
 | `zsh-options` | MVP | The kept `setopt` set, locale, umask rule | Interactive option block |
 | `editor` | MVP | `EDITOR` from an option (default `emacs -nw` when present, else `vi`) | emacs/xemacs detection |
 | `pager` | MVP | `PAGER`, `LESS`, coloured man pages, coloured `diff`, `diffcp` | OMZ colored-man-pages, diff overrides |
-| `ls` | MVP | `ll`, `la`, `dir`, `lf`, `lsf`; eza-backed in Modernization | eza alias block |
-| `ps` | MVP | The seven ps helpers, fixed; procs-backed in Modernization | ps function block |
+| `ls` | MVP | `ll`, `la`, `dir`, `lf`, `lsf`, eza-backed when installed; bare `ls` stays native | eza alias block |
+| `ps` | MVP | The seven ps helpers, fixed; ps selects and procs draws the selection when installed (`ps.procs`); bare `ps` untouched | ps function block |
 | `nav` | MVP | Directory stack options, Alt-arrow directory widgets | OMZ dirhistory and dircycle |
 | `zoxide` | MVP | Cached init | |
 | `completion` | MVP | `compinit`, zstyles, completion cache | Completion block, OMZ lib |
@@ -493,7 +493,7 @@ changes fetched by sync apply to the next invocation.
 | `command-not-found` | MVP | Homebrew and apt handlers | OMZ command-not-found |
 | `history-atuin` | MVP | atuin init, `history` and `h` | History option block, per-directory plugin |
 | `history-native` | MVP | Fallback file-based history | |
-| `prompt-starship` | MVP | Cached init | OMZ themes, p10k |
+| `prompt-starship` | MVP | Cached init; `config` option selects a file or a bundled preset (`rich`) as `STARSHIP_CONFIG` | OMZ themes, p10k |
 | `node-nvm` | MVP | nvm load, `.nvmrc` hook | nvm block, `load-nvmrc` |
 | `go-gvm` | MVP | gvm activation, `go.mod` hook, consistent `GOROOT` | gvm blocks |
 | `python` | MVP | uv preferred, pyenv fallback | pyenv/uv block |
@@ -513,8 +513,8 @@ changes fetched by sync apply to the next invocation.
 | `greeting` | MVP | fortune, opt-in | fortune line |
 | `direnv` | MVP | Cached hook, opt-in | fish-only today |
 | `lmstudio`, `cuda` | MVP | App-tier paths and env | `build_path` fragments |
-| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins, order 90+ | |
-| `theme` | Modernization | vivid `LS_COLORS`, bat man pager, delta, fzf previews | |
+| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins at 95 and 99, after fzf-tab and atuin; an atuin suggestion strategy when atuin is installed; syntax highlighting loads last of all | |
+| `theme` | Modernization | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include through `GIT_CONFIG_COUNT`, fzf defaults and previews (fzf-tab included); order 21, before completion reads `LS_COLORS` | |
 | `completion-carapace` | Modernization | Opt-in | |
 | `cloud` | Later | kubectl, krew, kubectx, gcloud, aws, helm | k8s and gcloud blocks |
 

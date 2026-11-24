@@ -1,0 +1,9 @@
+# Pinned third-party plugins for the built-in offline loader (spec 6.8).
+#
+# Startup only loads already-cloned pins from the XDG cache and never touches
+# the network; refresh clones explicitly with zsh-plugin-update.
+#
+# One directive per line:
+#   plugin <name> <git-url> <commit-sha> [shell <shell>] [kind source|fpath]
+# 0.8.0
+plugin zsh-syntax-highlighting https://github.com/zsh-users/zsh-syntax-highlighting db085e4661f6aafd24e5acb5b2e17e4dd5dddf3e shell zsh kind source

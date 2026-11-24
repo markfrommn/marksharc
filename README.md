@@ -137,6 +137,26 @@ The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv`, `nv
 For per-host Node, Go, Python, and Ruby ownership through mise, including startup behavior,
 fallback, compatibility commands, and migration, see [the mise guide](docs/mise.md).
 
+The interactive layer is on by default and degrades to native behaviour for each missing tool:
+
+| Module | What it adds | Options |
+| --- | --- | --- |
+| `zsh-autosuggestions` | Suggestions from atuin, then the session history and completion | `strategy`, `async` |
+| `zsh-syntax-highlighting` | Command-line highlighting, loaded after every other module | `highlighters` |
+| `theme` | vivid `LS_COLORS`, bat as man pager, fzf defaults and bat/eza previews; delta for git when enabled | `ls_colors`, `man_pager`, `bat_theme`, `delta`, `fzf` |
+| `ps` | The ps helpers drawn by procs | `procs` |
+| `prompt-starship` | A starship config file or the bundled `rich` preset | `config` |
+
+The two plugins are pinned clones: `marksharc update` (or `zsh-plugin-update`) fetches them,
+and startup only loads clones that exist. `marksharc bootstrap` installs the tools the modules
+declare (eza, procs, vivid, bat, git-delta, fzf, fd, starship).
+
+```text
+set theme.delta on
+set theme.ls_colors nord
+set prompt-starship.config rich
+```
+
 The same module and host conf files accept declarative environment lines. Values use shell-word
 quoting; `~` and `$NAME` are references, never command substitution. `when command`, `dir` and
 `file` guards run in the next shell, while `os` and `host` guards are settled by `render`.

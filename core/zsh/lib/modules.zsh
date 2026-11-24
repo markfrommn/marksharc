@@ -218,6 +218,40 @@ _ms_mise_drop_shims() {
     unset MARKSHARC_MISE_SHIMS
 }
 
+# Load the pinned plugins named by a module's zsh.plugins registry (spec 6.8), in
+# registry order, from the XDG cache. Startup never touches the network: a missing
+# clone is skipped silently (doctor reports it) and zsh-plugin-update clones. The
+# loader functions live with completion-fzf-tab; they are autoloaded from there when
+# that module is disabled, so every plugin module works on its own.
+#   _ms_plugins_load <module>
+_ms_plugins_load() {
+    local _ms_pl_registry=${_ms_mod_dir[$1]:-$MARKSHARC_HOME/modules/$1}/zsh.plugins
+    local _ms_pl_loader=$MARKSHARC_HOME/modules/completion-fzf-tab/functions/zsh
+    local _ms_pl_line _ms_pl_kind
+    local -a _ms_pl_words
+    integer _ms_pl_i
+    [[ -r $_ms_pl_registry ]] || return 0
+    (( ${+functions[zsh-plugin-load]} )) || autoload -Uz "$_ms_pl_loader/zsh-plugin-load"
+    (( ${+functions[_zsh-plugin-valid-quoting]} )) || autoload -Uz "$_ms_pl_loader/_zsh-plugin-valid-quoting"
+    while IFS= read -r _ms_pl_line || [[ -n $_ms_pl_line ]]; do
+        _ms_pl_line=${_ms_pl_line#"${_ms_pl_line%%[![:space:]]*}"}
+        [[ -z ${_ms_pl_line//[[:space:]]/} || ${_ms_pl_line[1]} == \# ]] && continue
+        _ms_pl_words=( "${(Z:C:)_ms_pl_line}" ) 2>/dev/null || continue
+        _zsh-plugin-valid-quoting "${(j: :)_ms_pl_words}" || continue
+        _ms_pl_words=( "${(Q)_ms_pl_words[@]}" )
+        [[ ${_ms_pl_words[1]:-} == plugin && -n ${_ms_pl_words[2]:-} && -n ${_ms_pl_words[4]:-} ]] || continue
+        _ms_pl_kind=source
+        for (( _ms_pl_i=5; _ms_pl_i < $#_ms_pl_words; _ms_pl_i++ )); do
+            if [[ ${_ms_pl_words[_ms_pl_i]} == kind ]]; then
+                _ms_pl_kind=${_ms_pl_words[_ms_pl_i+1]}
+                break
+            fi
+        done
+        zsh-plugin-load "${_ms_pl_words[2]}" "${_ms_pl_words[4]}" "$_ms_pl_kind"
+    done < "$_ms_pl_registry"
+    return 0
+}
+
 # Declared options become $_ms_opt_<module>_<key> (non-alphanumerics -> _).
 _ms_module_options() {
     emulate -L zsh
