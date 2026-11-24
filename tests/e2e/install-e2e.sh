@@ -1,13 +1,13 @@
 #!/bin/sh
-# End-to-end install check (spec 6.15, plan P2.4 "Done when"): install marksharc into a fresh
-# HOME, start login and interactive zsh shells, and prove they come up working
-# (MARKSHARC_SESSION set, the marksharc command resolves, nothing on stderr), then uninstall.
-# Two passes, each in its own fresh HOME:
-#   1. "checkout": sh <checkout>/install.sh --home <checkout>   (the clone-first README path)
+# End-to-end install check (spec 6.15, plans P2.4 and DEV-71): install MarkSharc,
+# start shells through their normal startup files, then uninstall.
+# Three passes, each in its own temporary HOME:
+#   1. "checkout": sh <checkout>/install.sh                    (the clone-first README path)
 #   2. "clone":    sh < <checkout>/install.sh with MARKSHARC_REPO=<checkout>, run from a directory
 #                  that is not a checkout (the curl | sh README path: the installer clones),
 #                  ending in uninstall --purge --yes, which must delete that clone.
-# Needs only sh, zsh and git; the interactive-on-a-terminal step also uses python3 when present.
+#   3. "legacy":   install --clobber over existing zsh, Bash and Fish files, then restore them.
+# Needs sh, zsh, bash and git; runs Fish and terminal checks when fish and python3 are available.
 #
 # Usage: tests/e2e/install-e2e.sh <checkout>
 # CI runs it on macOS and Ubuntu against the pull request checkout; it also runs in a Linux
@@ -37,23 +37,65 @@ silent() {
   [ ! -s "$err" ] || { cat "$err" >&2; fail "$desc: unexpected stderr"; }
 }
 
+legacy_dotfiles='.zshenv .zshrc .zprofile .zlogin .zlogout .bashrc .bash_profile .bash_login .profile'
+seed_legacy_home() {
+  fish_dir=$home/.config/fish
+  mkdir -p "$fish_dir/conf.d" "$fish_dir/functions" "$work/$pass/original"
+  for name in $legacy_dotfiles; do
+    printf '# original %s\n' "$name" > "$home/$name"
+  done
+  ln -s .profile "$home/.login"
+  printf '# original config\n' > "$fish_dir/config.fish"
+  printf 'SETUVAR legacy_setting:original\n' > "$fish_dir/fish_variables"
+  printf '# original plugin\n' > "$fish_dir/conf.d/plugin.fish"
+  printf '# original function\n' > "$fish_dir/functions/legacy.fish"
+  cp -pR "$home/." "$work/$pass/original/"
+}
+
+verify_legacy_clean() {
+  for name in .zshrc .zprofile .zlogin .zlogout .bash_login .profile .login; do
+    [ ! -e "$home/$name" ] && [ ! -L "$home/$name" ] || fail "$name remains after cleanup"
+  done
+  remaining=$(find "$fish_dir" -print | LC_ALL=C sort)
+  [ "$remaining" = "$fish_dir
+$fish_dir/conf.d
+$fish_dir/conf.d/00-marksharc.fish" ] || fail "unexpected entries in clean Fish configuration: $remaining"
+}
+
+verify_legacy_restored() {
+  original=$work/$pass/original
+  for name in $legacy_dotfiles; do
+    cmp -s "$original/$name" "$home/$name" || fail "$name was not restored"
+  done
+  [ -L "$home/.login" ] && [ "$(readlink "$home/.login")" = .profile ] || fail ".login symlink was not restored"
+  diff -r "$original/.config/fish" "$fish_dir" || fail "Fish configuration was not restored"
+}
+
 # exercise PASS: install (the way PASS says), start shells, uninstall. Sets pass and home.
 exercise() {
   pass=$1
   home=$work/$pass/home
   mkdir -p "$home" "$work/$pass/cwd"
-  step "install into a fresh HOME"
   case $pass in
     checkout)
+      step "install into a fresh HOME from a checkout"
       fw=$checkout
-      clean_env sh "$checkout/install.sh" --home "$checkout" --no-plugins > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh failed"; }
+      clean_env sh "$checkout/install.sh" --no-plugins > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh failed"; }
       ;;
     clone)
+      step "install into a fresh HOME from a piped script"
       fw=$home/.local/share/marksharc
       # The installer is piped in and run from a directory that is not a checkout.
       (cd "$work/$pass/cwd" && clean_env MARKSHARC_REPO="$checkout" sh -s -- --no-plugins < "$checkout/install.sh") > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "piped install.sh failed"; }
       [ -d "$fw/.git" ] && [ -r "$fw/core/zsh/zshenv.zsh" ] || fail "the installer did not clone the framework into $fw"
       grep -q '^framework_cloned=1$' "$home/.local/state/marksharc/install.manifest" || fail "the manifest does not record the clone"
+      ;;
+    legacy)
+      step "install into an existing HOME with --clobber"
+      fw=$checkout
+      seed_legacy_home
+      clean_env sh "$checkout/install.sh" --home "$checkout" --no-plugins --clobber > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh --clobber failed"; }
+      verify_legacy_clean
       ;;
   esac
   [ -f "$home/.zshenv" ] || fail "the stub was not written"
@@ -81,6 +123,22 @@ EOF
   [ "${session#*|}" = "$fw" ] || fail "login shell: MARKSHARC_HOME is '${session#*|}', expected $fw"
   [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "login shell: marksharc resolves to '$(sed -n 2p "$out")'"
   [ -d "$home/.local/state/marksharc/zdot" ] || fail "login shell did not generate the ZDOTDIR"
+
+  step "login Bash comes up working"
+  # shellcheck disable=SC2016
+  silent "login Bash" /bin/bash -l -c 'printf "%s\n" "$MARKSHARC_HOME"; command -v marksharc'
+  [ "$(sed -n 1p "$out")" = "$fw" ] || fail "login Bash did not locate the framework"
+  [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "login Bash did not add marksharc to PATH"
+
+  if command -v fish > /dev/null 2>&1; then
+    step "login Fish comes up working"
+    # shellcheck disable=SC2016
+    silent "login Fish" fish -l -c 'printf "%s\n" "$MARKSHARC_HOME"; command -v marksharc'
+    [ "$(sed -n 1p "$out")" = "$fw" ] || fail "login Fish did not locate the framework"
+    [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "login Fish did not add marksharc to PATH"
+  else
+    step "fish not found; skipping the login Fish check"
+  fi
 
   step "noninteractive Bash hook comes up working"
   # shellcheck disable=SC2016
@@ -126,8 +184,13 @@ EOF
     silent "marksharc uninstall" zsh -c 'marksharc uninstall'
     [ -d "$fw" ] || fail "uninstall removed the checkout"
   fi
-  [ ! -e "$home/.zshenv" ] || fail "the stub is still there after uninstall"
-  [ ! -e "$home/.bashrc" ] && [ ! -e "$home/.bash_profile" ] || fail "Bash stubs remain after uninstall"
+  if [ "$pass" = legacy ]; then
+    verify_legacy_restored
+  else
+    [ ! -e "$home/.zshenv" ] || fail "the stub is still there after uninstall"
+    [ ! -e "$home/.bashrc" ] && [ ! -e "$home/.bash_profile" ] || fail "Bash stubs remain after uninstall"
+    [ ! -e "$home/.config/fish/conf.d/00-marksharc.fish" ] || fail "Fish stub remains after uninstall"
+  fi
   [ ! -e "$home/.local/state/marksharc/zdot" ] || fail "the generated ZDOTDIR is still there after uninstall"
   [ -f "$home/.config/marksharc/config.conf" ] || fail "uninstall removed the overlay"
   # shellcheck disable=SC2016
@@ -138,4 +201,5 @@ EOF
 pass=start
 exercise checkout
 exercise clone
+exercise legacy
 echo "e2e: ok"

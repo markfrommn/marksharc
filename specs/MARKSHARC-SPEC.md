@@ -335,7 +335,7 @@ Wiring per shell:
 | Shell | Stub written by the installer | Then |
 |---|---|---|
 | zsh | `~/.zshenv`: set `MARKSHARC_HOME`, source `core/zsh/zshenv.zsh` | `zshenv.zsh` sets `ZDOTDIR` to `~/.local/state/marksharc/zdot` (four one-line stubs) and runs the env phase. `.zprofile` re-asserts PATH after macOS `path_helper`. `.zshrc` runs the init phase. |
-| fish | `~/.config/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. The user's `config.fish` is untouched. |
+| fish | `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. Existing Fish configuration is preserved by default. |
 | bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash`, silently, in every mode. No interactive phase until full bash is in scope. `BASH_ENV` is set only when the `agent.bash_env` option is on. |
 
 The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
@@ -345,7 +345,11 @@ The env phase exports `MARKSHARC_ENV=<render id>`. A child shell that inherits a
 `ZDOTDIR` takeover is deliberate: it keeps installer edits to `~/.zshrc` from changing the shell silently. `marksharc doctor` lists foreign lines found in `~/.zshrc`, `~/.zprofile`, `~/.bashrc`, and `~/.config/fish/config.fish` so each can become a module or an overlay line.
 An installer-managed Bash stub whose checksum matches the install manifest is
 accepted. A missing, symlinked, or modified recorded Bash stub is reported.
-The fish `config.fish` remains separate from the managed `conf.d` stub.
+The Fish `config.fish` is separate from the managed `conf.d` stub. When the
+installer offers a clean Fish configuration, it defaults to keeping the
+existing tree. If the stub path is occupied by a custom file and cleanup is
+declined, the installer reports that it skipped Fish and continues with zsh
+and Bash.
 
 ### 6.7 PATH composition
 
@@ -444,13 +448,19 @@ A host has two checkouts: the framework and the overlay (plus any private module
 
 | Command | Purpose |
 |---|---|
-| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up and write the stubs, fetch the plugin pins (`--no-plugins` skips; a failed fetch warns and leaves the install in place), render. |
+| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up startup files and write the stubs, fetch the plugin pins (`--no-plugins` skips and a failed fetch warns), then render. `--clobber` answers yes to optional cleanup and `--dry-run` previews changes without prompting. |
 | `marksharc bootstrap` | Install packages declared by enabled modules for the current OS and by overlay bundles. Generate a temporary Brewfile for Homebrew on macOS and Linux. Print apt or dnf commands and require confirmation before invoking sudo. |
 | `marksharc update` | Sync repositories, refresh plugin pins, run module and overlay steps, and render. Continue after individual failures and report each step's result. `--list` lists the steps, `--only <label>` selects one, and `--dry-run` prints commands without running them. Replaces `bin/do_updates.sh` and all startup-time pulls. |
 | `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |
 | `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
 | `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
 | `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
+
+The Bash backup includes `.bashrc`, `.bash_profile`, `.bash_login`,
+`.profile` and `.login`. Confirmed Fish cleanup moves the entire Fish
+directory into a private backup beside it and writes a clean configuration
+with only the managed stub. Uninstall restores the Fish backup and preserves
+files added to the replacement directory.
 
 Doctor reports legacy `.provider` files for an enabled `cc-providers` module
 and reports an empty provider directory when the module or directory is

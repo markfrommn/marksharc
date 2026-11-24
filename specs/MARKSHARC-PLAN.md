@@ -504,6 +504,12 @@ Rollback at any point before P6.1: `marksharc uninstall` restores the previous s
 - **Gates:** local gates on macOS: lint 66 files; zsh 331, contract 4, install 40, repo 26 examples, 0 failures.
 - **Day 0 verification:** `tests/e2e/install-e2e.sh` passes in a `debian:stable-slim` container for both the `--home` and the piped clone installs, and CI runs it on macOS and Ubuntu. The literal README `curl … | sh` command remains a manual check once the repository is public; it is private today.
 
+#### P2.4.1 — Enhance installer (DEV-71)
+
+Extend P2.4 with the remaining Bash login-file backups and opt-in Fish
+configuration cleanup. The [DEV-71 plan](DEV-71-PLAN.md) covers migration,
+rollback, and verification on clean and existing accounts.
+
 #### P2.5 — Sync and doctor (DEV-45)
 
 - **Repo:** marksharc

@@ -12,11 +12,18 @@ Describe 'marksharc uninstall'
     fake_fw "$FW"
     printf 'original bash rc\n' > "$HOME/.bashrc"
     printf 'original profile\n' > "$HOME/profile-target"
+    printf 'original POSIX profile\n' > "$HOME/.profile"
     ln -s profile-target "$HOME/.bash_profile"
+    ln -s profile-target "$HOME/.bash_login"
+    ln -s missing "$HOME/.login"
     inst --home "$FW" || return 1
+    [ ! -e "$HOME/.profile" ] && [ ! -L "$HOME/.bash_login" ] && [ ! -L "$HOME/.login" ] || return 4
     uninstall || { cat "$TEST_ROOT/err"; return 2; }
     [ "$(cat "$HOME/.bashrc")" = 'original bash rc' ] || return 3
-    [ -L "$HOME/.bash_profile" ] && [ "$(readlink "$HOME/.bash_profile")" = profile-target ]
+    [ "$(readlink "$HOME/.bash_profile")" = profile-target ] || return 5
+    [ "$(readlink "$HOME/.bash_login")" = profile-target ] || return 6
+    [ "$(readlink "$HOME/.login")" = missing ] || return 7
+    [ "$(cat "$HOME/.profile")" = 'original POSIX profile' ]
   }
   It 'restores regular and symlinked Bash startup files'
     When run bash_restore_case
@@ -54,6 +61,90 @@ Describe 'marksharc uninstall'
   }
   It 'removes the managed fish stub while preserving user configuration'
     When run fish_uninstall_case
+    The status should be success
+  End
+
+  fish_restore_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    XDG_CONFIG_HOME=$XDG_CONFIG_HOME//
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$FW/core/fish" "$fish_dir/functions"
+    : > "$FW/core/fish/marksharc.fish"
+    printf 'legacy config\n' > "$fish_dir/config.fish"
+    printf 'legacy vars\n' > "$fish_dir/fish_variables"
+    : > "$fish_dir/.plugin-list"
+    ln -s ../fish_variables "$fish_dir/functions/legacy.fish"
+    # Upgrade from an install that left the legacy Fish configuration in place.
+    inst --home "$FW" --no-plugins || return 1
+    inst --home "$FW" --clobber --no-plugins || { cat "$TEST_ROOT/err"; return 2; }
+    printf 'new vars\n' > "$fish_dir/fish_variables"
+    uninstall --purge --yes || { cat "$TEST_ROOT/err"; return 3; }
+    [ ! -e "$fish_dir/conf.d/00-marksharc.fish" ] || return 4
+    [ "$(cat "$fish_dir/config.fish")" = 'legacy config' ] || return 5
+    [ "$(cat "$fish_dir/fish_variables")" = 'legacy vars' ] || return 6
+    [ -f "$fish_dir/.plugin-list" ] && [ "$(readlink "$fish_dir/functions/legacy.fish")" = ../fish_variables ] || return 7
+    grep -R -q 'new vars' "$XDG_CONFIG_HOME"
+  }
+  It 'restores the original Fish tree and saves files made after cleanup even with purge'
+    When run fish_restore_case
+    The status should be success
+  End
+
+  fish_restore_retry_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$FW/core/fish" "$fish_dir"
+    : > "$FW/core/fish/marksharc.fish"
+    printf 'legacy fish\n' > "$fish_dir/config.fish"
+    printf 'legacy profile\n' > "$HOME/.profile"
+    printf 'legacy zsh\n' > "$HOME/.zshrc"
+    inst --home "$FW" --clobber --no-plugins || return 1
+    real_cp=$(command -v cp)
+    cat > "$TEST_ROOT/bin/cp" <<EOF
+#!/bin/sh
+for arg do
+    case \$arg in "$HOME/.profile.marksharc-restore."*) exit 1 ;; esac
+done
+exec "$real_cp" "\$@"
+EOF
+    chmod +x "$TEST_ROOT/bin/cp"
+    uninstall && return 2
+    rm -- "$TEST_ROOT/bin/cp"
+    [ -f "$fish_dir/conf.d/00-marksharc.fish" ] || return 3
+    [ "$(cat "$HOME/.zshrc")" = 'legacy zsh' ] || return 4
+    uninstall || { cat "$TEST_ROOT/err"; return 5; }
+    [ "$(cat "$fish_dir/config.fish")" = 'legacy fish' ] &&
+      [ "$(cat "$HOME/.profile")" = 'legacy profile' ]
+  }
+  It 'can retry Fish restoration after an earlier dotfile restore fails'
+    When run fish_restore_retry_case
+    The status should be success
+  End
+
+  fish_restore_checkpoint_case() {
+    FW=$TEST_ROOT/fw
+    fake_fw "$FW"
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$FW/core/fish" "$fish_dir"
+    : > "$FW/core/fish/marksharc.fish"
+    printf 'legacy fish\n' > "$fish_dir/config.fish"
+    printf '# marksharc: managed stub from another install\n# original bash\n' > "$HOME/.bashrc"
+    inst --home "$FW" --clobber --no-plugins || return 1
+    retired_manifest=$XDG_STATE_HOME/marksharc/install.manifest.restored
+    mkdir "$retired_manifest"
+    uninstall && return 2
+    [ "$(cat "$fish_dir/config.fish")" = 'legacy fish' ] || return 3
+    inst --home "$FW" --no-plugins && return 5
+    [ ! -e "$fish_dir/conf.d/00-marksharc.fish" ] || return 6
+    rmdir "$retired_manifest"
+    uninstall || { cat "$TEST_ROOT/err"; return 4; }
+    [ "$(cat "$fish_dir/config.fish")" = 'legacy fish' ] && [ -f "$retired_manifest" ] &&
+      grep -Fq '# original bash' "$HOME/.bashrc"
+  }
+  It 'finishes uninstall when the Fish tree was restored before the manifest could be retired'
+    When run fish_restore_checkpoint_case
     The status should be success
   End
 

@@ -41,12 +41,98 @@ Describe 'install.sh'
     mkdir -p "$XDG_CONFIG_HOME/fish/conf.d" "$TEST_ROOT/fw/core/fish"
     : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
     printf 'foreign\n' > "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish"
-    inst --home "$TEST_ROOT/fw" --no-plugins && return 1
+    inst --home "$TEST_ROOT/fw" --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
     [ "$(cat "$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish")" = foreign ] || return 2
-    [ ! -e "$HOME/.zshenv" ]
+    [ -f "$HOME/.zshenv" ] && [ -f "$HOME/.bash_profile" ] || return 3
+    [ -z "$(mf fish_stub)" ] || return 4
+    grep -qi 'warning.*fish' "$TEST_ROOT/out"
   }
-  It 'refuses a foreign fish stub before writing'
+  It 'warns and skips Fish when cleanup is declined and the stub slot is occupied'
     When run fish_collision_case
+    The status should be success
+  End
+
+  fish_clobber_case() {
+    fake_fw "$TEST_ROOT/fw"
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$fish_dir/conf.d" "$fish_dir/functions" "$TEST_ROOT/fw/core/fish"
+    : > "$TEST_ROOT/fw/core/fish/marksharc.fish"
+    printf 'foreign\n' > "$fish_dir/conf.d/00-marksharc.fish"
+    printf 'set -U old_var value\n' > "$fish_dir/fish_variables"
+    : > "$fish_dir/.plugin-list"
+    ln -s ../fish_variables "$fish_dir/functions/legacy.fish"
+    before=$(snapshot)
+    inst --home "$TEST_ROOT/fw" --clobber --dry-run --no-plugins || { cat "$TEST_ROOT/err"; return 1; }
+    grep -q 'would back up.*fish' "$TEST_ROOT/out" || return 2
+    [ "$(snapshot)" = "$before" ] || return 3
+    inst --home "$TEST_ROOT/fw" --clobber --no-plugins || { cat "$TEST_ROOT/err"; return 4; }
+    [ "$(find "$fish_dir" ! -type d -print)" = "$fish_dir/conf.d/00-marksharc.fish" ] || return 5
+    grep -q '^# marksharc: managed stub' "$fish_dir/conf.d/00-marksharc.fish" || return 6
+    before=$(snapshot)
+    inst --home "$TEST_ROOT/fw" --clobber --no-plugins || return 7
+    [ "$(snapshot)" = "$before" ]
+  }
+  It 'previews and backs up a legacy Fish tree with --clobber, once'
+    When run fish_clobber_case
+    The status should be success
+  End
+
+  fish_prompt_case() {
+    [ -n "$PYTHON" ] || return 0
+    fw=$TEST_ROOT/fw
+    fake_fw "$fw"
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$fish_dir" "$fw/core/fish"
+    : > "$fw/core/fish/marksharc.fish"
+    printf 'legacy\n' > "$fish_dir/config.fish"
+    pty_install() {
+      PTY_INPUT=$1 "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty \
+        sh "$installer" --home "$fw" --no-plugins > "$TEST_ROOT/out" 2>&1
+    }
+    pty_install '
+' || { cat "$TEST_ROOT/out"; return 1; }
+    grep -Fq '(y/N)' "$TEST_ROOT/out" || return 2
+    [ "$(cat "$fish_dir/config.fish")" = legacy ] || return 3
+    pty_install 'y
+' || { cat "$TEST_ROOT/out"; return 4; }
+    [ ! -e "$fish_dir/config.fish" ] && [ -f "$fish_dir/conf.d/00-marksharc.fish" ]
+  }
+  It 'asks on a terminal, keeps Fish config on Enter and backs it up on yes'
+    When run fish_prompt_case
+    The status should be success
+  End
+
+  fish_overlay_overlap_case() {
+    fw=$TEST_ROOT/fw
+    fake_fw "$fw"
+    fish_dir=$XDG_CONFIG_HOME/fish
+    mkdir -p "$fish_dir" "$fw/core/fish" "$TEST_ROOT/overlay"
+    : > "$fw/core/fish/marksharc.fish"
+    printf 'legacy\n' > "$fish_dir/config.fish"
+    ln -s "$TEST_ROOT/overlay" "$fish_dir/overlay-link"
+    before=$(snapshot)
+    MARKSHARC_CONFIG="$fish_dir/overlay-link" inst --home "$fw" --clobber --no-plugins && return 1
+    grep -Fq 'cannot clean Fish' "$TEST_ROOT/err" || return 2
+    [ "$(snapshot)" = "$before" ]
+  }
+  It 'refuses to move a Fish tree that contains the overlay symlink'
+    When run fish_overlay_overlap_case
+    The status should be success
+  End
+
+  installer_lock_case() {
+    fw=$TEST_ROOT/fw
+    fake_fw "$fw"
+    mkdir -p "$fw/core/fish" "$XDG_CONFIG_HOME/fish" "$XDG_STATE_HOME/.marksharc-install.lock"
+    : > "$fw/core/fish/marksharc.fish"
+    printf 'legacy\n' > "$XDG_CONFIG_HOME/fish/config.fish"
+    before=$(snapshot)
+    inst --home "$fw" --clobber --no-plugins && return 1
+    grep -Fq 'another install or uninstall' "$TEST_ROOT/err" || return 2
+    [ "$(snapshot)" = "$before" ]
+  }
+  It 'leaves the active backup and configuration alone when another installer owns the lock'
+    When run installer_lock_case
     The status should be success
   End
 
@@ -54,13 +140,17 @@ Describe 'install.sh'
     fake_fw "$TEST_ROOT/fw"
     printf 'original bash rc\n' > "$HOME/.bashrc"
     printf 'original profile\n' > "$HOME/profile-target"
+    printf 'original POSIX profile\n' > "$HOME/.profile"
     ln -s profile-target "$HOME/.bash_profile"
+    ln -s profile-target "$HOME/.bash_login"
+    ln -s missing "$HOME/.login"
     inst --home "$TEST_ROOT/fw" || { cat "$TEST_ROOT/err"; return 1; }
     [ -f "$HOME/.bashrc" ] && [ ! -L "$HOME/.bash_profile" ] || return 2
     head -n 1 "$HOME/.bashrc" | grep -q '^# marksharc: managed stub' || return 3
     head -n 1 "$HOME/.bash_profile" | grep -q '^# marksharc: managed stub' || return 4
     grep -qx 'file=.bashrc' "$XDG_STATE_HOME/marksharc/install.manifest" || return 5
     grep -qx 'link=.bash_profile=profile-target' "$XDG_STATE_HOME/marksharc/install.manifest" || return 6
+    [ ! -e "$HOME/.profile" ] && [ ! -L "$HOME/.bash_login" ] && [ ! -L "$HOME/.login" ]
   }
   It 'backs up existing Bash files and installs both Bash stubs'
     When run bash_install_case
@@ -86,6 +176,25 @@ Describe 'install.sh'
   }
   It 'upgrades a zsh-only install without losing the earlier backup'
     When run bash_upgrade_case
+    The status should be success
+  End
+
+  bash_profile_upgrade_case() {
+    fake_fw "$TEST_ROOT/fw"
+    printf 'original zsh rc\n' > "$HOME/.zshrc"
+    inst --home "$TEST_ROOT/fw" --no-plugins || return 1
+    original_backup=$(backup_dir)
+    printf 'original POSIX profile\n' > "$HOME/.profile"
+    ln -s missing "$HOME/.login"
+    inst --home "$TEST_ROOT/fw" --no-plugins || { cat "$TEST_ROOT/err"; return 2; }
+    [ ! -e "$HOME/.profile" ] && [ ! -L "$HOME/.login" ] || return 3
+    [ "$(backup_dir)" = "$original_backup" ] || return 4
+    [ "$(cat "$original_backup/.zshrc")" = 'original zsh rc' ] || return 5
+    [ "$(cat "$original_backup/.profile")" = 'original POSIX profile' ] || return 6
+    grep -qx 'link=.login=missing' "$XDG_STATE_HOME/marksharc/install.manifest"
+  }
+  It 'adds newly covered login files to an existing Bash-enabled install'
+    When run bash_profile_upgrade_case
     The status should be success
   End
 
