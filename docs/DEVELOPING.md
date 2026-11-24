@@ -27,6 +27,39 @@ This runs `tests/lint` and every suite, in the same order as CI. See
 CI runs on `macos-latest` and `ubuntu-latest` for every pull request and every
 push to `main`; both must be green before a merge.
 
+## Measuring a live shell
+
+The test suites run in a temporary HOME. To time a real host's startup, or to
+try a tool against it, use a live shell. Three things make a measurement from
+inside an agent or a script go wrong:
+
+- **Agent markers change the session class.** A shell started from an agent
+  inherits markers such as `CLAUDECODE`, so it runs as `agent` and skips the
+  init phase (spec 6.6). Unset every variable in the `agent.markers` option
+  first.
+- **`interactive` needs a terminal on stdin and stdout.** Redirecting stdout
+  to `/dev/null` or a file makes the shell `batch`. Run it under a
+  pseudo-terminal and send its output to `/dev/tty`, and write the results to
+  a file instead:
+
+  ```sh
+  # Linux; on macOS: script -q /dev/null zsh -f bench.zsh
+  script -qec 'zsh -f bench.zsh' /dev/null
+  ```
+
+  Inside `bench.zsh`, start each shell as
+  `zsh -i -c exit </dev/tty >/dev/tty`, time it with `$EPOCHREALTIME`, and
+  set `MARKSHARC_ENV=` so every run rebuilds the environment. Confirm the
+  class once with `echo $MARKSHARC_SESSION`.
+- **Trials must not touch the real overlay or cache.** Point `MARKSHARC_CONFIG`
+  at a scratch overlay and `XDG_CACHE_HOME` at a scratch cache. The scratch
+  overlay links every entry of the real one except `config.conf`, which is a
+  copy you can change, for example with `module node-nvm off`. Give the tool
+  under trial scratch directories of its own as well.
+
+`MARKSHARC_VERBOSE=1` prints each module's env and init time.
+`specs/DEV-62-PLAN.md` gives an example of the method and its results.
+
 ## Rules
 
 - Every behaviour change ships with a spec. Specs use a temporary HOME and
