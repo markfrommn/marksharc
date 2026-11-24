@@ -34,7 +34,7 @@
 | 3. Modernization | marksharc | Rendered env, bash env, write-once commands, Day 0 / Day 2 commands, multiplexers, upgrades, push sync | DEV-49, DEV-50, DEV-51, DEV-52, DEV-53, DEV-54, DEV-55, DEV-56 |
 | 4. Fish | marksharc | Fish on the same structure | DEV-57, DEV-58 |
 | 6. Cleanup | mark-desktop-files | No shell code left outside the overlay | DEV-59 |
-| 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64, DEV-TBD (L6) |
+| 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64, DEV-72 (L6) |
 
 Rough size: 95 estimate points across 26 scheduled PRs, plus 6 unscheduled candidates.
 
@@ -73,7 +73,7 @@ flowchart LR
   L3["L3 DEV-62"]
   L4["L4 DEV-63"]
   L5["L5 DEV-64"]
-  L6["L6 DEV-TBD"]
+  L6["L6 DEV-72"]
   P1_1 --> P1_2
   P1_2 --> P1_3
   P1_2 --> P1_4
@@ -1022,7 +1022,7 @@ on the Mac and sol is a manual acceptance step after merge.
 
 **Outcome:** Yes, as an opt-in module. Evidence and decision in [DEV-62-PLAN.md](DEV-62-PLAN.md): nvm and gvm cost about 3.5 ms at startup but about 1.9 s per `cd` into a `.nvmrc` directory; mise's hook costs about 30 ms and a shim about 27 ms per call. Operator decisions: approach A (a `mise` module owns the tools named in `mise.tools`, and the legacy modules stand aside per tool, with automatic fallback), shims for agent and batch shells, tools node, go, python, and ruby. Follow-up: L6.
 
-#### L6 — Opt-in mise module (DEV-TBD)
+#### L6 — Opt-in mise module (DEV-72)
 
 - **Repo:** marksharc
 - **Estimate:** 3
@@ -1106,7 +1106,7 @@ on the Mac and sol is a manual acceptance step after merge.
 | 6.13 Multiplexers | DEV-39 (lift), DEV-53 (adapters) |
 | 6.14 Sync | DEV-45, DEV-56 |
 | 6.15 Day 0 and Day 2 | DEV-44, DEV-45, DEV-52 |
-| 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60, L6 (DEV-TBD) |
+| 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60, L6 (DEV-72) |
 | 8 Testing and quality | Every PR; DEV-41 (CI), DEV-48 (inventory) |
 | 9 Migration map | DEV-42, DEV-43, DEV-46, DEV-59 |
 | 10 Design rules | DEV-47 |
