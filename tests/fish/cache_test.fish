@@ -44,4 +44,17 @@ ms_stub spaced 'printf "set -g SPACED %s\n" "\"$1\""'
 _ms_fish_init_cached spaced spaced 'a b'
 @test "arguments with spaces reach the tool" "$SPACED" = "a b"
 
+ms_stub colours 'printf "%s\n" "$*" >>"$TEST_ROOT/colours-calls"
+printf "%s\n" "di=01;34:*.tar=01;31 \$(touch x)'"'"'q"'
+set -e LS_COLORS
+_ms_fish_init_cached -x LS_COLORS colours colours generate
+@test "-x sets the output as an exported value" "$LS_COLORS" = "di=01;34:*.tar=01;31 \$(touch x)'q"
+@test "-x exports it" (set -S LS_COLORS | string match -q '*exported*'; and echo yes) = yes
+set -e LS_COLORS
+_ms_fish_init_cached -x LS_COLORS colours colours generate
+@test "a -x hit succeeds" $status -eq 0
+@test "a -x hit sets the value without running the tool" "$LS_COLORS|"(count <"$TEST_ROOT/colours-calls") = "di=01;34:*.tar=01;31 \$(touch x)'q|1"
+_ms_fish_init_cached -x 'a b' colours colours generate
+@test "-x refuses a bad name" $status -eq 2
+
 ms_cleanup

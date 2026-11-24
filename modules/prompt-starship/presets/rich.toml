@@ -1,0 +1,55 @@
+# The "rich" preset of the prompt-starship module (set prompt-starship.config rich).
+#
+# The left prompt stays short (directory and prompt character) so the eye stays where you
+# type; everything else flows to the right prompt through $all, including modules enabled
+# later. Plain Unicode symbols only: no Nerd Font is needed.
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = false
+command_timeout = 1000
+format = """$directory$character"""
+right_format = """$all"""
+
+[character]
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+vimcmd_symbol = '[❮](bold yellow)'
+
+[directory]
+truncation_length = 4
+truncate_to_repo = true
+
+[git_branch]
+symbol = '⎇ '
+format = '[$symbol$branch(:$remote_branch)]($style) '
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+
+# The exit code of a failed command; the red prompt character says that it failed.
+[status]
+disabled = false
+format = '[✘ $status]($style) '
+
+# Only commands that ran for two seconds or more.
+[cmd_duration]
+min_time = 2000
+format = '[⏱ $duration](yellow) '
+
+[jobs]
+symbol = '✦ '
+
+# The nesting depth, once inside a nested shell.
+[shlvl]
+disabled = false
+threshold = 2
+format = '[↕$shlvl]($style) '
+
+# Shown while sudo credentials are cached.
+[sudo]
+disabled = false
+format = '[$symbol]($style)'
+symbol = '⚡ '
+
+[time]
+disabled = true

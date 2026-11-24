@@ -820,6 +820,8 @@ Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux
 - Enabled on the Mac and sol.
 - The startup budget is still met.
 
+**Outcome:** The `zsh-autosuggestions` (95, atuin-aware) and `zsh-syntax-highlighting` (99, last) plugin modules load through a core `_ms_plugins_load` helper; the ps helpers select with ps and draw with procs; the `theme` module sets cached vivid `LS_COLORS`, bat as man pager, an opt-in delta include and fzf defaults and previews in zsh and fish; `prompt-starship.config` selects a file or the bundled `rich` preset. All are enabled by default. Live on sol, startup rose about 33 ms, to a 302–353 ms warm doctor reading against the 500 ms budget. The [task plan](DEV-54-PLAN.md) records the decisions and checks.
+
 #### P3.7 — Carapace opt-in module and evaluation (DEV-55)
 
 - **Repo:** marksharc

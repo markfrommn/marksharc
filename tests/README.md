@@ -71,7 +71,7 @@ this table to cover every module.
 | Core | Session classes; silent batch/agent startup; marker override; PTY interactive | `spec/zsh/core_session_spec.sh` |
 | Core | Env/init phase ordering through generated ZDOTDIR; MARKSHARC_ENV inherit-skip; zprofile PATH re-assert | `spec/zsh/core_phases_spec.sh` |
 | Core | Module discovery, order, requires, options, fpath, idempotency, failure containment, guard cache | `spec/zsh/core_modules_spec.sh` |
-| Core | Cached tool init: hit/miss keys, symlink resolution, missing/failing tools, unwritable cache, empty output, fixed PATH | `spec/zsh/core_cache_spec.sh` |
+| Core | Cached tool init: hit/miss keys, symlink resolution, missing/failing tools, unwritable cache, empty output, fixed PATH, `-x` export values | `spec/zsh/core_cache_spec.sh` |
 | Core | `cs`/`li` reload: rebuild, trace, session kept, edit pickup | `spec/zsh/core_reload_spec.sh` |
 | Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
 | Bash environment | Rendered Bash syntax, PATH and export parity, late guards, manager paths, agent markers, inheritance and cache recovery | `spec/contract/bash_spec.sh` |
@@ -84,6 +84,10 @@ this table to cover every module.
 | brew, core libs | setup-homebrew variants; host-fact seams | `spec/zsh/environment_spec.sh` |
 | Tool modules | brew/go/rust/bun/pnpm/lmstudio/cuda env placement; ls/pager/zsh-options/nav/zoxide/starship/direnv/greeting/completion init; editor selection (option, then emacs, then vi, no xemacs fallback); FreeBSD sourcing of the kept modules with no CLICOLOR/startx behavior | `spec/zsh/tools_spec.sh` |
 | ps | Seven helpers, header kept, self-match excluded, portable flags | `spec/zsh/ps_spec.sh` |
+| ps (procs) | Native fallback when procs is missing or `ps.procs` is off; ps selects and procs draws the selected PIDs; job columns; plain procs for all processes; empty selection; bare `ps` untouched; fish parity | `spec/zsh/modules/ps/ps_spec.sh`, `modules/ps/tests/ps_test.fish` |
+| Line-editor plugins | Load order (fzf-tab, nav and atuin before zsh-autosuggestions, zsh-syntax-highlighting last of all); each pin sourced once in order, not on reload; silent without clones; loads with completion-fzf-tab off; atuin strategy only with atuin; strategy filtering, async and atuin widgets clearing the suggestion; highlighters | `spec/zsh/modules/zsh-syntax-highlighting/load_order_spec.sh`, `spec/zsh/modules/zsh-autosuggestions/autosuggestions_spec.sh` |
+| theme | Native behaviour without vivid, bat, delta, fd or eza; cached vivid `LS_COLORS`; bat or batcat man pager; `BAT_THEME`; delta include appended to and removed from `GIT_CONFIG_COUNT`; fzf command, layout and previews, fzf-tab preview zstyles; reload removal; loads before completion; fish parity | `spec/zsh/modules/theme/theme_spec.sh`, `modules/theme/tests/theme_test.fish` |
+| prompt-starship | Config option: bundled preset or file exported as `STARSHIP_CONFIG`, unknown ignored, only its own value removed; the rich preset; fish parity | `spec/zsh/modules/prompt-starship/starship_spec.sh`, `modules/prompt-starship/tests/prompt-starship_test.fish` |
 | OMZ keepers | No OMZ references; no cloud startup; plugin loader kinds, pins, update, no-eval; nav widgets; coloured man; command-not-found | `spec/zsh/omz_removal_spec.sh` |
 | history-atuin, history-native | Wrapper over atuin, policy, native fallback, no stray history files | `spec/zsh/history_spec.sh` |
 | Overlay | Private module root, host config, env-id invalidation, reload paths, function ownership, post hook, option restore | `spec/zsh/overlay_spec.sh` |
@@ -124,7 +128,7 @@ this table to cover every module.
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |
 | Fish contract | Shared environment and PATH, session classification, inherited render ID, reload (including unloading a disabled module's functions), native modules and plugin loading, safe caller-state directives | `spec/contract/fish_render_spec.sh`, `spec/contract/fish_plugin_spec.sh`, `spec/contract/fish_directives_spec.sh` |
-| Fish units | Init cache (hit, miss, key change, empty, failing and missing tool, -P), `marksharc` completion | `fish/cache_test.fish`, `fish/completions_test.fish` |
+| Fish units | Init cache (hit, miss, key change, empty, failing and missing tool, -P, -x), `marksharc` completion | `fish/cache_test.fish`, `fish/completions_test.fish` |
 | Fish modules | Native fish behaviour per module: nav, ps, titles, mux, x11, docker, greeting, command-not-found, node-nvm, go-gvm, python, mise, brew, pager, editor, history-atuin, history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent, git-worktree | `modules/<name>/tests/<name>_test.fish` (run by `run-fish-units`) |
 | Doctor (fish) | Unchanged, modified, missing and symlinked fish stub; foreign `config.fish` lines; fisher leftovers | `spec/zsh/doctor_spec.sh` |
 | Fish runner | Pinned-version check, scrubbed environment, default discovery, workspace removal | `spec/repo/fish_runner_spec.sh` |

@@ -20,7 +20,9 @@ Describe 'module tree: bands, idempotency, tree layout and loading'
         brew) lo=10 hi=19 ;;
         completion|completion-fzf-tab|fzf-fish|herdr|cwf) lo=70 hi=79 ;;
         nav|zoxide|prompt-starship|history-atuin|history-native) lo=80 hi=89 ;;
-        titles|x11|ssh-agent|greeting) lo=90 hi=99 ;;
+        titles|x11|ssh-agent|greeting) lo=90 hi=94 ;;
+        # Line-editor plugins that wrap widgets load last of all.
+        zsh-autosuggestions|zsh-syntax-highlighting) lo=95 hi=99 ;;
         *) lo=20 hi=69 ;;
       esac
       (( order >= lo && order <= hi )) || { print "$name order $order outside $lo-$hi"; return 2; }

@@ -1,23 +1,29 @@
 # Cached tool init (spec 6.10), the fish port of _ms_init_cached.
 #
-#   _ms_fish_init_cached [-k <extra-key>] [-P <PATH>] <tool> <command...>
+#   _ms_fish_init_cached [-k <extra-key>] [-P <PATH>] [-x <NAME>] <tool> <command...>
 #
 # Stores the output of <command...> (for example `starship init fish`) under
 # $XDG_CACHE_HOME/marksharc/<host>/init/, keyed on the command's resolved binary path,
 # its mtime, the arguments, the optional extra key and the -P value, then sources the
-# file. -P runs the command under that PATH. Empty output is never cached. A hit forks
+# file. -P runs the command under that PATH. -x caches the output as the value of an
+# exported variable NAME instead of as a script. Empty output is never cached. A hit forks
 # nothing. A missing tool returns 1 silently; a failing tool returns its status and
 # caches nothing. If the cache cannot be written, the output is applied directly: it is
 # the tool's own documented shell integration, the one place generated text is evaluated.
 function _ms_fish_init_cached
     set -l extra
     set -l runpath
-    while set -q argv[1]; and contains -- "$argv[1]" -k -P
+    set -l export_name
+    while set -q argv[1]; and contains -- "$argv[1]" -k -P -x
         set -q argv[2]; or return 2
-        if test "$argv[1]" = -k
-            set extra (string replace -a \n ' ' -- "$argv[2]")
-        else
-            set runpath "$argv[2]"
+        switch $argv[1]
+            case -k
+                set extra (string replace -a \n ' ' -- "$argv[2]")
+            case -P
+                set runpath "$argv[2]"
+            case -x
+                string match -qr '^[A-Za-z_][A-Za-z0-9_]*$' -- "$argv[2]"; or return 2
+                set export_name "$argv[2]"
         end
         set -e argv[1..2]
     end
@@ -33,10 +39,12 @@ function _ms_fish_init_cached
     set bin (path resolve -- "$bin")
     set -l mtime (path mtime -- "$bin"); or return 1
     set -l key (string replace -a \n ' ' -- "$bin|$mtime|$extra|$runpath|$argv")
+    test -n "$export_name"; and set key "$key|x:$export_name"
     set -l name (string replace -a -r '[^A-Za-z0-9._-]' _ -- "$tool")__(string join _ -- $argv[2..] | string replace -a -r '[^A-Za-z0-9._-]' _)
     if test -n "$extra"
         set name "$name"__k_(string replace -a -r '[^A-Za-z0-9._-]' _ -- "$extra")
     end
+    test -n "$export_name"; and set name "$name"__x_$export_name
     set name (string sub -l 120 -- "$name")
     set -l cache "$HOME/.cache"
     set -q XDG_CACHE_HOME; and test -n "$XDG_CACHE_HOME"; and set cache "$XDG_CACHE_HOME"
@@ -66,6 +74,8 @@ function _ms_fish_init_cached
     test $result -eq 0; or return $result
     set out (string join \n -- $out | string collect)
     test -n (string trim -- "$out" | string collect); or return 0
+    # set keeps the previous status; true makes a sourced hit succeed.
+    test -n "$export_name"; and set out "set -gx $export_name "(string escape -- "$out")\ntrue
     test -d "$dir"; or command mkdir -p -- "$dir" 2>/dev/null
     set -l tmp "$file.$fish_pid"
     if printf '# marksharc-init: %s\n%s\n' "$key" "$out" >"$tmp" 2>/dev/null; and command mv -f -- "$tmp" "$file" 2>/dev/null

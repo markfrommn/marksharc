@@ -34,4 +34,26 @@ pssu >/dev/null
 @test "pssu without a pattern lists your processes" "$(cat "$TEST_ROOT/ps-args")" = "x -o pid,ppid,user,stat,etime,command"
 @test "every helper is defined" (count (functions -q pss pssj psj pssu pssuj psuj psju; and echo yes)) -eq 1
 
+# procs installed: ps still selects, procs draws the selected PIDs.
+ms_stub procs 'printf "procs %s\n" "$*" >>"$TEST_ROOT/procs-args"; echo PROCS'
+set out (pss sshd)
+@test "with procs, the selection is drawn by procs" "$out" = PROCS
+@test "procs gets the selected PIDs" "$(cat "$TEST_ROOT/procs-args")" = "procs --or 42"
+printf '' >"$TEST_ROOT/procs-args"
+pssuj init >/dev/null
+@test "the job view inserts columns" "$(cat "$TEST_ROOT/procs-args")" = "procs --insert Ppid --insert Pgid --insert State --or 1"
+printf '' >"$TEST_ROOT/procs-args"
+printf '' >"$TEST_ROOT/ps-args"
+pss >/dev/null
+@test "all processes with no pattern is plain procs" "$(cat "$TEST_ROOT/procs-args")" = "procs "
+@test "and ps is not run" -z "$(cat "$TEST_ROOT/ps-args")"
+printf '' >"$TEST_ROOT/procs-args"
+@test "nothing selected prints nothing" -z "$(pss nomatch)"
+@test "and procs is not called" -z "$(cat "$TEST_ROOT/procs-args")"
+set -g _ms_opt_ps_procs off
+set out (pss sshd)
+@test "ps.procs off keeps the native output" "$out[2]" = "   42     1 me   S   00:10 sshd: me@pts/0"
+set -e _ms_opt_ps_procs
+@test "bare ps is not wrapped" (functions -q ps; and echo yes; or echo no) = no
+
 ms_cleanup

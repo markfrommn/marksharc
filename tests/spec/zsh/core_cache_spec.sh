@@ -55,6 +55,28 @@ DATA
     When run miss_case
     The status should be success
   End
+  export_case() {
+    emulate -L zsh
+    ms_fixture
+    cat > "$TEST_ROOT/bin/colours" <<'DATA'
+#!/bin/sh
+echo "GEN $*" >> "$OPLOG"
+printf '%s\n' "di=01;34:*.tar=01;31 \$(touch x)'q"
+DATA
+    chmod +x "$TEST_ROOT/bin/colours"
+    # -x caches the output as an export, quoted literally; a hit runs nothing.
+    ms_run -c '_ms_init_cached -x LS_COLORS colours colours generate; print -r -- "rc=$? ${(t)LS_COLORS} $LS_COLORS"' || return 1
+    [[ $(<"$TEST_ROOT/out") == "rc=0 scalar-export di=01;34:*.tar=01;31 \$(touch x)'q" ]] || { cat "$TEST_ROOT/out" "$TEST_ROOT/err"; return 2; }
+    ms_run -c '_ms_init_cached -x LS_COLORS colours colours generate; print -r -- "rc=$? $LS_COLORS"' || return 3
+    [[ $(<"$TEST_ROOT/out") == "rc=0 di=01;34:*.tar=01;31 \$(touch x)'q" && $(<"$OPLOG") == 'GEN generate' && ! -e x ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 4; }
+    # The export name is part of the key, and a bad name is refused.
+    ms_run -c '_ms_init_cached -x OTHER colours colours generate; print -r -- "$OTHER"; _ms_init_cached -x "a b" colours colours generate; print -r -- "bad=$?"' || return 5
+    [[ $(<"$TEST_ROOT/out") == $'di=01;34:*.tar=01;31 $(touch x)\'q\nbad=2' && $(grep -c GEN "$OPLOG") == 2 ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 6; }
+  }
+  It 'caches output as the value of an exported variable with -x'
+    When run export_case
+    The status should be success
+  End
   symlink_case() {
     emulate -L zsh
     ms_fixture; tool_stub real-faketool

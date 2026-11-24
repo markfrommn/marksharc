@@ -5,6 +5,19 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- An interactive layer for zsh: the pinned `zsh-autosuggestions` (atuin-aware, asynchronous)
+  and `zsh-syntax-highlighting` plugin modules load after fzf-tab and atuin, syntax
+  highlighting last of all. `marksharc update` or `zsh-plugin-update` clones the pins.
+- The `theme` module sets one colour baseline in zsh and fish: cached vivid `LS_COLORS`,
+  bat as the man pager, opt-in delta for git (`set theme.delta on`), and fzf defaults with
+  bat and eza previews, also in fzf-tab.
+- The ps helpers draw their selection with procs when it is installed (`set ps.procs off`
+  keeps the native table); bare `ps` and `ls` stay untouched.
+- `set prompt-starship.config rich` selects a bundled starship preset (short left prompt,
+  context, exit status and command duration on the right); a file path works too.
+- `_ms_init_cached -x <NAME>` (and the fish equivalent) caches a tool's output as an
+  exported value.
+
 - Fish is a daily-driver shell: modules carry `init.fish`, `functions/fish` and
   `completions/fish` (nav, ls, ps, titles, mux, x11, docker, greeting,
   command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin,

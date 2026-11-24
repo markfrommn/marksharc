@@ -54,13 +54,14 @@ DATA
     [[ ${(j: :)got} == ${(j: :)want} ]] || { print -r -- "env got: ${(j: :)got}"; return 2; }
     # Init phase: the system and workflow modules in the old startup sequence, against the
     # environment and tool modules: completion (70) before herdr (78) and cwf (79), the
-    # 90-99 band last (titles 90, x11 91, ssh-agent 93), greeting (94) after ssh-agent.
+    # 90-99 band last (titles 90, x11 91, ssh-agent 93), greeting (94) after ssh-agent, then
+    # the line-editor plugins (zsh-autosuggestions 95, zsh-syntax-highlighting 99).
     # The author's private modules (convoy, mark-tools, site-bac) never load in this repo.
-    want=( completion cwf titles x11 ssh-agent greeting ); got=()
+    want=( completion cwf titles x11 ssh-agent greeting zsh-autosuggestions zsh-syntax-highlighting ); got=()
     for m in $seen; do (( ${want[(Ie)$m]} )) && got+=( $m ); done
     [[ ${(j: :)got} == ${(j: :)want} ]] || { print -r -- "init got: ${(j: :)got}"; return 3; }
-    # Nothing loads after greeting: it is the last init of the tree.
-    [[ ${seen[-1]} == greeting ]] || { print -r -- "last init: ${seen[-1]}"; return 4; }
+    # Nothing loads after zsh-syntax-highlighting: it is the last init of the tree.
+    [[ ${seen[-1]} == zsh-syntax-highlighting ]] || { print -r -- "last init: ${seen[-1]}"; return 4; }
   }
   It 'loads the env and init phases in the order that reproduces the old startup sequence'
     When run order_case
