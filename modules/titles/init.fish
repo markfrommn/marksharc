@@ -6,8 +6,8 @@ function _ms_titles_on_pwd --on-variable PWD
     chdir-set-title
 end
 
+_ms_fish_track_functions fish_title
 function fish_title
 end
-_ms_fish_track_functions fish_title
 
 true

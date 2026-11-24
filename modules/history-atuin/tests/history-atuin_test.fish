@@ -15,7 +15,8 @@ ms_module history-atuin >"$TEST_ROOT/out" 2>&1
 @test "startup prints nothing" ! -s "$TEST_ROOT/out"
 @test "the cached atuin init was sourced" "$_atuin_init_ran" = yes
 @test "init ran 'atuin init fish'" "$(cat "$TEST_ROOT/atuin-calls")" = "init fish"
-@test "history and h are autoloadable" (functions -q history h; and echo yes) = yes
+@test "history and h are defined" (functions -q history h; and echo yes) = yes
+@test "fish's own history function is kept, not the module's" (functions _ms_fish_history_native | string match -v -r '^\s*#' | string match -q '*atuin*'; and echo ours; or echo fish) = fish
 
 set -e _atuin_init_ran
 ms_module history-atuin

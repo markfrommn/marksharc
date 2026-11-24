@@ -30,25 +30,25 @@ if command -sq man
             end
         end
     end
+    _ms_fish_track_functions man
     function man --wraps man --description 'Format and display the on-line manual pages, in colour'
         colored _ms_fish_man_plain $argv
     end
-    _ms_fish_track_functions man
 end
 for _ms_name in dman debman
     if command -sq $_ms_name
+        _ms_fish_track_functions $_ms_name
         function $_ms_name --wraps $_ms_name --inherit-variable _ms_name --description 'Coloured Debian man pages'
             colored command $_ms_name $argv
         end
-        _ms_fish_track_functions $_ms_name
     end
 end
 
 # Use diff --color=always if available, then default the wrapper to --color=auto.
 if command diff --color=always /dev/null /dev/null &>/dev/null
+    _ms_fish_track_functions diff
     function diff --wraps diff --description 'diff with --color=auto'
         command diff --color=auto $argv
     end
-    _ms_fish_track_functions diff
 end
 return 0

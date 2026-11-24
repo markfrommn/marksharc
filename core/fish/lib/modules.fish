@@ -160,12 +160,17 @@ function _ms_fish_init_module
     return 0
 end
 
-# init.fish calls this for the functions it defines over fish's own (fish_title, man,
-# history): the new-name check cannot see a redefinition. A reload that disables the module
-# then erases them and loads fish's copy again.
+# init.fish calls this BEFORE it defines a function over fish's own (fish_title, man,
+# history): the new-name check cannot see a redefinition. The current definition (fish's,
+# autoloaded if need be) is saved once as _ms_fish_saved_<name>, so a reload that disables
+# the module can erase the override and put fish's function back. Fish may embed its
+# functions in the binary, so a copy is the portable way to keep them.
 function _ms_fish_track_functions
     set -q _ms_fish_init_fvar; or return 0
     for fn in $argv
+        if not functions -q _ms_fish_saved_$fn; and functions -q -- "$fn"
+            functions -c -- "$fn" _ms_fish_saved_$fn
+        end
         contains -- "$fn" $$_ms_fish_init_fvar; or set -ga $_ms_fish_init_fvar "$fn"
     end
 end
@@ -187,12 +192,13 @@ function _ms_fish_forget_disabled_modules
         for fn in $$fvar
             # Autoloaded functions left with their directory. An erased name never autoloads
             # again in this session, so only inline ones are erased, and a fish function they
-            # shadowed (man, history, fish_title) is loaded again from fish's own copy.
+            # shadowed (man, history, fish_title) comes back from the copy saved before it.
+            string match -q '_ms_fish_saved_*' -- "$fn"; and continue
             functions -q -- "$fn"; or continue
             set -l details (functions -D -v -- "$fn")
             test "$details[2]" = autoloaded; and continue
             functions -e -- "$fn"
-            test -r "$__fish_data_dir/functions/$fn.fish"; and source "$__fish_data_dir/functions/$fn.fish"
+            functions -q _ms_fish_saved_$fn; and functions -c _ms_fish_saved_$fn "$fn"
         end
         for line in $$bvar
             set -l words (string split -n ' ' -- "$line")

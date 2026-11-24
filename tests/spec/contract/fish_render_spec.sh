@@ -273,7 +273,7 @@ EOF
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish"
     printf 'describe demo\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/module.conf"
     printf 'function demo_fn; echo demo; end\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish/demo_fn.fish"
-    printf 'function demo_hook --on-variable PWD; demo_fn; end\nbind alt-q demo_fn\nfunction fish_title; end\n_ms_fish_track_functions fish_title\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/init.fish"
+    printf 'function demo_hook --on-variable PWD; demo_fn; end\nbind alt-q demo_fn\n_ms_fish_track_functions fish_title\nfunction fish_title; end\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/init.fish"
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/keep"
     printf 'describe keep\n' > "$XDG_CONFIG_HOME/marksharc/modules/keep/module.conf"
     printf 'function keep_fn; echo keep; end\n' > "$XDG_CONFIG_HOME/marksharc/modules/keep/init.fish"
@@ -296,7 +296,7 @@ EOF
       cd /; or exit 13
       test (keep_fn) = keep; or exit 14
       not set -q _ms_fish_reloading; or exit 15
-      functions -D fish_title | string match -q "$__fish_data_dir/functions/fish_title.fish"; or exit 16
+      functions -q fish_title; and not functions -D fish_title | string match -q "*/modules/demo/init.fish"; or exit 16
       echo reloaded
     ' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
     grep -q '^reloaded$' "$TEST_ROOT/out"
