@@ -1037,6 +1037,8 @@ on the Mac and sol is a manual acceptance step after merge.
 - Init phase: cached `mise activate zsh` with the hook on directory change only by default (`hook chpwd`: mise's `precmd` hook removed, a wrapper refreshes after `mise shell`, `use` and similar, `cd .` picks up a hand-edited config; `hook prompt` keeps mise's per-prompt hook; `hook off` uses shims only); optional `nvm` and `gvm` translation functions.
 - `node-nvm`, `go-gvm`, and the pyenv branch of `python` stand aside for owned tools, including on reload.
 - Doctor checks: mise missing for a non-empty `mise.tools`; a uv-format `~/.python-version` when python is owned.
+- Day 2 directives (P3.4, landed): `installer mise installers/mise`, `package brew mise`, and an `update` step.
+- Fish (P4.2, landed): `init.fish` with a directory-change-only `mise activate fish`, and the same stand-aside in the fish halves of `node-nvm` (including its `nvm.fish` plugin), `go-gvm`, and `python`.
 
 **Tests**
 

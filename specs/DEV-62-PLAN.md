@@ -39,8 +39,8 @@ From the documentation (2026-11) and the trial:
 - **Activation modes.** `mise activate zsh` adds a `precmd` and a `chpwd` hook that run
   `mise hook-env` and prepend the selected tools' `bin` directories. Shims (one directory of
   links to the `mise` binary) resolve the version from the current directory each time they
-  run. `mise exec` serves scripts. bash and fish are supported natively, which would replace
-  nvm.fish and fish-gvm in the fish phase.
+  run. `mise exec` serves scripts. bash and fish are supported natively, so one tool would serve
+  the fish modules (DEV-58) in place of the `nvm.fish` plugin and the fish gvm functions.
 - **Version files** are off until enabled per tool
   (`idiomatic_version_file_enable_tools`, or `MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS`):
   `.nvmrc` (with `lts/*` aliases), `.node-version`, `package.json`; `.go-version`, `go.mod`,
@@ -141,7 +141,9 @@ Operator decisions, 2026-11-24:
 
 ## Follow-up
 
-L6 in MARKSHARC-PLAN carries the implementation; its Linear issue is linked there.
+L6 in MARKSHARC-PLAN carries the implementation; its Linear issue is linked there. This
+evaluation ran against `a3b1522`; since then explicit installers (P3.4) and the native fish modules
+(DEV-58) have landed, so L6 covers a mise installer and the fish half of the module as well.
 
 ## Result
 
