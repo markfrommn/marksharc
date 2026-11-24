@@ -65,6 +65,57 @@ Describe 'marksharc doctor'
     When run altered_fish_stub_case
     The status should be success
   End
+  unchanged_fish_stub_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    local stub=$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish
+    mkdir -p "$XDG_STATE_HOME/marksharc" "${stub:h}"
+    print -r -- '# marksharc: managed stub' > "$stub"
+    print -r -- "fish_stub=$stub"$'\n'"fish_stub_sum=$(command cksum < "$stub" | tr -s ' ' ' ')" > "$XDG_STATE_HOME/marksharc/install.manifest"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'fish stub'* && $(<"$TEST_ROOT/out") != *'foreign dotfile'*fish* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'accepts an unchanged fish installer stub by its manifest checksum'
+    When run unchanged_fish_stub_case
+    The status should be success
+  End
+  missing_fish_stub_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    local stub=$XDG_CONFIG_HOME/fish/conf.d/00-marksharc.fish
+    mkdir -p "$XDG_STATE_HOME/marksharc"
+    print -r -- "fish_stub=$stub"$'\n''fish_stub_sum=1 1' > "$XDG_STATE_HOME/marksharc/install.manifest"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *"missing or unmanaged fish stub: $stub"* ]] || { cat "$TEST_ROOT/out"; return 1; }
+    mkdir -p "${stub:h}"
+    print -r -- 'elsewhere' > "$TEST_ROOT/linked.fish"
+    ln -s "$TEST_ROOT/linked.fish" "$stub"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") == *"missing or unmanaged fish stub: $stub"* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'reports a missing or symlinked fish installer stub'
+    When run missing_fish_stub_case
+    The status should be success
+  End
+  fisher_leftover_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_CONFIG_HOME/fish/functions"
+    print -r -- 'jorgebucaran/fisher'$'\n''edc/bass' > "$XDG_CONFIG_HOME/fish/fish_plugins"
+    print -r -- 'function fisher; end' > "$XDG_CONFIG_HOME/fish/functions/fisher.fish"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *"fisher leftover (marksharc pins its fish plugins): $XDG_CONFIG_HOME/fish/fish_plugins"* &&
+       $out == *'2: edc/bass'* &&
+       $out == *"fisher leftover (marksharc pins its fish plugins): $XDG_CONFIG_HOME/fish/functions/fisher.fish"* ]] || { print -r -- "$out"; return 1; }
+  }
+  It 'reports fisher leftovers so the host can drop fisher'
+    When run fisher_leftover_case
+    The status should be success
+  End
   installed_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"

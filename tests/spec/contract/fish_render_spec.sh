@@ -272,18 +272,31 @@ EOF
     [ -n "$PYTHON" ] || return 0
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish"
     printf 'describe demo\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/module.conf"
-    printf 'module path\nmodule demo\nmodule git-worktree\nset git-worktree.roots "%s"\nenv RELOAD_VALUE old\nenv REMOVED_VALUE keep\n' "$HOME" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    printf 'function demo_fn; echo demo; end\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish/demo_fn.fish"
+    printf 'function demo_hook --on-variable PWD; demo_fn; end\nbind alt-q demo_fn\nfunction fish_title; end\n_ms_fish_track_functions fish_title\n' > "$XDG_CONFIG_HOME/marksharc/modules/demo/init.fish"
+    mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/keep"
+    printf 'describe keep\n' > "$XDG_CONFIG_HOME/marksharc/modules/keep/module.conf"
+    printf 'function keep_fn; echo keep; end\n' > "$XDG_CONFIG_HOME/marksharc/modules/keep/init.fish"
+    printf 'module path\nmodule demo\nmodule keep\nmodule git-worktree\nset git-worktree.roots "%s"\nenv RELOAD_VALUE old\nenv REMOVED_VALUE keep\n' "$HOME" > "$XDG_CONFIG_HOME/marksharc/config.conf"
     env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
     "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c '
       source "$MARKSHARC_HOME/core/fish/marksharc.fish"
       test "$MARKSHARC_SESSION" = interactive; or exit 2
       test "$_ms_opt_git_worktree_roots" = "$HOME"; or exit 7
       contains -- "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish" $fish_function_path; or exit 5
-      printf "module path\nenv RELOAD_VALUE new\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+      test (demo_fn) = demo; or exit 9
+      functions -q demo_hook; and test -n "$(bind --user alt-q)"; or exit 11
+      printf "module path\nmodule keep\nenv RELOAD_VALUE new\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"
       marksharc reload; or exit 3
       test "$RELOAD_VALUE" = new; and not set -q REMOVED_VALUE; or exit 4
       not set -q _ms_opt_git_worktree_roots; or exit 8
       not contains -- "$XDG_CONFIG_HOME/marksharc/modules/demo/functions/fish" $fish_function_path; or exit 6
+      not functions -q demo_fn; or exit 10
+      not functions -q demo_hook; and test -z "$(bind --user alt-q)"; or exit 12
+      cd /; or exit 13
+      test (keep_fn) = keep; or exit 14
+      not set -q _ms_fish_reloading; or exit 15
+      functions -D fish_title | string match -q "$__fish_data_dir/functions/fish_title.fish"; or exit 16
       echo reloaded
     ' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
     grep -q '^reloaded$' "$TEST_ROOT/out"

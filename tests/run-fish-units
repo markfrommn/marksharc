@@ -1,0 +1,60 @@
+#!/bin/sh
+# Run the fish unit suite (fishtape) in a scrubbed environment with a throwaway HOME.
+# Usage: tests/run-fish-units [test files]
+# With no arguments it runs every modules/*/tests/*_test.fish and tests/fish/*_test.fish.
+# Tests never install their runner: set FISHTAPE_FUNC to functions/fishtape.fish from the
+# pinned checkout (tests/fishtape.pin). The suite fails when fishtape fails, when any
+# assertion reports "not ok", or when no assertion ran at all.
+set -eu
+suite=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+root=$(CDPATH='' cd -- "$suite/.." && pwd)
+pinned=$(awk '$1 == "version" { print $2 }' "$suite/fishtape.pin")
+func=${FISHTAPE_FUNC:-}
+if [ -z "$func" ] || [ ! -r "$func" ]; then
+  echo "fishtape $pinned required; set FISHTAPE_FUNC to its functions/fishtape.fish." >&2
+  exit 127
+fi
+func=$(CDPATH='' cd -- "$(dirname -- "$func")" && pwd)/$(basename -- "$func")
+if ! command -v fish >/dev/null 2>&1; then
+  echo "fish is required for the fish unit suite." >&2
+  exit 127
+fi
+# shellcheck disable=SC2016 # $argv belongs to fish
+actual=$(fish --no-config -c 'source $argv[1]; and fishtape --version' "$func" 2>/dev/null || :)
+if [ "$actual" != "fishtape, version $pinned" ]; then
+  echo "fishtape $pinned required; $func reports '${actual:-no version}'." >&2
+  exit 127
+fi
+cd "$root"
+if [ "$#" -eq 0 ]; then
+  for f in modules/*/tests/*_test.fish tests/fish/*_test.fish; do
+    [ -f "$f" ] && set -- "$@" "$f"
+  done
+fi
+if [ "$#" -eq 0 ]; then
+  echo "run-fish-units: no test files" >&2
+  exit 1
+fi
+workspace=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-fish-units.XXXXXX")
+trap 'rm -rf -- "$workspace"' EXIT
+trap 'exit 130' HUP INT TERM
+mkdir -p "$workspace/home" "$workspace/config" "$workspace/cache" "$workspace/data" "$workspace/state"
+# fishtape keeps its counts in universal variables that each per-file child fish updates, so
+# the parent fish reads its (throwaway) configuration: no --no-config here.
+status=0
+# shellcheck disable=SC2016 # $argv belongs to fish
+env -i PATH="$PATH" HOME="$workspace/home" \
+  XDG_CONFIG_HOME="$workspace/config" XDG_CACHE_HOME="$workspace/cache" \
+  XDG_DATA_HOME="$workspace/data" XDG_STATE_HOME="$workspace/state" \
+  MARKSHARC_ROOT="$root" REAL_GIT="$(command -v git)" TMPDIR="$workspace" TERM=dumb \
+  fish -c 'source $argv[1]; and fishtape $argv[2..]' "$func" "$@" > "$workspace/tap" 2>&1 || status=$?
+cat "$workspace/tap"
+if [ "$status" -eq 0 ] && grep -q '^not ok' "$workspace/tap"; then
+  echo "run-fish-units: an assertion failed" >&2
+  status=1
+fi
+if [ "$status" -eq 0 ] && ! grep -q '^ok' "$workspace/tap"; then
+  echo "run-fish-units: no assertion ran" >&2
+  status=1
+fi
+exit "$status"

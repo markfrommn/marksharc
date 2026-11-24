@@ -51,8 +51,3 @@ function _ms_fish_run_with_directives
     test $command_status -ne 0; and return $command_status
     return $apply_status
 end
-
-function _ms_fish_caller_state_command
-    set -lx MARKSHARC_SESSION "$MARKSHARC_SESSION"
-    _ms_fish_run_with_directives (status current-function) $argv
-end

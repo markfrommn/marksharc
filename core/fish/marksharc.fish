@@ -4,6 +4,7 @@ if not set -q MARKSHARC_HOME
 end
 
 source "$MARKSHARC_HOME/core/fish/lib/directives.fish"
+source "$MARKSHARC_HOME/core/fish/lib/cache.fish"
 source "$MARKSHARC_HOME/core/fish/lib/path.fish"
 source "$MARKSHARC_HOME/core/fish/lib/modules.fish"
 source "$MARKSHARC_HOME/core/fish/lib/plugins.fish"
@@ -79,6 +80,12 @@ if test -r "$_ms_rendered"
     source "$_ms_rendered"
 end
 if test "$MARKSHARC_SESSION" = interactive
+    # Startup prints nothing by default (spec 6.10): fish's own welcome text stays off unless
+    # the user set fish_greeting. The greeting module owns any greeting.
+    set -q fish_greeting; or set -g fish_greeting ''
+    if not contains -- "$MARKSHARC_HOME/core/fish/completions" $fish_complete_path
+        set -gp fish_complete_path "$MARKSHARC_HOME/core/fish/completions"
+    end
     function marksharc
         if test "$argv[1]" != reload
             command "$MARKSHARC_HOME/bin/marksharc" $argv
@@ -99,9 +106,6 @@ if test "$MARKSHARC_SESSION" = interactive
         for name in $_ms_fish_aliases
             functions -e "$name"
         end
-        for name in $_ms_fish_wrappers
-            functions -e "$name"
-        end
         for dir in $_ms_fish_function_paths
             set -l index (contains -i -- "$dir" $fish_function_path)
             test -n "$index"; and set -e -g fish_function_path[$index]
@@ -112,7 +116,6 @@ if test "$MARKSHARC_SESSION" = interactive
         end
         set -g _ms_fish_exports
         set -g _ms_fish_aliases
-        set -g _ms_fish_wrappers
         set -g _ms_fish_function_paths
         set -g _ms_fish_completion_paths
         set -g _ms_fish_plugins_loaded
@@ -121,7 +124,8 @@ if test "$MARKSHARC_SESSION" = interactive
         if test $verbose -eq 1
             set -g _ms_fish_force_verbose 1
         end
-        source "$MARKSHARC_HOME/core/fish/marksharc.fish"
+        _ms_fish_source_entry
+        _ms_fish_forget_disabled_modules
         set -e -g _ms_fish_reloading
         set -e -g _ms_fish_force_verbose
         return 0
