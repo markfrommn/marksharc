@@ -62,7 +62,7 @@ directive applier. Native fish code is tested with fishtape units next to each m
 - [x] `tests/check` (lint, zsh, contract, install, repo, fish units) on Linux; a PTY smoke of an
       interactive fish against a temporary HOME with the real tools on this host.
 - [x] Update `tests/README.md`, `README.md`, the changelog and the P4.2 outcome.
-- [ ] Hosted macOS and Ubuntu checks on the PR. The Mac daily-driver check stays a manual acceptance step.
+- [x] Hosted macOS and Ubuntu checks on the PR. The Mac daily-driver check stays a manual acceptance step.
 
 ## Local verification
 
@@ -79,3 +79,13 @@ fixed. Reloading also exposed an older defect: the entry point's final `return` 
 `marksharc reload` early and left `_ms_fish_reloading` set. That is fixed too, with regression checks.
 
 Fish on the Mac and sol as a daily driver remains a manual acceptance step.
+
+## Delivery
+
+Implemented in [PR #13](https://github.com/markfrommn/marksharc/pull/13). Both hosted check jobs
+and both install end-to-end jobs passed on commit `68b5dce`
+([run](https://github.com/markfrommn/marksharc/actions/runs/45301839514)). The first hosted runs
+exposed portability gaps the Linux host could not show: Homebrew fish 4.9 embeds its function
+files and lists comments in `bind --user`, macOS keeps `bash` and `cat` only in `/bin` and has BSD
+`touch`, and fishtape skips without counting an assertion whose expression errors. The code and
+units now handle each case, and `run-fish-units` fails on a fish error.
