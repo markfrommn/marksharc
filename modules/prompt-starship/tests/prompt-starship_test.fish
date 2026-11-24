@@ -25,7 +25,7 @@ set -e _ms_fish_reloading
 @test "reload does not source the init again" ! (functions -q _marker_prompt_starship; and echo yes)
 
 ms_stub starship 'exit 1'
-command touch -d 2001-01-01 "$TEST_ROOT/bin/starship"
+command touch -t 200101010000 "$TEST_ROOT/bin/starship"
 ms_module prompt-starship >"$TEST_ROOT/out" 2>&1
 set -l st $status
 @test "a failing init breaks nothing" $st -eq 0

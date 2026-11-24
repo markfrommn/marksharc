@@ -13,7 +13,7 @@ _ms_fish_init_cached demo demo init fish
 @test "a hit sources the cached output" "$DEMO_LOADED" = "init fish"
 @test "a hit runs nothing" (count <"$TEST_ROOT/demo-calls") -eq 1
 
-command touch -d '2001-01-01 00:00:00' "$TEST_ROOT/bin/demo"
+command touch -t 200101010000 "$TEST_ROOT/bin/demo"
 _ms_fish_init_cached demo demo init fish
 @test "a changed binary mtime is a miss" (count <"$TEST_ROOT/demo-calls") -eq 2
 

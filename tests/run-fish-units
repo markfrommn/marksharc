@@ -4,7 +4,8 @@
 # With no arguments it runs every modules/*/tests/*_test.fish and tests/fish/*_test.fish.
 # Tests never install their runner: set FISHTAPE_FUNC to functions/fishtape.fish from the
 # pinned checkout (tests/fishtape.pin). The suite fails when fishtape fails, when any
-# assertion reports "not ok", or when no assertion ran at all.
+# assertion reports "not ok", when fish reports an error (an assertion whose expression
+# failed to run is skipped, not counted), or when no assertion ran at all.
 set -eu
 suite=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH='' cd -- "$suite/.." && pwd)
@@ -51,6 +52,10 @@ env -i PATH="$PATH" HOME="$workspace/home" \
 cat "$workspace/tap"
 if [ "$status" -eq 0 ] && grep -q '^not ok' "$workspace/tap"; then
   echo "run-fish-units: an assertion failed" >&2
+  status=1
+fi
+if [ "$status" -eq 0 ] && grep -Eq '^fish: |\.fish \(line [0-9]+\): ' "$workspace/tap"; then
+  echo "run-fish-units: fish reported an error" >&2
   status=1
 fi
 if [ "$status" -eq 0 ] && ! grep -q '^ok' "$workspace/tap"; then

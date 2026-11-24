@@ -26,7 +26,7 @@ setup-homebrew "$FAKEBREW" >"$TEST_ROOT/out" 2>&1
 @test "shellenv ran under the fixed minimal PATH" (count (string match -- '*PATH=/usr/bin:/bin:/usr/sbin:/sbin' <"$OPLOG")) -eq 1
 
 # Brew directories already present keep their place; only absent ones move to the front.
-set -gx PATH "$TEST_ROOT/bin" $keep "$FAKE/sbin" /usr/bin
+set -gx PATH "$TEST_ROOT/bin" $keep "$FAKE/sbin" /usr/bin /bin
 set before $PATH
 setup-homebrew "$FAKEBREW"
 @test "a directory already on PATH keeps its position" (string join '|' -- $PATH) = (string join '|' -- "$FAKE/bin" $before)
@@ -40,7 +40,7 @@ setup-homebrew "$FAKEBREW"
 
 # A missing candidate is skipped; the first existing one wins.
 set -e HOMEBREW_PREFIX
-set -gx PATH "$TEST_ROOT/bin" /usr/bin
+set -gx PATH "$TEST_ROOT/bin" /usr/bin /bin
 setup-homebrew "$TEST_ROOT/none/brew" "$FAKEBREW"
 @test "a missing candidate is skipped" "$HOMEBREW_PREFIX" = "$FAKE"
 @test "a directory is never a candidate" (setup-homebrew "$FAKE/bin"; echo $status) = 0

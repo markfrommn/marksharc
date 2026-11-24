@@ -55,16 +55,16 @@ function _ms_fish_init_cached
         end
     end
     test "$_ms_fish_verbose" = 1; and printf 'marksharc: init-cache miss: %s\n' "$tool" >&2
+    # set keeps the status of its command substitution; the lines are joined afterwards.
     set -l out
-    set -l result 0
     if test -n "$runpath"
-        set out (env PATH="$runpath" "$cmdbin" $argv[2..] 2>/dev/null | string collect)
-        set result $pipestatus[1]
+        set out (env PATH="$runpath" "$cmdbin" $argv[2..] 2>/dev/null)
     else
-        set out ($cmdbin $argv[2..] 2>/dev/null | string collect)
-        set result $pipestatus[1]
+        set out ($cmdbin $argv[2..] 2>/dev/null)
     end
+    set -l result $status
     test $result -eq 0; or return $result
+    set out (string join \n -- $out | string collect)
     test -n (string trim -- "$out" | string collect); or return 0
     test -d "$dir"; or command mkdir -p -- "$dir" 2>/dev/null
     set -l tmp "$file.$fish_pid"

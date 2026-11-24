@@ -88,11 +88,11 @@ ms_module go-gvm
 printf 'export gvm_go_name; gvm_go_name="go1.21.5"\n' >"$GV/environments/default"
 
 # 6. gvm use switches natively: PATH entries are replaced in place, variables set, no bash.
-set -gx PATH "$TEST_ROOT/bin" /opt/first (trio go1.21.5) "$GV/bin" /opt/last /usr/bin
+set -gx PATH "$TEST_ROOT/bin" /opt/first (trio go1.21.5) "$GV/bin" /opt/last /usr/bin /bin
 printf '' >"$OPLOG"
 set -l out (gvm use go1.22.1)
 @test "use prints the gvm acknowledgement" "$out" = "Now using version go1.22.1"
-@test "use replaces the gvm entries where they stood" (gos) = (string join '|' -- "$TEST_ROOT/bin" /opt/first (trio go1.22.1) "$GV/bin" /opt/last /usr/bin)
+@test "use replaces the gvm entries where they stood" (gos) = (string join '|' -- "$TEST_ROOT/bin" /opt/first (trio go1.22.1) "$GV/bin" /opt/last /usr/bin /bin)
 @test "use sets GOROOT" "$GOROOT" = "$GV/gos/go1.22.1"
 @test "use sets GOPATH to the global pkgset" "$GOPATH" = "$GV/pkgsets/go1.22.1/global"
 @test "use sets gvm_go_name and gvm_pkgset_name" "$gvm_go_name $gvm_pkgset_name" = "go1.22.1 global"
@@ -102,9 +102,9 @@ set -l out (gvm use go1.22.1)
 @test "go resolves to the new Go" "$(go)" = go1.22.1
 
 # 7. Use with the gvm entries absent puts the new ones in front.
-set -gx PATH "$TEST_ROOT/bin" /usr/bin
+set -gx PATH "$TEST_ROOT/bin" /usr/bin /bin
 gvm use go1.9.7 >/dev/null
-@test "use with no gvm entries prepends them" (gos) = (string join '|' -- (trio go1.9.7) "$TEST_ROOT/bin" /usr/bin)
+@test "use with no gvm entries prepends them" (gos) = (string join '|' -- (trio go1.9.7) "$TEST_ROOT/bin" /usr/bin /bin)
 
 # 8. A Go that is not installed fails without changing anything.
 set -l before (gos)

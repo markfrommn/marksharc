@@ -64,6 +64,13 @@ EOF
     The output should include 'not ok 1 broken'
     The stderr should include 'an assertion failed'
   End
+  It 'fails when fish reports an error, which fishtape does not count'
+    fake_reporting_fishtape 'fish: Unknown command: cat'
+    When run run_units modules/ps/tests/ps_test.fish
+    The status should be failure
+    The output should include 'Unknown command'
+    The stderr should include 'fish reported an error'
+  End
   It 'fails when no assertion ran'
     fake_reporting_fishtape '1..0'
     When run run_units modules/ps/tests/ps_test.fish
