@@ -51,6 +51,11 @@ All notable changes to this project are recorded here. The format follows
 
 ### Added
 
+- Opt-in `mise` ownership of Node, Go, Python, and Ruby per host, with manager-tier shims
+  for every session class, directory-change-only interactive activation, safe `MISE_*`
+  defaults, legacy-manager fallback, optional nvm/gvm compatibility functions, doctor
+  diagnostics, and explicit install/update integration. Migration is in
+  [docs/mise.md](docs/mise.md).
 - `marksharc bootstrap`, declarative package bundles, selectable update steps and
   explicit installers for krew, gvm, WezTerm terminfo, pyenv and nvm. Updates
   report each result and continue after failures.

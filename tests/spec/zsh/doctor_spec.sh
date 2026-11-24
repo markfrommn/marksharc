@@ -396,6 +396,55 @@ Describe 'marksharc doctor'
     When run timing_notify_case
     The status should be success
   End
+  mise_doctor_fixture() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module mise
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    ms_env
+  }
+  missing_mise_case() {
+    mise_doctor_fixture
+    print -r -- 'set mise.tools "node go"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *mise*missing* || $out == *missing*mise* ]] || { print -r -- "$out"; return 1; }
+    print -r -- 'set mise.tools ""' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    out=$(<"$TEST_ROOT/out")
+    [[ $out != *mise*missing* && $out != *missing*mise* ]] || { print -r -- "$out"; return 2; }
+    print -r -- 'set mise.tools "node go"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command mise 'exit 0'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    out=$(<"$TEST_ROOT/out")
+    [[ $out != *mise*missing* && $out != *missing*mise* ]] || { print -r -- "$out"; return 3; }
+  }
+  It 'diagnoses missing mise only for nonempty configured tools without requiring module listing'
+    When run missing_mise_case
+    The status should be success
+  End
+
+  uv_pin_case() {
+    mise_doctor_fixture
+    stub_command mise 'exit 0'
+    print -r -- 'set mise.tools "python"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    print -r -- 'cpython-3.13-any-any-any' > "$HOME/.python-version"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *'.python-version'* && $out == *uv* && $out == *mise* ]] || { print -r -- "$out"; return 1; }
+    print -r -- '3.13.0' > "$HOME/.python-version"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'.python-version'* ]] || { cat "$TEST_ROOT/out"; return 2; }
+    print -r -- 'cpython-3.13-any-any-any' > "$HOME/.python-version"
+    print -r -- 'set mise.tools "node"' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $(<"$TEST_ROOT/out") != *'.python-version'* ]] || { cat "$TEST_ROOT/out"; return 3; }
+  }
+  It 'warns about a uv Python pin only while mise owns Python'
+    When run uv_pin_case
+    The status should be success
+  End
+
   host_override_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"

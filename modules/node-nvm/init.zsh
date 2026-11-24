@@ -4,11 +4,16 @@
 # it leaves PATH alone) the first time nvm runs or an .nvmrc needs it.
 autoload -Uz add-zsh-hook
 typeset -g HAVE_NVM=
+if (( ${+functions[_ms_mise_owns]} )) && _ms_mise_owns node; then
+    add-zsh-hook -d chpwd load-nvmrc
+    return 0
+fi
 if [[ -s $NVM_DIR/nvm.sh ]]; then
     HAVE_NVM=1
     # A reload keeps an nvm that is already loaded, and the first-use stub otherwise.
     if (( ! ${+functions[nvm]} )); then
         nvm() { _ms_nvm_load || return $?; nvm "$@"; }
+        typeset -g _ms_nvm_first_use_stub=1
     fi
 fi
 
@@ -17,9 +22,11 @@ if [[ -n $HAVE_NVM ]]; then
     _ms_nvm_load() {
         [[ -n ${_ms_nvm_loaded-} ]] && return 0
         unfunction nvm 2>/dev/null
+        unset _ms_nvm_first_use_stub
         if ! source "$NVM_DIR/nvm.sh" --no-use || (( ! ${+functions[nvm]} )); then
             print -ru2 -- "nvm: could not load $NVM_DIR/nvm.sh"
             nvm() { _ms_nvm_load || return $?; nvm "$@"; }
+            typeset -g _ms_nvm_first_use_stub=1
             return 1
         fi
         [[ ! -s $NVM_DIR/bash_completion ]] || source "$NVM_DIR/bash_completion"

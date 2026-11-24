@@ -306,6 +306,103 @@ EOF
     The status should be success
   End
 
+  mise_parity_case() {
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$XDG_DATA_HOME/mise/shims"
+    cat > "$XDG_CONFIG_HOME/marksharc/config.conf" <<'EOF'
+module path
+module mise
+set mise.tools "node go"
+set mise.auto_install off
+set mise.set_gobin off
+EOF
+    stub_command mise 'exit 0'
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 XDG_DATA_HOME="$XDG_DATA_HOME" \
+      zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh"; print -r -- "$PATH|$MISE_NOT_FOUND_AUTO_INSTALL|$MISE_GO_SET_GOBIN|$MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS"' \
+      > "$TEST_ROOT/zsh-env" 2> "$TEST_ROOT/err" || return 2
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 XDG_DATA_HOME="$XDG_DATA_HOME" \
+      fish --no-config -c 'source "$MARKSHARC_HOME/core/fish/marksharc.fish"; printf "%s" (string join : $PATH); printf "|%s|%s|%s\n" "$MISE_NOT_FOUND_AUTO_INSTALL" "$MISE_GO_SET_GOBIN" "$MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS"' \
+      > "$TEST_ROOT/fish-env" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 3; }
+    cmp "$TEST_ROOT/zsh-env" "$TEST_ROOT/fish-env" || { cat "$TEST_ROOT/zsh-env" "$TEST_ROOT/fish-env"; return 4; }
+    grep -F "$XDG_DATA_HOME/mise/shims" "$TEST_ROOT/fish-env" >/dev/null &&
+      grep -F '|false|false|node,go' "$TEST_ROOT/fish-env" >/dev/null
+  }
+  It 'builds identical mise shims and safe exports in fish and zsh'
+    When run mise_parity_case
+    The status should be success
+  End
+
+  fish_missing_inherited_case() {
+    [ -n "$PYTHON" ] || return 0
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$XDG_DATA_HOME/mise/shims" \
+      "$HOME/.nvm/alias" "$HOME/.nvm/versions/node/v22.1.0/bin" \
+      "$HOME/.gvm/environments" "$HOME/.gvm/gos/go1.23.0/bin"
+    printf '22\n' > "$HOME/.nvm/alias/default"
+    printf 'gvm_go_name=go1.23.0\n' > "$HOME/.gvm/environments/default"
+    printf '#!/bin/sh\nexit 0\n' > "$HOME/.gvm/gos/go1.23.0/bin/go"
+    chmod +x "$HOME/.gvm/gos/go1.23.0/bin/go"
+    cat > "$XDG_CONFIG_HOME/marksharc/config.conf" <<'EOF'
+module path
+module mise
+module node-nvm
+module go-gvm
+set mise.tools "node go"
+set mise.hook chpwd
+EOF
+    stub_command mise 'if [ "$1 $2" = "activate fish" ]; then
+      printf "%s\n" "function __mise_env_eval; end" "function __mise_cd_hook --on-variable PWD; end" "function mise; end" "set -gx MISE_SHELL fish" "set -gx MISE_NODE_VERSION 20" "set -gx __MISE_ORIG_PATH \$PATH" "set -gx __MISE_SESSION stub" "set -gx __MISE_DIFF stub" "set -gp PATH \"$XDG_DATA_HOME/mise/installs/node/22/bin\""
+    fi'
+    printf '%s\n' 'source "$MARKSHARC_HOME/core/fish/marksharc.fish"' 'type -P mise' 'echo $PATH' 'set -q MISE_NOT_FOUND_AUTO_INSTALL; echo "AUTO=$status"' 'set -q MISE_SHELL; echo "SHELL=$status"' 'set -q MISE_NODE_VERSION; echo "VERSION=$status"' > "$TEST_ROOT/child.fish"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c '
+      source "$MARKSHARC_HOME/core/fish/marksharc.fish"
+      rm "$TEST_ROOT/bin/mise"
+      fish --no-config "$TEST_ROOT/child.fish"
+    ' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
+    out=$(cat "$TEST_ROOT/out")
+    case $out in
+      *"$HOME/.nvm/versions/node/v22.1.0/bin"*"$HOME/.gvm/gos/go1.23.0/bin"*'AUTO=1'*'SHELL=1'*'VERSION=1'*) ;;
+      *) cat "$TEST_ROOT/out"; return 3 ;;
+    esac
+    case $out in *"$XDG_DATA_HOME/mise/"*) cat "$TEST_ROOT/out"; return 4 ;; esac
+  }
+  It 'rebuilds fish legacy paths when an activated parent loses mise'
+    When run fish_missing_inherited_case
+    The status should be success
+  End
+
+  mise_disable_case() {
+    [ -n "$PYTHON" ] || return 0
+    sha=85cadd56f71b11574566dbd6c32e0027e361d085
+    root="$XDG_CACHE_HOME/marksharc/plugins/nvm.fish@$sha"
+    mkdir -p "$root/functions" "$XDG_CONFIG_HOME/marksharc"
+    printf 'function nvm; echo real-nvm; end\n' > "$root/functions/nvm.fish"
+    cat > "$XDG_CONFIG_HOME/marksharc/config.conf" <<'EOF'
+module path
+module mise
+module node-nvm
+module go-gvm
+set mise.tools "node go"
+set mise.hook off
+EOF
+    stub_command mise 'exit 0'
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 TERM=dumb fish --no-config -i -c '
+      source "$MARKSHARC_HOME/core/fish/marksharc.fish"
+      functions -q nvm; and functions -q gvm; or exit 2
+      printf "module path\nmodule node-nvm\nmodule go-gvm\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+      marksharc reload; or exit 3
+      test (nvm) = real-nvm; or exit 4
+      functions -D -v gvm | string match -q "*/modules/go-gvm/functions/fish/gvm.fish"; or exit 5
+      echo restored
+    ' > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 2; }
+    grep -q '^restored$' "$TEST_ROOT/out"
+  }
+  It 'restores real fish nvm and gvm when the mise module is disabled'
+    When run mise_disable_case
+    The status should be success
+  End
+
   verbose_case() {
     [ -n "$PYTHON" ] || return 0
     mkdir -p "$XDG_CONFIG_HOME/marksharc/modules/missing"

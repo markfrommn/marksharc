@@ -44,6 +44,41 @@ Describe 'fish plugin loading'
     The status should be success
   End
 
+  owned_node_plugin_case() {
+    sha=85cadd56f71b11574566dbd6c32e0027e361d085
+    root="$XDG_CACHE_HOME/marksharc/plugins/nvm.fish@$sha"
+    mkdir -p "$root/conf.d" "$XDG_CONFIG_HOME/marksharc"
+    printf 'set -g FISH_PLUGIN_ACTIVATED yes\n' > "$root/conf.d/test.fish"
+    printf 'module path\nmodule mise\nmodule node-nvm\nset mise.tools node\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command mise 'exit 0'
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    host=$(hostname)
+    host=${host%%.*}
+    fish --no-config -c '
+      source "$MARKSHARC_ROOT/core/fish/lib/path.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/modules.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/plugins.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/cache.fish"
+      set MARKSHARC_SESSION interactive
+      source "$argv[1]"
+      not set -q FISH_PLUGIN_ACTIVATED
+    ' "$XDG_CACHE_HOME/marksharc/$host/env.fish" || return 2
+    printf 'module path\nmodule mise\nmodule node-nvm\nset mise.tools ""\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 3
+    fish --no-config -c '
+      source "$MARKSHARC_ROOT/core/fish/lib/path.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/modules.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/plugins.fish"
+      set MARKSHARC_SESSION interactive
+      source "$argv[1]"
+      test "$FISH_PLUGIN_ACTIVATED" = yes
+    ' "$XDG_CACHE_HOME/marksharc/$host/env.fish"
+  }
+  It 'skips nvm.fish for owned node and loads it again on empty-tools fallback'
+    When run owned_node_plugin_case
+    The status should be success
+  End
+
   module_init_case() {
     root="$XDG_CONFIG_HOME/marksharc"
     mkdir -p "$root/modules/demo/functions/fish" "$root/modules/demo/completions/fish" "$root/local"

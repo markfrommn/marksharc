@@ -186,7 +186,23 @@ builtin cd "$PROJ"
 @test "the hook still switches after a reload" "$gvm_go_name" = go1.22.1
 builtin cd "$HOME"
 
-# 14. No gvm installation: quiet, no hook, and gvm says so.
+# 14. Owned Go removes the go.mod PWD hook; empty tools or missing mise restore it.
+builtin cd "$HOME"
+set -g _ms_opt_mise_tools go
+ms_stub mise 'exit 0'
+ms_module go-gvm >"$TEST_ROOT/out" 2>&1
+@test "owned Go removes the gvm PWD hook" (functions -q _ms_fish_gvm_hook; echo $status) = 1
+@test "owned Go startup is quiet" ! -s "$TEST_ROOT/out"
+set -g _ms_opt_mise_tools ''
+ms_module go-gvm
+@test "empty mise tools restore the gvm PWD hook" (functions -q _ms_fish_gvm_hook; and echo yes) = yes
+command rm -f "$TEST_ROOT/bin/mise"
+set -g _ms_opt_mise_tools go
+ms_module go-gvm
+@test "missing mise restores the gvm PWD hook" (functions -q _ms_fish_gvm_hook; and echo yes) = yes
+set -g _ms_opt_mise_tools ''
+
+# 15. No gvm installation: quiet, no hook, and gvm says so.
 set -gx GVM_ROOT "$TEST_ROOT/none"
 set -e gvm_go_name
 ms_module go-gvm >"$TEST_ROOT/out" 2>&1

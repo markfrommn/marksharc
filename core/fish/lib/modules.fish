@@ -1,7 +1,159 @@
 # Native pieces that cannot yet be expressed by module directives.
+function _ms_fish_mise_owns
+    set -q argv[1]; or return 1
+    contains -- "$argv[1]" node go python ruby; or return 1
+    _ms_fish_command_available mise; or return 1
+    set -q _ms_opt_mise_tools; or return 1
+    contains -- "$argv[1]" (string split ' ' -- "$_ms_opt_mise_tools")
+end
+
+function _ms_fish_mise_drop_activation_paths
+    set -l filtered
+    for entry in $PATH
+        contains -- "$entry" $_ms_fish_mise_activation_paths; or set -a filtered "$entry"
+    end
+    set -gx PATH $filtered
+    set -g _ms_fish_mise_activation_paths
+    set -e -g MARKSHARC_MISE_ACTIVATION_PATHS
+end
+
+function _ms_fish_mise_drop_shims
+    set -l filtered
+    for entry in $PATH
+        test "$entry" = "$MARKSHARC_MISE_SHIMS"; or set -a filtered "$entry"
+    end
+    set -gx PATH $filtered
+    set -e -g MARKSHARC_MISE_SHIMS
+end
+
+function _ms_fish_mise_track_activation_paths
+    set -l before $argv
+    set -l next
+    for entry in $PATH
+        if contains -- "$entry" $_ms_fish_mise_activation_paths; or not contains -- "$entry" $before
+            set -a next "$entry"
+        end
+    end
+    set -g _ms_fish_mise_activation_paths $next
+    set -gx MARKSHARC_MISE_ACTIVATION_PATHS (string join : -- $_ms_fish_mise_activation_paths)
+end
+
 function _ms_fish_module_env
     switch $argv[1]
+        case mise
+            set -l owned
+            set -l configured
+            set -l requested (string split ' ' -- "$_ms_opt_mise_tools")
+            for tool in node go python ruby
+                contains -- "$tool" $requested; or continue
+                set -a configured "$tool"
+                if _ms_fish_mise_owns "$tool"
+                    set -a owned "$tool"
+                end
+            end
+            set -l data_home "$HOME/.local/share"
+            set -q XDG_DATA_HOME[1]; and test -n "$XDG_DATA_HOME"; and set data_home "$XDG_DATA_HOME"
+            set -l data_dir "$data_home/mise"
+            set -q MISE_DATA_DIR[1]; and test -n "$MISE_DATA_DIR"; and set data_dir "$MISE_DATA_DIR"
+            set -l shims "$data_dir/shims"
+            set -q MISE_SHIMS_DIR[1]; and test -n "$MISE_SHIMS_DIR"; and set shims "$MISE_SHIMS_DIR"
+            if not set -q owned[1]
+                if set -q configured[1]; and not _ms_fish_command_available mise
+                    set -l filtered
+                    for entry in $PATH
+                        test "$entry" = "$shims"; or set -a filtered "$entry"
+                    end
+                    set -gx PATH $filtered
+                end
+                # On a direct ownership transition, remove only exports this module set.
+                # With no earlier mise ownership, a fallback leaves the environment alone.
+                if set -q _ms_fish_mise_exports_active
+                    for name in MISE_NOT_FOUND_AUTO_INSTALL MISE_GO_SET_GOBIN MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS
+                        set -e -g "$name"
+                    end
+                    set -e -g _ms_fish_mise_exports_active
+                end
+                return 0
+            end
+
+            set -l auto_install false
+            contains -- "$_ms_opt_mise_auto_install" on 1 yes true; and set auto_install true
+            set -l set_gobin false
+            contains -- "$_ms_opt_mise_set_gobin" on 1 yes true; and set set_gobin true
+            set -l version_files ''
+            contains -- "$_ms_opt_mise_version_files" on 1 yes true; and set version_files (string join , -- $owned)
+            set -gx MISE_NOT_FOUND_AUTO_INSTALL "$auto_install"
+            set -gx MISE_GO_SET_GOBIN "$set_gobin"
+            set -gx MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS "$version_files"
+            set -g _ms_fish_mise_exports_active 1
+            set -gx MARKSHARC_MISE_SHIMS "$shims"
+            set -gx MARKSHARC_MISE_SETTINGS_ACTIVE 1
+            for name in MISE_NOT_FOUND_AUTO_INSTALL MISE_GO_SET_GOBIN MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS
+                contains -- "$name" $_ms_fish_exports; or set -ga _ms_fish_exports "$name"
+            end
+
+            # Inherited manager paths outrank the managed block after activation. Drop only
+            # stores whose tools mise owns; unrelated manager entries must remain in place.
+            set -l node_pattern ''
+            if contains -- node $owned
+                set -l root "$HOME/.nvm"
+                set -q NVM_DIR[1]; and test -n "$NVM_DIR"; and set root "$NVM_DIR"
+                set node_pattern '^'(string escape --style=regex -- "$root")'/versions/(node|io\.js)/[^/]+/bin$'
+            end
+            set -l gvm_pattern ''
+            if contains -- go $owned
+                set -l root "$HOME/.gvm"
+                set -q GVM_ROOT[1]; and test -n "$GVM_ROOT"; and set root "$GVM_ROOT"
+                set gvm_pattern '^'(string escape --style=regex -- "$root")'/(?:bin|gos/[^/]+/bin|pkgsets/[^/]+/[^/]+(?:/overlay)?/bin)$'
+            end
+            set -l pyenv_pattern ''
+            if contains -- python $owned
+                set -l root "$HOME/.pyenv"
+                set -q PYENV_ROOT[1]; and test -n "$PYENV_ROOT"; and set root "$PYENV_ROOT"
+                set pyenv_pattern '^'(string escape --style=regex -- "$root")'/(?:bin|shims)$'
+            end
+            set -l filtered
+            if contains -- go $owned
+                set -l gvm_root "$HOME/.gvm"
+                set -q GVM_ROOT[1]; and test -n "$GVM_ROOT"; and set gvm_root "$GVM_ROOT"
+                if set -q GOPATH[1]
+                    set -l gopath_kept
+                    for part in (string split : -- "$GOPATH")
+                        string match -q -- "$gvm_root/pkgsets/*" "$part"; or set -a gopath_kept "$part"
+                    end
+                    if set -q gopath_kept[1]
+                        set -gx GOPATH (string join : -- $gopath_kept)
+                    else
+                        set -e -g GOPATH
+                    end
+                end
+                if set -q GVM_OVERLAY_PREFIX[1]; and string match -q -- "$gvm_root/pkgsets/*" "$GVM_OVERLAY_PREFIX"
+                    set -e -g GVM_OVERLAY_PREFIX
+                end
+                if set -q GOROOT[1]; and string match -q -- "$gvm_root/gos/*" "$GOROOT"
+                    set -e -g GOROOT
+                end
+                set -e -g gvm_go_name gvm_pkgset_name
+            end
+            for entry in $PATH
+                if test -n "$node_pattern"; and string match -qr -- "$node_pattern" "$entry"
+                    continue
+                end
+                if test -n "$gvm_pattern"; and string match -qr -- "$gvm_pattern" "$entry"
+                    continue
+                end
+                if test -n "$pyenv_pattern"; and string match -qr -- "$pyenv_pattern" "$entry"
+                    continue
+                end
+                set -a filtered "$entry"
+            end
+            set -gx PATH $filtered
+
+            _ms_fish_path_add manager "$shims"
         case go-gvm
+            if functions -q _ms_fish_mise_owns; and _ms_fish_mise_owns go
+                return 0
+            end
             set -l root "$HOME/.gvm"
             set -q GVM_ROOT; and test -n "$GVM_ROOT"; and set root "$GVM_ROOT"
             set -l chosen
@@ -52,11 +204,18 @@ function _ms_fish_module_env
                 _ms_fish_path_add user "$PNPM_HOME"
             end
         case python
+            if functions -q _ms_fish_mise_owns; and _ms_fish_mise_owns python
+                set -e -g PYENV_ROOT
+                return 0
+            end
             if test -f "$HOME/.pyenv/bin/pyenv"; and not _ms_fish_command_available uv
                 set -gx PYENV_ROOT "$HOME/.pyenv"
                 _ms_fish_path_add manager "$PYENV_ROOT/shims" "$PYENV_ROOT/bin"
             end
         case node-nvm
+            if functions -q _ms_fish_mise_owns; and _ms_fish_mise_owns node
+                return 0
+            end
             if not set -q NVM_DIR; or test -z "$NVM_DIR"
                 set -gx NVM_DIR "$HOME/.nvm"
             end

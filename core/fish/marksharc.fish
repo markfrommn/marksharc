@@ -8,6 +8,11 @@ source "$MARKSHARC_HOME/core/fish/lib/cache.fish"
 source "$MARKSHARC_HOME/core/fish/lib/path.fish"
 source "$MARKSHARC_HOME/core/fish/lib/modules.fish"
 source "$MARKSHARC_HOME/core/fish/lib/plugins.fish"
+if set -q MARKSHARC_MISE_ACTIVATION_PATHS
+    set -g _ms_fish_mise_activation_paths (string split : -- "$MARKSHARC_MISE_ACTIVATION_PATHS")
+else
+    set -g _ms_fish_mise_activation_paths
+end
 set -g _ms_fish_verbose 0
 if set -q MARKSHARC_VERBOSE; and test -n "$MARKSHARC_VERBOSE"; and test "$MARKSHARC_VERBOSE" != 0
     set -g _ms_fish_verbose 1
@@ -50,6 +55,10 @@ if test -r "$_ms_rendered"; and not status is-login; and not set -q _ms_fish_rel
     end <"$_ms_rendered"
 end
 
+if set -q MARKSHARC_MISE_ACTIVATION_PATHS; or set -q MARKSHARC_MISE_SHIMS; or set -q MARKSHARC_MISE_SETTINGS_ACTIVE
+    set -g _ms_fish_rebuild 1
+end
+
 if not set -q _ms_fish_reloading
     set -g MARKSHARC_SESSION batch
     set -l _ms_markers CLAUDECODE AI_AGENT CODEX_SESSION_ID CODEX_SANDBOX OPENCODE GEMINI_CLI CURSOR_AGENT COPILOT_CLI KILO_CLI_MODE VSCODE_INJECTION VSCODE_NONCE
@@ -74,6 +83,23 @@ if not set -q _ms_fish_reloading
     if test "$MARKSHARC_SESSION" = batch; and status is-interactive; and test -t 0; and test -t 1
         set -g MARKSHARC_SESSION interactive
     end
+end
+
+set -l _ms_mise_had_state 0
+set -q MARKSHARC_MISE_ACTIVATION_PATHS; and set _ms_mise_had_state 1
+set -q MARKSHARC_MISE_SHIMS; and set _ms_mise_had_state 1
+set -q MARKSHARC_MISE_SETTINGS_ACTIVE; and set _ms_mise_had_state 1
+_ms_fish_mise_drop_activation_paths
+if set -q MARKSHARC_MISE_SHIMS
+    _ms_fish_mise_drop_shims
+end
+if set -q MARKSHARC_MISE_SETTINGS_ACTIVE
+    set -e -g MISE_NOT_FOUND_AUTO_INSTALL MISE_GO_SET_GOBIN MISE_IDIOMATIC_VERSION_FILE_ENABLE_TOOLS
+end
+set -e -g MARKSHARC_MISE_SETTINGS_ACTIVE
+if test "$_ms_mise_had_state" = 1
+    set -e -g MISE_SHELL MISE_NODE_VERSION MISE_GO_VERSION MISE_PYTHON_VERSION MISE_RUBY_VERSION
+    set -e -g __MISE_ORIG_PATH __MISE_SESSION __MISE_DIFF
 end
 
 if test -r "$_ms_rendered"
@@ -106,6 +132,9 @@ if test "$MARKSHARC_SESSION" = interactive
         for name in $_ms_fish_aliases
             functions -e "$name"
         end
+        for name in (set -n | string match '_ms_opt_*')
+            set -e -g "$name"
+        end
         for dir in $_ms_fish_function_paths
             set -l index (contains -i -- "$dir" $fish_function_path)
             test -n "$index"; and set -e -g fish_function_path[$index]
@@ -121,6 +150,10 @@ if test "$MARKSHARC_SESSION" = interactive
         set -g _ms_fish_plugins_loaded
         set -e -g _ms_fish_gvm_root
         set -g _ms_fish_reloading 1
+        for cleanup in $_ms_fish_init_cleanups
+            functions -q "$cleanup"; and "$cleanup"
+        end
+        set -g _ms_fish_init_cleanups
         if test $verbose -eq 1
             set -g _ms_fish_force_verbose 1
         end
