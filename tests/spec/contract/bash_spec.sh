@@ -492,7 +492,10 @@ EOF
       XDG_CACHE_HOME="$XDG_CACHE_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
       MISE_DATA_DIR="$MISE_DATA_DIR" MISE_SHELL=zsh MISE_NODE_VERSION=20 __MISE_ORIG_PATH=/stale __MISE_SESSION=stub __MISE_DIFF=stub MARKSHARC_HOME="$MARKSHARC_ROOT" OPLOG="$OPLOG" TEST_ROOT="$TEST_ROOT" \
       BASH_ENV="$MARKSHARC_ROOT/core/bash/env.bash" \
-      zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh"; printf "module path\nmodule mise\nmodule node-nvm\nmodule go-gvm\nmodule python\nset mise.tools \"\"\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"; /bin/bash -c '\''printf "%s\n%s\n%s\n%s\n" "$PATH" "${MISE_NOT_FOUND_AUTO_INSTALL-unset}" "${MISE_SHELL-unset}" "${MISE_NODE_VERSION-unset}"'\' > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
+      zsh -f -c 'source "$MARKSHARC_HOME/core/zsh/zshenv.zsh";
+        # Bash 3.2 compares cache mtimes at whole-second resolution.
+        sleep 1
+        printf "module path\nmodule mise\nmodule node-nvm\nmodule go-gvm\nmodule python\nset mise.tools \"\"\n" > "$XDG_CONFIG_HOME/marksharc/config.conf"; /bin/bash -c '\''printf "%s\n%s\n%s\n%s\n" "$PATH" "${MISE_NOT_FOUND_AUTO_INSTALL-unset}" "${MISE_SHELL-unset}" "${MISE_NODE_VERSION-unset}"'\' > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
     grep -F "$HOME/.nvm/versions/node/v22.1.0/bin" "$TEST_ROOT/out" >/dev/null || return 2
     grep -F "$HOME/.gvm/gos/go1.23.0/bin" "$TEST_ROOT/out" >/dev/null || return 3
     grep -F "$HOME/.pyenv/shims" "$TEST_ROOT/out" >/dev/null || return 4
