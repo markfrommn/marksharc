@@ -148,7 +148,7 @@ Counts are Mac / sol.
 
 - A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm).
 - Full interactive bash.
-- mise or fnm replacing nvm, gvm, and pyenv.
+- An opt-in `mise` module that takes over node, Go, Python, and Ruby from nvm, gvm, and pyenv on the hosts that choose it (decided in DEV-62; fnm not pursued).
 - A coexist install mode that does not take over `ZDOTDIR`.
 - A generic `AGENTS.md` / `CLAUDE.md` for the public repo.
 - A Go helper binary for hot-path work.
@@ -179,6 +179,7 @@ Full findings were gathered on 2026-11-20. The decisions they drove:
 | Deployment | chezmoi, dotbot, stow, and mise bootstrap all work, but each makes the user adopt a manager. prezto and thoughtbot show the "framework + user-owned overlay" split. | The repo is a framework that is cloned and never edited; the user owns `~/.config/marksharc/`. |
 | Startup order | macOS `path_helper` reorders PATH after `.zshenv`. Claude Code sources the rc file non-interactively. `BASH_ENV` is honoured by `bash -c` but not `sh -c`. | Env in `.zshenv`, re-asserted in `.zprofile`; interactive work gated on session class. |
 | Testing | ShellSpec is stale but works for zsh and bash; ShellCheck cannot parse zsh; `shfmt -ln zsh` exists but is incomplete; fishtape for fish. | Keep ShellSpec, add a cross-shell contract suite, lint with `zsh -n`. |
+| Version managers | Re-evaluated in DEV-62 (2026-11-24). nvm and gvm cost about 3.5 ms at startup but about 1.9 s for a `cd` into a `.nvmrc` directory and 0.7 s for the first `gvm`. mise 2026.11: `hook-env` about 30 ms, shims add about 27 ms per call, native zsh, bash, and fish, version files per tool. | An opt-in `mise` module; nvm, gvm, and pyenv stay the default and the fallback. |
 | Agents | atuin tags agent commands and exposes an MCP server; agents set `CLAUDECODE`, `AI_AGENT`, and similar. | An `agent` module: full env, no output, no interactive phase. |
 
 ## 6. Architecture
@@ -356,7 +357,7 @@ Default order, chosen to reproduce today's result except that version managers c
 |---|---|
 | `first` | Explicit user overrides |
 | *(inherited, unmanaged, before any managed entry)* | Virtualenv and tool activations, including an explicit `nvm use` or `gvm use` |
-| `manager` | Version-manager directories (gvm Go and pkgset bin, nvm default node bin, pyenv shims), contributed without sourcing the manager; always ahead of `brew` in every session class, including after the `.zprofile` re-assert |
+| `manager` | Version-manager directories (gvm Go and pkgset bin, nvm default node bin, pyenv shims, and the mise shim directory for tools the `mise` module owns), contributed without sourcing the manager; always ahead of `brew` in every session class, including after the `.zprofile` re-assert |
 | `brew` | Homebrew `bin` and `sbin` |
 | `local` | `/usr/local`, `/opt`, Linuxbrew (unless `brew.linuxbrew_tier` is `brew`), `/opt/dell`, `~/.opencode/bin`, and on macOS LM Studio. Before `system` on macOS; on Linux after `app`, the last tier before `last` |
 | `system` | `/bin`, `/usr/bin`, `/sbin`, `/usr/sbin` |
@@ -487,6 +488,7 @@ changes fetched by sync apply to the next invocation.
 | `go-gvm` | MVP | gvm activation, `go.mod` hook, consistent `GOROOT` | gvm blocks |
 | `python` | MVP | uv preferred, pyenv fallback | pyenv/uv block |
 | `bun`, `pnpm`, `rust`, `go` | MVP | Paths and env | Assorted lines |
+| `mise` | Later | Opt-in owner of the tools named in `mise.tools` (node, go, python, ruby): shim directory in the `manager` tier in every session class, cached `mise activate` in interactive shells (run on directory change by default, not at every prompt), `MISE_*` settings from options, optional `nvm` and `gvm` translation functions. The owned tools' legacy modules stand aside; without mise they run as before | `node-nvm`, `go-gvm`, and pyenv, per tool, when enabled |
 | `ssh-agent` | MVP | Agent discovery and cache under the state dir, `clean-ssh-agents` | `setup-ssh-agent`, `clean-ssh-agents` |
 | `x11` | MVP | DISPLAY inference; mux-aware in Modernization | `setup-x11-display` |
 | `docker` | MVP | `cleanup-docker`, `fix-docker-socket`, container detection | Same names |
@@ -614,4 +616,5 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Plugin manager | None; built-in pinned loader | Research |
 | Deployment tool | None imposed; own installer and stubs | Research |
 | Test runner | ShellSpec plus a cross-shell contract suite | Research, existing suite |
+| Version managers (revisited) | mise as an opt-in module that owns tools per host; shims for agent and batch shells, activation for interactive ones; nvm, gvm, and pyenv remain the default and the fallback | Operator, DEV-62 |
 | Version-manager PATH order | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order | Operator, DEV-38 |
