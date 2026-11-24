@@ -45,7 +45,7 @@ if [[ -n $fish_stub ]]; then
     if [[ $fish_stub != "$fish_config/fish/conf.d/00-marksharc.fish" || ! -f $fish_stub || -L $fish_stub ]]; then
         print -r -- "doctor: missing or unmanaged fish stub: $fish_stub"
         (( ++issues ))
-    elif [[ -n $fish_sum && $(command cksum < "$fish_stub") != "$fish_sum" ]]; then
+    elif [[ -n $fish_sum && ${(j: :)${=$(command cksum < "$fish_stub")}} != "${(j: :)${=fish_sum}}" ]]; then
         print -r -- "doctor: modified fish stub: $fish_stub"
         (( ++issues ))
     fi
@@ -102,6 +102,14 @@ for dotfile in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.zlogin" "$HOME/.zlogout"
         print_dotfile_lines "$dotfile"
         (( ++issues ))
     fi
+done
+# fisher is retired: marksharc pins the fish plugins it uses (spec 6.8).
+fish_dir=${${XDG_CONFIG_HOME:-$HOME/.config}%/}/fish
+for fisher_file in "$fish_dir/fish_plugins" "$fish_dir/functions/fisher.fish"; do
+    [[ -e $fisher_file || -L $fisher_file ]] || continue
+    print -r -- "doctor: fisher leftover (marksharc pins its fish plugins): $fisher_file"
+    [[ $fisher_file != */fish_plugins ]] || print_dotfile_lines "$fisher_file"
+    (( ++issues ))
 done
 typeset -A path_seen=()
 typeset -a inspected_path=( "${path[@]}" )

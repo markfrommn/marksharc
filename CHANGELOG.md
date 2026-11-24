@@ -5,6 +5,25 @@ All notable changes to this project are recorded here. The format follows
 
 ## [Unreleased]
 
+- Fish is a daily-driver shell: modules carry `init.fish`, `functions/fish` and
+  `completions/fish` (nav, ls, ps, titles, mux, x11, docker, greeting,
+  command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin,
+  history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent,
+  git-worktree), tool init is cached, `marksharc` has fish completions, and
+  [docs/fish.md](docs/fish.md) publishes the parity table. `gvm use` works natively in
+  fish, so fish-gvm and bass are no longer needed.
+- `doctor` reports fisher leftovers so a host can drop fisher, and accepts an
+  unchanged fish stub whatever spacing `cksum` prints.
+- Fish units run under fishtape 3.0.1 (`tests/run-fish-units`, pinned in
+  `tests/fishtape.pin`) in `tests/check` and CI.
+- Interactive fish no longer prints fish's welcome text unless `fish_greeting` is set.
+
+### Fixed
+
+- `marksharc reload` in fish now finishes its own work: the entry point's final `return`
+  used to end the reload early, leaving the session marked as reloading. A reload that
+  disables a module also removes the hooks, wrappers and key bindings its `init.fish` added.
+
 - Bash environment rendering and startup stubs provide PATH and tool exports to Bash
   sessions. `set agent.bash_env on` enables the noninteractive Bash hook for agents.
 

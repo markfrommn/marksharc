@@ -15,6 +15,7 @@ tests/run-tests --shell sh spec/contract      # cross-shell startup contract
 tests/run-tests --shell sh spec/install       # install.sh, uninstall and the end-to-end install
 tests/e2e/install-e2e.sh <checkout>           # install into a fresh HOME and start shells
 tests/run-tests --shell sh spec/repo          # runner, lint and repository checks
+tests/run-fish-units                          # fishtape units: modules/*/tests/*_test.fish, tests/fish/
 SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
 ```
 
@@ -27,6 +28,14 @@ checkout), `REAL_GIT`, `REAL_FISH`, `PYTHON` and `TERM=dumb`. Fixtures create
 a private launcher for the selected fish executable so it remains available
 after PATH is restricted.
 
+`run-fish-units` requires fishtape at the version in [`fishtape.pin`](fishtape.pin)
+(3.0.1). Check out the pinned commit and set `FISHTAPE_FUNC` to its
+`functions/fishtape.fish`. The wrapper starts fish with `PATH`, a throwaway `HOME`
+and XDG directories, `TMPDIR`, `MARKSHARC_ROOT`, `REAL_GIT` and `TERM=dumb`.
+fishtape runs each test file in its own fish process. Files source
+`fish/support/helpers.fish` (`ms_fixture`, `ms_stub`, `ms_module`, `ms_cleanup`)
+for a private HOME, stubs first on PATH, and loud stubs for network and service commands.
+
 ## Layout
 
 | Path | Contents |
@@ -35,6 +44,8 @@ after PATH is restricted.
 | `lint` | Static checks for every tracked or new shell file |
 | `check` | Lint plus both suites, as CI runs them |
 | `shellspec.pin` | ShellSpec version, commit and source used locally and in CI |
+| `run-fish-units`, `fishtape.pin` | fishtape runner wrapper and its pin |
+| `fish/`, `fish/support/helpers.fish` | Core fish units and the shared fish fixture |
 | `spec/spec_helper.sh`, `spec/support/fixtures.sh` | Per-example sandbox and shared helpers (`stub_command`, `git_fixture`, `run_bounded`, `file_mode`) |
 | `support/function-safe-check.py` | Static check that file-scope declarations in sourced zsh files say `-g`; run by `spec/zsh/function_safe_spec.sh` |
 | `support/pty_socket.py` | OS fixture support only: a PTY child supervisor and a Unix socket binder |
@@ -111,4 +122,8 @@ this table to cover every module.
 | Function-safe modules | File-scope declarations in module env/init files, core files and overlay hooks say -g (`tests/support/function-safe-check.py`; fixture covers function, anonymous-function, `function name()`, here-string, case-arm and `builtin`/`command` forms); the env phase ends with `true`; `marksharc reload` and `cs` leave the same globals, PS1 and history settings, and after markers are planted in module scratch variables (and PS1 exported) no reload path leaves a marker or an exported PS1 (this spec fails against the pre-`-g` modules) | `spec/zsh/function_safe_spec.sh` |
 | Hygiene | Personal-value lint over the portable tree | `spec/zsh/personal_values_spec.sh` |
 | Contract | Quiet batch/agent startup, same environment in every zsh mode, idempotent re-source, writes confined to cache/state | `spec/contract/zsh_spec.sh` |
-| Fish contract | Shared environment and PATH, session classification, inherited render ID, reload, native modules and plugin loading, safe caller-state directives | `spec/contract/fish_render_spec.sh`, `spec/contract/fish_plugin_spec.sh`, `spec/contract/fish_directives_spec.sh` |
+| Fish contract | Shared environment and PATH, session classification, inherited render ID, reload (including unloading a disabled module's functions), native modules and plugin loading, safe caller-state directives | `spec/contract/fish_render_spec.sh`, `spec/contract/fish_plugin_spec.sh`, `spec/contract/fish_directives_spec.sh` |
+| Fish units | Init cache (hit, miss, key change, empty, failing and missing tool, -P), `marksharc` completion | `fish/cache_test.fish`, `fish/completions_test.fish` |
+| Fish modules | Native fish behaviour per module: nav, ps, titles, mux, x11, docker, greeting, command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin, history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent, git-worktree | `modules/<name>/tests/<name>_test.fish` (run by `run-fish-units`) |
+| Doctor (fish) | Unchanged, modified, missing and symlinked fish stub; foreign `config.fish` lines; fisher leftovers | `spec/zsh/doctor_spec.sh` |
+| Fish runner | Pinned-version check, scrubbed environment, default discovery, workspace removal | `spec/repo/fish_runner_spec.sh` |

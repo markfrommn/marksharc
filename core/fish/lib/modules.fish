@@ -125,20 +125,6 @@ end
 
 function _ms_fish_init_module
     set -l dir $argv[1]
-    switch (path basename "$dir")
-        case cwf
-            functions -e cwf-new
-            functions -c _ms_fish_caller_state_command cwf-new
-            set -ga _ms_fish_wrappers cwf-new
-        case git-worktree
-            functions -e gwt-clean
-            functions -c _ms_fish_caller_state_command gwt-clean
-            set -ga _ms_fish_wrappers gwt-clean
-        case ssh-agent
-            functions -e setup-ssh-agent
-            functions -c _ms_fish_caller_state_command setup-ssh-agent
-            set -ga _ms_fish_wrappers setup-ssh-agent
-    end
     if test -d "$dir/functions/fish"; and not contains -- "$dir/functions/fish" $fish_function_path
         set -gp fish_function_path "$dir/functions/fish"
         set -ga _ms_fish_function_paths "$dir/functions/fish"
@@ -148,7 +134,96 @@ function _ms_fish_init_module
         set -ga _ms_fish_completion_paths "$dir/completions/fish"
     end
     if test -r "$dir/init.fish"
+        # Record what init.fish adds (inline functions, handlers, wrappers, key bindings) so
+        # a reload that disables the module can take it away again.
+        set -l var (string replace -a -r '[^A-Za-z0-9_]' _ -- (path basename -- "$dir"))
+        set -l fvar _ms_fish_module_functions_$var
+        set -l bvar _ms_fish_module_binds_$var
+        set -l functions_before (functions -a -n)
+        set -l binds_before (bind --user | string match -r '^bind\s.*')
+        set -g _ms_fish_init_fvar $fvar
         source "$dir/init.fish"
+        set -e -g _ms_fish_init_fvar
+        set -l functions_after (functions -a -n)
+        if test (count $functions_after) -ne (count $functions_before)
+            set -l known '^(?:'(string join '|' -- (string escape --style=regex -- $functions_before))')$'
+            for fn in (string match -v -r -- "$known" $functions_after)
+                contains -- "$fn" $$fvar; or set -ga $fvar "$fn"
+            end
+        end
+        # Only binding lines; newer fish also lists comments.
+        for line in (bind --user | string match -r '^bind\s.*')
+            contains -- "$line" $binds_before; or contains -- "$line" $$bvar; or set -ga $bvar "$line"
+        end
+        contains -- (path basename -- "$dir") $_ms_fish_tracked_modules; or set -ga _ms_fish_tracked_modules (path basename -- "$dir")
     end
     return 0
+end
+
+# init.fish calls this BEFORE it defines a function over fish's own (fish_title, man,
+# history): the new-name check cannot see a redefinition. The current definition (fish's,
+# autoloaded if need be) is saved once as _ms_fish_saved_<name>, so a reload that disables
+# the module can erase the override and put fish's function back. Fish may embed its
+# functions in the binary, so a copy is the portable way to keep them.
+function _ms_fish_track_functions
+    set -q _ms_fish_init_fvar; or return 0
+    for fn in $argv
+        if not functions -q _ms_fish_saved_$fn; and functions -q -- "$fn"
+            functions -c -- "$fn" _ms_fish_saved_$fn
+        end
+        contains -- "$fn" $$_ms_fish_init_fvar; or set -ga $_ms_fish_init_fvar "$fn"
+    end
+end
+
+# Source the entry point inside a function of its own: its top-level return then ends only
+# this function, and the rest of marksharc reload still runs.
+function _ms_fish_source_entry
+    source "$MARKSHARC_HOME/core/fish/marksharc.fish"
+end
+
+# After a reload: erase the functions and key bindings that the init.fish of a module no
+# longer enabled added, so no handler, wrapper or binding calls into a module that is gone.
+function _ms_fish_forget_disabled_modules
+    for name in $_ms_fish_tracked_modules
+        contains -- "$name" $_ms_fish_enabled_modules; and continue
+        set -l var (string replace -a -r '[^A-Za-z0-9_]' _ -- "$name")
+        set -l fvar _ms_fish_module_functions_$var
+        set -l bvar _ms_fish_module_binds_$var
+        for fn in $$fvar
+            # Autoloaded functions left with their directory. An erased name never autoloads
+            # again in this session, so only inline ones are erased, and a fish function they
+            # shadowed (man, history, fish_title) comes back from the copy saved before it.
+            string match -q '_ms_fish_saved_*' -- "$fn"; and continue
+            functions -q -- "$fn"; or continue
+            set -l details (functions -D -v -- "$fn")
+            test "$details[2]" = autoloaded; and continue
+            functions -e -- "$fn"
+            functions -q _ms_fish_saved_$fn; and functions -c _ms_fish_saved_$fn "$fn"
+        end
+        for line in $$bvar
+            set -l words (string split -n ' ' -- "$line")
+            set -l mode default
+            set -l key
+            set -l i 2
+            while test $i -le (count $words)
+                switch "$words[$i]"
+                    case -M --mode
+                        set i (math $i + 1)
+                        set mode $words[$i]
+                    case -m --sets-mode
+                        set i (math $i + 1)
+                    case '-*'
+                    case '*'
+                        set key (string unescape -- "$words[$i]")
+                        break
+                end
+                set i (math $i + 1)
+            end
+            test -n "$key"; and bind -M "$mode" -e -- "$key"
+        end
+        set -e $fvar
+        set -e $bvar
+        set -l index (contains -i -- "$name" $_ms_fish_tracked_modules)
+        set -e _ms_fish_tracked_modules[$index]
+    end
 end

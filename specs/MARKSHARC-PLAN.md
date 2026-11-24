@@ -920,6 +920,11 @@ Native fish module migration and legacy config retirement remain in P4.2.
 - The parity table marks every MVP module as supported, native-equivalent, or not applicable.
 - Fish is usable for a normal working day on the Mac and sol.
 
+**Outcome:** Implemented in [PR #13](https://github.com/markfrommn/marksharc/pull/13); task plan
+[DEV-58-PLAN.md](DEV-58-PLAN.md). [docs/fish.md](../docs/fish.md) holds the parity table and the
+retirement steps. The hosted macOS and Ubuntu checks pass, including the fishtape units. Daily use
+on the Mac and sol is a manual acceptance step after merge.
+
 ### Phase 6: Cleanup
 
 #### P6.1 — Remove shell support from mark-desktop-files (DEV-59)

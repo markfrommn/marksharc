@@ -9,8 +9,8 @@ checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
 > installer, Bash environment, and `marksharc` bootstrap, update, and install commands
-> are in place. The fish core loads the shared environment and native plugins.
-> The remaining fish modules come in later releases.
+> are in place. Fish runs every module natively; see [docs/fish.md](docs/fish.md)
+> for the parity table and how to retire an old fish configuration and fisher.
 
 ## Requirements
 
@@ -56,7 +56,8 @@ What it does:
   (symlinks are recorded by target), and writes zsh and Bash startup stubs. If the zsh core
   cannot load, the stub sets a minimal PATH and prints one line on stderr.
   The installer also manages `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`
-  and leaves the user's `config.fish` untouched.
+  and leaves the user's `config.fish` untouched (`doctor` lists its lines so they can move into
+  the overlay).
 - **Plugins.** Clones pinned plugins (fzf-tab, nvm.fish and fzf.fish) into
   `${XDG_CACHE_HOME:-~/.cache}/marksharc/plugins/`. Shell startup never fetches them. A
   failed fetch, when offline for example, leaves the install in place with a warning;

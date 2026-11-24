@@ -44,6 +44,16 @@ jobs:
           git -C "$dir" checkout -q FETCH_HEAD
           echo "SHELLSPEC_BIN=$dir/shellspec" >> "$GITHUB_ENV"
 
+      - name: Install pinned fishtape
+        run: |
+          commit=$(awk '$1 == "commit" { print $2 }' tests/fishtape.pin)
+          source=$(awk '$1 == "source" { print $2 }' tests/fishtape.pin)
+          dir="$RUNNER_TEMP/fishtape"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 "$source" "$commit"
+          git -C "$dir" checkout -q FETCH_HEAD
+          echo "FISHTAPE_FUNC=$dir/functions/fishtape.fish" >> "$GITHUB_ENV"
+
       - name: Tool versions
         run: |
           zsh --version
@@ -66,6 +76,9 @@ jobs:
 
       - name: Repository suite
         run: tests/run-tests --shell sh spec/repo
+
+      - name: Fish unit suite
+        run: tests/run-fish-units
 
   # The Day 0 path on a clean account: install.sh from this checkout into a fresh HOME,
   # then a login zsh and an interactive zsh must come up working. Needs only sh, zsh, git.
