@@ -35,7 +35,8 @@ printf x >-dash
 printf x >'*.star'
 printf x >local-only
 printf x >other.star
-$REAL_GIT add tracked.txt "sp ace.txt" -- -dash '*.star'
+# Literal pathspecs, so the fixture tracks the file named '*.star' and not other.star.
+$REAL_GIT --literal-pathspecs add tracked.txt "sp ace.txt" -- -dash '*.star'
 $REAL_GIT commit -q -m first
 
 @test "git-managed lists the tracked files" "$(git-managed tracked.txt local-only 'sp ace.txt' -dash)" = "Git Managed: tracked.txt sp ace.txt -dash"

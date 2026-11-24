@@ -69,13 +69,15 @@ man ls
 @test "standout is bold yellow on blue" (field man.out so) = "E[01;33mE[44m"
 @test "underline is bold green" (field man.out us) = "E[01;32m"
 @test "the end sequences reset" "$(field man.out me)$(field man.out se)$(field man.out ue)" = "E[00mE[00mE[00m"
-@test "fish's own man pages come first in MANPATH" (count (string match -- "manpath=$__fish_data_dir/man*" <"$TEST_ROOT/man.out")) -eq 1
+# The wrapped function is fish's own man under another name (its body, whatever the fish version).
+set -l ours (functions _ms_fish_man_plain | string match -v -r '^\s*#' | string replace -r '^function _ms_fish_man_plain' 'function man')
+set -l fish_bin (status fish-path)
+set -l theirs ($fish_bin --no-config -c 'functions man' | string match -v -r '^\s*#')
+@test "man wraps a copy of fish's own man function" "$(string join \n -- $ours)" = "$(string join \n -- $theirs)"
 @test "the environment does not leak after man" "$(set -q LC_ALL; and echo set:$LC_ALL)" = "$lcall_before"
 @test "PAGER is not changed by man" "$PAGER" = "$pager_before"
 @test "GROFF_NO_SGR does not leak" (set -q GROFF_NO_SGR; and echo set; or echo unset) = unset
 @test "LESS_TERMCAP does not leak" (set -q LESS_TERMCAP_md; and echo set; or echo unset) = unset
-man :
-@test "fish's own man keeps its special-name mapping" (field man.out args) = true
 man 'a page' with-space
 @test "man arguments with spaces stay whole" (field man.out args) = "a page with-space"
 @test "man returns the status of the real man" (ms_stub man 'exit 5'; man x; echo $status) = 5

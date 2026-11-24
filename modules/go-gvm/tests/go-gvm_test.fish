@@ -64,11 +64,13 @@ ms_module go-gvm
 for v in gvm_go_name gvm_pkgset_name GOPATH GVM_OVERLAY_PREFIX GOROOT
     set -e $v
 end
-set -gx PATH "$TEST_ROOT/bin" $OTHER
+# No system directories here: a host may have go in /usr/bin.
+set -gx PATH "$TEST_ROOT/bin" /opt/other
 set -gx GOROOT /somewhere/else
 ms_module go-gvm
 @test "with no go on PATH the default environment names the Go" "$gvm_go_name" = go1.21.5
 @test "with no go on PATH GOROOT is left alone" "$GOROOT" = /somewhere/else
+set -gx PATH "$TEST_ROOT/bin" $OTHER
 printf '#!/bin/sh\n' >"$TEST_ROOT/bin/go"
 command chmod +x "$TEST_ROOT/bin/go"
 ms_module go-gvm

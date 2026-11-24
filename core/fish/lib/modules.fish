@@ -140,7 +140,7 @@ function _ms_fish_init_module
         set -l fvar _ms_fish_module_functions_$var
         set -l bvar _ms_fish_module_binds_$var
         set -l functions_before (functions -a -n)
-        set -l binds_before (bind --user)
+        set -l binds_before (bind --user | string match -r '^bind\s.*')
         set -g _ms_fish_init_fvar $fvar
         source "$dir/init.fish"
         set -e -g _ms_fish_init_fvar
@@ -151,7 +151,8 @@ function _ms_fish_init_module
                 contains -- "$fn" $$fvar; or set -ga $fvar "$fn"
             end
         end
-        for line in (bind --user)
+        # Only binding lines; newer fish also lists comments.
+        for line in (bind --user | string match -r '^bind\s.*')
             contains -- "$line" $binds_before; or contains -- "$line" $$bvar; or set -ga $bvar "$line"
         end
         contains -- (path basename -- "$dir") $_ms_fish_tracked_modules; or set -ga _ms_fish_tracked_modules (path basename -- "$dir")
