@@ -3,112 +3,91 @@
 All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+<!-- Agent guidance: Keep entries newest first.  Lead with one intent-focused sentence per merged PR under Unreleased, including Linear keys.
+Fill in additional details on more major changes includeing in the additional (optional) sections like ### Added, ### Fixed, etc.
+Leave implementation details and file inventories to git and GitHub. Move pending entries into a real version at release.
+The 0.<PR>.0 versions below are historical backfills, not a versioning rule for future releases. -->
 
-- An interactive layer for zsh: the pinned `zsh-autosuggestions` (atuin-aware, asynchronous)
-  and `zsh-syntax-highlighting` plugin modules load after fzf-tab and atuin, syntax
-  highlighting last of all. `marksharc update` or `zsh-plugin-update` clones the pins.
-- The `theme` module sets one colour baseline in zsh and fish: cached vivid `LS_COLORS`,
-  bat as the man pager, opt-in delta for git (`set theme.delta on`), and fzf defaults with
-  bat and eza previews, also in fzf-tab.
-- The ps helpers draw their selection with procs when it is installed (`set ps.procs off`
-  keeps the native table); bare `ps` and `ls` stay untouched.
-- `set prompt-starship.config rich` selects a bundled starship preset (short left prompt,
-  context, exit status and command duration on the right); a file path works too.
-- `_ms_init_cached -x <NAME>` (and the fish equivalent) caches a tool's output as an
-  exported value.
+## [0.21.0]
 
-- Fish is a daily-driver shell: modules carry `init.fish`, `functions/fish` and
-  `completions/fish` (nav, ls, ps, titles, mux, x11, docker, greeting,
-  command-not-found, node-nvm, go-gvm, python, brew, pager, editor, history-atuin,
-  history-native, prompt-starship, zoxide, direnv, cwf, herdr, ssh-agent,
-  git-worktree), tool init is cached, `marksharc` has fish completions, and
-  [docs/fish.md](docs/fish.md) publishes the parity table. `gvm use` works natively in
-  fish, so fish-gvm and bass are no longer needed.
-- `doctor` reports fisher leftovers so a host can drop fisher, and accepts an
-  unchanged fish stub whatever spacing `cksum` prints.
-- Fish units run under fishtape 3.0.1 (`tests/run-fish-units`, pinned in
-  `tests/fishtape.pin`) in `tests/check` and CI.
-- Interactive fish no longer prints fish's welcome text unless `fish_greeting` is set.
+Tweak github actions, redo CHANGELOG.md.
 
-### Fixed
+## [0.20.0] - 2026-11-24
 
-- `marksharc reload` in fish now finishes its own work: the entry point's final `return`
-  used to end the reload early, leaving the session marked as reloading. A reload that
-  disables a module also removes the hooks, wrappers and key bindings its `init.fish` added.
+Improved interactive shells with suggestions, syntax highlighting, consistent themes, richer prompts, and optional procs-based process display. (DEV-54)
 
-- Bash environment rendering and startup stubs provide PATH and tool exports to Bash
-  sessions. `set agent.bash_env on` enables the noninteractive Bash hook for agents.
+## [0.19.0] - 2026-11-24
 
-### Fixed
+Made installer cleanup reversible across Bash and Fish while preserving user changes and supporting safe reruns. (DEV-71)
 
-- `doctor` recognizes unchanged installer-managed Bash startup files, reports
-  modified or missing files, and identifies provider configuration that needs migration.
-- Interactive zsh startup on the Mac drops from about 5 s to under 1 s: `node-nvm`
-  and `go-gvm` load nvm and gvm on first use instead of at startup. The env phase
-  already puts the default node and Go on PATH, and `go-gvm` sets `GOPATH` and
-  `gvm_go_name` itself. The `.nvmrc` and `go.mod` hooks load the manager only
-  when a switch may be needed.
-- `install.sh` fetches the pinned plugins, so fzf-tab works after a fresh install
-  (`--no-plugins` skips the fetch). `doctor` names `marksharc update` for a
-  missing pin.
-- `doctor` no longer reports a missing required command for a module that is
-  enabled by default and skips itself (for example `herdr` on a host with only
-  the herdr app). It reports a startup that outlives `doctor.startup_timeout_ms`
-  (default 5000) as timed out instead of failed.
-- zsh startup on Debian/Ubuntu: the distro-global `compinit` no longer runs
-  (`skip_global_compinit` is set in the env phase), so non-tty and agent shells
-  no longer abort at startup; the completion module now runs `compinit -i`, so
-  the security audit still applies but an insecure system directory (seen on the
-  ubuntu-latest CI image) is excluded instead of prompting or hanging the shell.
+## [0.18.0] - 2026-11-24
 
-### Added
+Added opt-in mise management for Node, Go, Python, and Ruby with legacy fallback and migration guidance. (DEV-72)
 
-- Opt-in `mise` ownership of Node, Go, Python, and Ruby per host, with manager-tier shims
-  for every session class, directory-change-only interactive activation, safe `MISE_*`
-  defaults, legacy-manager fallback, optional nvm/gvm compatibility functions, doctor
-  diagnostics, and explicit install/update integration. Migration is in
-  [docs/mise.md](docs/mise.md).
-- `marksharc bootstrap`, declarative package bundles, selectable update steps and
-  explicit installers for krew, gvm, WezTerm terminfo, pyenv and nvm. Updates
-  report each result and continue after failures.
-- Fish startup loads a rendered environment, pinned plugins, caller-state
-  commands, and current-shell reload. The installer manages a fish conf.d stub.
-- Write-once workflow, SSH-agent and Docker commands run as module executables.
-  zsh wrappers apply caller-state directives; provider and session shims are generated
-  in the private host cache and can be called from child shells. Provider files and
-  workflow hooks migrate as described in `docs/write-once.md`.
-- `marksharc render`: declarative module and overlay `env`, `path`, `alias` and
-  `completion` directives, with `when` guards, per-host cached `env.zsh`, generated
-  completions, render ids and stale-input reload. Overlay `tiers` lines customize
-  PATH order. The directive-expressible public environment and aliases now render
-  from `module.conf`, and the old compatibility host-fact names are gone.
-- `marksharc sync`, `update`, and `doctor`: fast-forward safe checkouts, refresh
-  plugin pins, report health, and notify interactively after a throttled detached fetch.
-- Installer and command: `install.sh` (`--home`, `--overlay`, `--dry-run`; backs up
-  the HOME zsh dotfiles with a manifest, writes the `~/.zshenv` stub with a
-  minimal-PATH fallback, safe to re-run), `bin/marksharc` (`reload`,
-  `module list|enable|disable`, `uninstall [--purge]`, `version`), the overlay
-  template in `templates/overlay/`, and an install end-to-end CI job on macOS and
-  Ubuntu (`tests/e2e/install-e2e.sh`).
-- Repository layout from the specification (`core/`, `modules/`,
-  `templates/overlay/`, `tests/`, `docs/`, `specs/`, `memory/`).
-- ShellSpec test harness with a pinned runner, per-example sandbox and smoke specs.
-- `tests/lint`: `zsh -n`, shellcheck and `fish --no-execute` over every shell file.
-- GitHub Actions CI on macOS and Ubuntu.
-- Developer guide in `docs/DEVELOPING.md`.
-- Zsh core loader (`core/zsh/`): session classes, env/init phases, module
-  loader, tiered PATH builder hooks, cached tool init, generated ZDOTDIR,
-  verbose reload (`cs`/`li`).
-- The 26 environment and tool modules (`modules/`): path, brew, zsh-options,
-  editor, pager, ls, ps, nav, zoxide, completion, completion-fzf-tab,
-  command-not-found, history-atuin, history-native, prompt-starship,
-  node-nvm, go-gvm, python, bun, pnpm, rust, go, lmstudio, cuda, direnv,
-  greeting.
-- The 13 system and workflow modules (`modules/`) with their module-local
-  specs linked from `tests/spec/zsh/modules/`: agent, ssh-agent, x11,
-  docker, mux, titles, herdr, wezterm, cc-providers, git-worktree, cwf,
-  fish-bridge, cloud.
-- Cross-shell contract suite (`tests/spec/contract/`), run in CI on macOS and
-  Ubuntu.
-- Personal-value lint over the portable tree.
+## [0.17.0] - 2026-11-24
+
+Documented how to measure live shell startup without agent markers or output redirection changing the session being measured. (DEV-62)
+
+## [0.16.0] - 2026-11-24
+
+Linked the planned mise module to its tracked issue and synchronized generated workflow ignore rules. (DEV-72)
+
+## [0.15.0] - 2026-11-24
+
+Evaluated mise and recorded the decision to adopt it as an opt-in version manager alongside legacy fallbacks. (DEV-62)
+
+## [0.14.0] - 2026-11-24
+
+Unified multiplexer integration and added reliable refresh and recovery of forwarded shell state. (DEV-53)
+
+## [0.13.0] - 2026-11-24
+
+Made Fish a daily-driver shell with native modules and a migration path away from the legacy configuration. (DEV-58)
+
+## [0.12.0] - 2026-11-23
+
+Improved doctor diagnostics for managed Bash startup files and provider configurations needing migration. (DEV-68)
+
+## [0.11.0] - 2026-11-23
+
+Added bootstrap, coordinated updates, and explicit tool installers for repeatable day-two setup and maintenance. (DEV-52)
+
+## [0.10.0] - 2026-11-23
+
+Brought Fish startup and environment behavior into parity with zsh, including managed startup and reload support. (DEV-57)
+
+## [0.9.0] - 2026-11-23
+
+Brought Bash login, inherited, and opted-in agent environments into parity with zsh. (DEV-50)
+
+## [0.8.0] - 2026-11-23
+
+Moved complex workflow and shell helpers to write-once executables with safe generated provider and session commands. (DEV-51)
+
+## [0.7.0] - 2026-11-23
+
+Added declarative environment rendering so module and overlay configuration produce consistent, recoverable shell state. (DEV-49)
+
+## [0.6.0] - 2026-11-22
+
+Fixed Mac cutover diagnostics and reduced interactive startup latency through lazy version-manager loading and reliable plugin installation. (DEV-46)
+
+## [0.5.0] - 2026-11-22
+
+Added safe repository synchronization, update notifications, and doctor health checks. (DEV-45)
+
+## [0.4.0] - 2026-11-22
+
+Added the initial installer, managed shell startup stubs, overlay template, and marksharc CLI. (DEV-44)
+
+## [0.3.0] - 2026-11-21
+
+Added the system and workflow modules with portable tests and private-overlay separation. (DEV-43)
+
+## [0.2.0] - 2026-11-21
+
+Added the zsh core loader and environment/tool modules with cross-platform startup coverage. (DEV-42)
+
+## [0.1.0] - 2026-11-20
+
+Established the MarkSharc repository scaffold, development conventions, test harness, and macOS/Linux CI. (DEV-41)
