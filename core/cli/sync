@@ -1,8 +1,288 @@
 #!/usr/bin/env zsh
 # Synchronize checkout worktrees only when their configured upstream is a safe fast-forward.
+# Also supports --auto (locked, quiet, state-dir logged, skips dirty trees),
+# --update [--system] [-y], and `timer on|off|status` (launchd / systemd user timer).
 emulate -L zsh
-(( $# == 0 )) || { print -ru2 -- 'Usage: marksharc sync'; exit 2; }
+
+usage() {
+    cat <<'EOF'
+Usage: marksharc sync [options]
+       marksharc sync timer <on|off|status>
+
+Options:
+  --auto              quiet, locked, logs to state dir, skips dirty trees
+  --update            run the full `marksharc update`
+  --system            with --update, also run native OS package updates
+  -y, --yes           with --update, pass -y to commands that support it
+  -h, --help          print this help
+EOF
+}
+
+_sync_os() {
+    if [[ -n ${MARKSHARC_OS-} ]]; then
+        REPLY=$MARKSHARC_OS
+        return 0
+    fi
+    case $OSTYPE in
+        darwin*) REPLY=darwin ;;
+        linux*)  REPLY=linux ;;
+        *)       REPLY=${OSTYPE%%[0-9.-]*} ;;
+    esac
+}
+
+_sync_xml_escape() {
+    local s=$1
+    s=${s//&/&amp;}
+    s=${s//</&lt;}
+    s=${s//>/&gt;}
+    s=${s//\"/&quot;}
+    s=${s//\'/&apos;}
+    REPLY=$s
+}
+
+_sync_systemd_quote() {
+    local s=$1
+    s=${s//\\/\\\\}
+    s=${s//\"/\\\"}
+    s=${s//\%/%%}
+    REPLY="\"$s\""
+}
+
+_sync_timer() {
+    local action= arg
+    for arg in "$@"; do
+        case $arg in
+            on|off|status)
+                if [[ -n $action ]]; then
+                    print -ru2 -- "sync timer: unexpected argument: $arg"
+                    exit 2
+                fi
+                action=$arg ;;
+            --update|--system|-y|--yes|--auto)
+                print -ru2 -- "sync timer: $arg is not supported; the timer runs \`marksharc sync --auto\` only"
+                exit 2 ;;
+            -h|--help)
+                print -r -- 'Usage: marksharc sync timer <on|off|status>'
+                exit 0 ;;
+            *)
+                print -ru2 -- "sync timer: unknown argument: $arg"
+                exit 2 ;;
+        esac
+    done
+    [[ -n $action ]] || { print -ru2 -- 'Usage: marksharc sync timer <on|off|status>'; exit 2; }
+
+    local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
+    local default_config=${XDG_CONFIG_HOME:-$HOME/.config}/marksharc
+    local state_sync_dir=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/sync
+    local marksharc_bin=$MARKSHARC_HOME/bin/marksharc
+    source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
+    _ms_config_load
+    local interval_min=${_ms_cfg_set[sync.timer_minutes]-60}
+    [[ $interval_min == <1-> ]] || interval_min=60
+
+    local REPLY= os
+    _sync_os; os=$REPLY
+
+    if [[ $os == darwin ]]; then
+        local plist_dir=$HOME/Library/LaunchAgents
+        local plist=$plist_dir/com.marksharc.sync.plist
+        local uid=$(id -u)
+        case $action in
+            on)
+                local interval_sec=$(( interval_min * 60 ))
+                local bin_xml log_xml cfg_xml env_block=
+                _sync_xml_escape "$marksharc_bin"; bin_xml=$REPLY
+                _sync_xml_escape "$state_sync_dir/launchd.log"; log_xml=$REPLY
+                if [[ -n ${MARKSHARC_CONFIG-} && $config != "$default_config" ]]; then
+                    _sync_xml_escape "$config"; cfg_xml=$REPLY
+                    env_block=$'  <key>EnvironmentVariables</key>\n  <dict>\n    <key>MARKSHARC_CONFIG</key>\n    <string>'"$cfg_xml"$'</string>\n  </dict>\n'
+                fi
+                command mkdir -p -- "$plist_dir" "$state_sync_dir" || exit 1
+                cat > "$plist.tmp.$$" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.marksharc.sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-f</string>
+    <string>${bin_xml}</string>
+    <string>sync</string>
+    <string>--auto</string>
+  </array>
+${env_block}  <key>StartInterval</key>
+  <integer>${interval_sec}</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log_xml}</string>
+  <key>StandardErrorPath</key>
+  <string>${log_xml}</string>
+</dict>
+</plist>
+EOF
+                command mv -f -- "$plist.tmp.$$" "$plist" || { command rm -f -- "$plist.tmp.$$"; exit 1; }
+                command launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
+                if ! command launchctl bootstrap "gui/$uid" "$plist"; then
+                    print -ru2 -- "sync timer: launchctl bootstrap failed for $plist"
+                    exit 1
+                fi
+                print -r -- "sync timer: enabled (launchd: $plist, every ${interval_min}m)"
+                ;;
+            off)
+                command launchctl bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
+                command rm -f -- "$plist"
+                print -r -- 'sync timer: disabled (launchd)'
+                ;;
+            status)
+                if [[ -f $plist ]]; then
+                    if command launchctl print "gui/$uid/com.marksharc.sync" >/dev/null 2>&1; then
+                        print -r -- "sync timer: enabled (launchd: $plist, loaded)"
+                    else
+                        print -r -- "sync timer: installed (launchd: $plist, not loaded)"
+                    fi
+                else
+                    print -r -- 'sync timer: disabled (launchd)'
+                fi
+                ;;
+        esac
+        exit 0
+    elif [[ $os == linux ]]; then
+        local unit_dir=${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user
+        local service_file=$unit_dir/marksharc-sync.service
+        local timer_file=$unit_dir/marksharc-sync.timer
+        case $action in
+            on)
+                local bin_q cfg_q env_line=
+                _sync_systemd_quote "$marksharc_bin"; bin_q=$REPLY
+                if [[ -n ${MARKSHARC_CONFIG-} && $config != "$default_config" ]]; then
+                    _sync_systemd_quote "MARKSHARC_CONFIG=$config"; cfg_q=$REPLY
+                    env_line=$'Environment='"$cfg_q"$'\n'
+                fi
+                command mkdir -p -- "$unit_dir" "$state_sync_dir" || exit 1
+                cat > "$service_file.tmp.$$" <<EOF
+[Unit]
+Description=MarkSharc automatic repository sync
+
+[Service]
+Type=oneshot
+${env_line}ExecStart=/usr/bin/env zsh -f ${bin_q} sync --auto
+EOF
+                cat > "$timer_file.tmp.$$" <<EOF
+[Unit]
+Description=MarkSharc automatic repository sync timer
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=${interval_min}min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+                command mv -f -- "$service_file.tmp.$$" "$service_file" || { command rm -f -- "$service_file.tmp.$$" "$timer_file.tmp.$$"; exit 1; }
+                command mv -f -- "$timer_file.tmp.$$" "$timer_file" || { command rm -f -- "$timer_file.tmp.$$"; exit 1; }
+                if ! command systemctl --user daemon-reload; then
+                    print -ru2 -- 'sync timer: systemctl --user daemon-reload failed'
+                    exit 1
+                fi
+                if ! command systemctl --user enable --now marksharc-sync.timer; then
+                    print -ru2 -- 'sync timer: systemctl --user enable --now marksharc-sync.timer failed'
+                    exit 1
+                fi
+                print -r -- "sync timer: enabled (systemd: $timer_file, every ${interval_min}m)"
+                ;;
+            off)
+                command systemctl --user disable --now marksharc-sync.timer >/dev/null 2>&1 || true
+                command rm -f -- "$timer_file" "$service_file"
+                command systemctl --user daemon-reload >/dev/null 2>&1 || true
+                print -r -- 'sync timer: disabled (systemd)'
+                ;;
+            status)
+                if [[ -f $timer_file ]]; then
+                    if command systemctl --user is-active marksharc-sync.timer >/dev/null 2>&1; then
+                        print -r -- "sync timer: enabled (systemd: $timer_file, active)"
+                    else
+                        print -r -- "sync timer: installed (systemd: $timer_file, inactive)"
+                    fi
+                else
+                    print -r -- 'sync timer: disabled (systemd)'
+                fi
+                ;;
+        esac
+        exit 0
+    else
+        print -ru2 -- "sync timer: unsupported OS: $os"
+        exit 1
+    fi
+}
+
+if [[ ${1-} == timer ]]; then
+    shift
+    _sync_timer "$@"
+fi
+
+integer auto_mode=0 with_update=0 with_system=0 assume_yes=0
+while (( $# )); do
+    case $1 in
+        --auto) auto_mode=1 ;;
+        --update) with_update=1 ;;
+        --system) with_system=1 ;;
+        -y|--yes) assume_yes=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) print -ru2 -- "Usage: marksharc sync [--auto] [--update [--system] [-y]] | marksharc sync timer <on|off|status>"; exit 2 ;;
+    esac
+    shift
+done
+
+if (( auto_mode && (with_update || with_system || assume_yes) )); then
+    print -ru2 -- 'sync: --auto cannot be combined with --update, --system, or -y'
+    exit 2
+fi
+if (( with_system && ! with_update )); then
+    print -ru2 -- 'sync: --system requires --update'
+    exit 2
+fi
+if (( assume_yes && ! with_update )); then
+    print -ru2 -- 'sync: -y requires --update'
+    exit 2
+fi
+
+if (( with_update )); then
+    typeset -a update_args=()
+    (( with_system )) && update_args+=( --system )
+    (( assume_yes )) && update_args+=( -y )
+    exec zsh -f "$MARKSHARC_HOME/core/cli/update" "${update_args[@]}"
+fi
+
 export GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never
+typeset log_file=
+integer lockfd=0
+if (( auto_mode )); then
+    export GIT_ASKPASS=/usr/bin/false SSH_ASKPASS=/usr/bin/false SSH_ASKPASS_REQUIRE=force
+    state_sync_dir=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/sync
+    command mkdir -p -- "$state_sync_dir" 2>/dev/null || exit 1
+    zmodload zsh/system 2>/dev/null || exit 1
+    : >> "$state_sync_dir/auto.lock" 2>/dev/null || exit 1
+    # Non-blocking flock on a stable inode; exit quietly when another auto-sync holds the lock.
+    zsystem flock -t 0 -f lockfd "$state_sync_dir/auto.lock" 2>/dev/null || exit 0
+    log_file=$state_sync_dir/auto.log
+    # Cap auto.log growth without losing recent entries.
+    if [[ -f $log_file ]]; then
+        zmodload zsh/stat 2>/dev/null || true
+        typeset -A st=()
+        if (( $+builtins[zstat] )) && zstat -H st -- "$log_file" 2>/dev/null && (( st[size] > 524288 )); then
+            command tail -n 500 "$log_file" > "$log_file.tmp.$$" 2>/dev/null && command mv -f -- "$log_file.tmp.$$" "$log_file" 2>/dev/null || command rm -f -- "$log_file.tmp.$$"
+        fi
+    fi
+    exec >> "$log_file" 2>&1
+    stamp=$(command date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || print -r -- unknown-time)
+    print -r -- "=== $stamp marksharc sync --auto ==="
+fi
+
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 typeset -a candidates=( "$MARKSHARC_HOME" "$config" )
 [[ ${MARKSHARC_SYNC_PART-} == pins ]] && candidates=()
@@ -17,7 +297,7 @@ for conf in "$config/config.conf" "$config/hosts/${MARKSHARC_HOST:-${HOST%%.*}}.
         fi
     done < "$conf"
 done
-integer failed=0
+integer failed=0 skipped_dirty=0
 for candidate in "${extras[@]}"; do
     [[ ${MARKSHARC_SYNC_PART-} == pins ]] && continue
     if [[ ! -d $candidate ]] || ! command git -C "${candidate:A}" rev-parse --show-toplevel >/dev/null 2>&1; then
@@ -44,8 +324,13 @@ for root in "${roots[@]}"; do
         continue
     fi
     if [[ -n $worktree_status ]]; then
-        print -r -- "sync: dirty: $root"
-        failed=1
+        if (( auto_mode )); then
+            print -r -- "sync: skipped (dirty): $root"
+            skipped_dirty=1
+        else
+            print -r -- "sync: dirty: $root"
+            failed=1
+        fi
         continue
     fi
     branch=$(command git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null) || { print -r -- "sync: detached: $root"; failed=1; continue; }
@@ -88,13 +373,21 @@ if (( ! failed )) && [[ ${MARKSHARC_SYNC_PART-} != pins ]]; then
     syncdir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/sync
     # These are derived files; they are rebuilt lazily on the next shell.
     command rm -f -- "$syncdir:h"/init/*(N-.) "$syncdir:h"/guard/*(N-.)
-    if command mkdir -p -- "$syncdir"; then
+    if (( auto_mode )) && [[ -x $MARKSHARC_HOME/core/cli/render ]]; then
+        zsh -f "$MARKSHARC_HOME/core/cli/render" || failed=1
+    fi
+    if (( ! failed )) && command mkdir -p -- "$syncdir"; then
         generation="$$-$RANDOM-$RANDOM"
         print -r -- "$generation" > "$syncdir/generation.tmp.$$" && command mv -f -- "$syncdir/generation.tmp.$$" "$syncdir/generation"
-        print -r -- current > "$syncdir/status.tmp.$$" && command mv -f -- "$syncdir/status.tmp.$$" "$syncdir/status"
+        if (( ! skipped_dirty )); then
+            print -r -- current > "$syncdir/status.tmp.$$" && command mv -f -- "$syncdir/status.tmp.$$" "$syncdir/status"
+        fi
     fi
 fi
-if [[ ${MARKSHARC_SYNC_PART-} != repositories && -x $MARKSHARC_HOME/core/cli/doctor ]]; then
+if (( ! auto_mode )) && [[ ${MARKSHARC_SYNC_PART-} != repositories && -x $MARKSHARC_HOME/core/cli/doctor ]]; then
     MARKSHARC_NOTIFY=0 zsh -f "$MARKSHARC_HOME/core/cli/doctor" || failed=1
+fi
+if (( auto_mode )); then
+    print -r -- "=== done (status $failed) ==="
 fi
 exit $failed

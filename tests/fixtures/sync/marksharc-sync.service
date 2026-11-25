@@ -1,0 +1,6 @@
+[Unit]
+Description=MarkSharc automatic repository sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env zsh -f "__MS_HOME__/bin/marksharc" sync --auto
