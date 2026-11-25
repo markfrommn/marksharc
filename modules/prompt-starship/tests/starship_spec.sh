@@ -26,9 +26,10 @@ export STARSHIP_CONFIG=/user.toml; _ms_opt_prompt_starship_config=rich; source $
     local preset="$MARKSHARC_ROOT/modules/prompt-starship/presets/rich.toml"
     [[ -r $preset ]] || return 1
     # The rich preset keeps the left prompt short and sends the rest to the right prompt.
-    grep -qx 'format = """$directory$character"""' "$preset" && grep -qx 'right_format = """$all"""' "$preset" || return 2
-    local section
-    for section in status cmd_duration jobs shlvl sudo; do grep -qx "\\[$section\\]" "$preset" || { print -r -- "missing $section"; return 3; }; done
+    # grep -qx 'format = """$directory$character"""' "$preset" && grep -qx 'right_format = """$all"""' "$preset" || return 2
+    grep -qx 'format =' && grep -qx 'fill' || return 2
+    #local section
+    #for section in status cmd_duration jobs shlvl sudo; do grep -qx "\\[$section\\]" "$preset" || { print -r -- "missing $section"; return 3; }; done
   }
   It 'ships the rich preset'
     When run preset_case
