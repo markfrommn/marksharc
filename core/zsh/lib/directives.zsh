@@ -1,7 +1,5 @@
 # Caller-state protocol. Fields are data, never shell code.
-_ms_directive_emit() {
-    emulate -L zsh
-    [[ -n ${MARKSHARC_DIRECTIVES-} ]] || return 0
+_ms_directive_fields() {
     local field line='' separator=''
     for field in "$@"; do
         field=${field//\%/\%25}
@@ -10,7 +8,13 @@ _ms_directive_emit() {
         line+="$separator$field"
         separator=$'\t'
     done
-    print -r -- "$line" >> "$MARKSHARC_DIRECTIVES"
+    print -r -- "$line"
+}
+
+_ms_directive_emit() {
+    emulate -L zsh
+    [[ -n ${MARKSHARC_DIRECTIVES-} ]] || return 0
+    _ms_directive_fields "$@" >> "$MARKSHARC_DIRECTIVES"
 }
 
 _ms_apply_directives() {

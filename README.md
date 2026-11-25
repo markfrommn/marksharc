@@ -87,6 +87,7 @@ marksharc sync --auto              # quiet, locked sync for timers (skips dirty 
 marksharc sync --update [--system] # run full marksharc update (with optional OS updates)
 marksharc sync timer on|off|status # manage launchd (macOS) or systemd user (Linux) timer
 marksharc hosts populate           # pick push hosts from ~/.ssh/config and `hc machine ls`
+launch-session [host:]directory    # open a terminal in a local or remote directory
 marksharc push [options] [regex…]  # run sync (or --update/--system) over SSH in parallel
 marksharc doctor                   # report local health
 marksharc update                   # sync, plugin pins and module update steps
@@ -154,6 +155,7 @@ The interactive layer is on by default and degrades to native behaviour for each
 | `zsh-syntax-highlighting` | Command-line highlighting, loaded after every other module | `highlighters` |
 | `theme` | vivid `LS_COLORS`, bat as man pager, fzf defaults and bat/eza previews; delta for git when enabled | `ls_colors`, `man_pager`, `bat_theme`, `delta`, `fzf` |
 | `ps` | The ps helpers drawn by procs | `procs` |
+| `launch` | Open a local or remote terminal through Herdr Core, Herdr TUI or tmux | `prefer`, `place`, `focus` |
 | `prompt-starship` | A starship config file or the bundled `rich` preset | `config` |
 | `completion-carapace` | Opt-in Carapace completion for zsh; disables `completion-fzf-tab` unless forced | `enable`, `bridges`, `excludes`, `allow_fzf_tab` |
 
@@ -240,6 +242,7 @@ set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a sessi
 - [Developing marksharc](docs/DEVELOPING.md)
 - [Tests](tests/README.md)
 - [Multiplexer titles, forwarding, and adapters](docs/MUX-ADAPTERS.md)
+- [Launch a terminal session](docs/launch.md)
 - [Specification](specs/MARKSHARC-SPEC.md) and [plan](specs/MARKSHARC-PLAN.md)
 
 ## License

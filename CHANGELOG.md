@@ -8,6 +8,10 @@ Fill in additional details on more major changes includeing in the additional (o
 Leave implementation details and file inventories to git and GitHub. Move pending entries into a real version at release.
 The 0.<PR>.0 versions below are historical backfills, not a versioning rule for future releases. -->
 
+## [Unreleased]
+
+Added `launch-session` to open terminals in a chosen directory on this host or a Herdr machine, with automation flags, zsh and fish completions, and reuse of local SSH agent and X11 forwarding. (DEV-74)
+
 ## [0.23.0]
 
 Added an opt-in Carapace completion module for zsh with bridges and excludes options, mutual exclusion with fzf-tab unless forced, and `completion-ui` switching across fresh shells. (DEV-55)

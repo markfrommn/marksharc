@@ -1,0 +1,396 @@
+#!/bin/zsh -f
+emulate -L zsh
+setopt extendedglob
+
+typeset launch_dir=${0:A:h:h}
+export MARKSHARC_HOME=${MARKSHARC_HOME:-${launch_dir:h:h}}
+export MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}
+typeset mux_cli=$MARKSHARC_HOME/modules/mux/bin/marksharc-mux
+
+launch_usage() {
+    cat <<'EOF'
+Usage: launch-session [options] [[host:]dir [command [args ...]]]
+       launch-session [options] -- command [args ...]
+       launch-session [options] [--host H] [--pwd D] [--command C] [-- args ...]
+
+  --host H          Launch on H (local, localhost, or remote to pick)
+  --pwd D           Start in D (default: the target home)
+  --command C       Run C with any arguments after --
+  --mux KIND        Use hc, herdr, or tmux
+  --mux-id ID       Select the multiplexer instance
+  --place PLACE     Place in a workspace, tab, or hidden terminal
+  --name NAME       Name the terminal
+  --env NAME=VALUE  Set a session variable (repeatable)
+  --in-shell        Run the command after shell init and keep the prompt
+  --no-focus        Keep the caller's focus
+  --dry-run         Print the launch commands without creating a terminal
+  --quiet           Suppress the result line
+  -h, --help        Show this help
+EOF
+}
+
+launch_invalid() {
+    print -ru2 -- "launch-session: $*"
+    return 2
+}
+
+launch_parse() {
+    local option value key target='' program=''
+    local -i positional=0 flags=0
+    while (( $# )); do
+        option=$1
+        shift
+        case $option in
+            -h|--help) help_requested=1; return 0 ;;
+            --host|--pwd|--command|--mux|--mux-id|--place|--name|--env)
+                if (( ! $# )) || [[ $1 == -- || ( -z $1 && $option != --name ) ]]; then
+                    launch_invalid "$option requires a value"
+                    return
+                fi
+                value=$1
+                shift
+                case $option in
+                    --host) host=$value; flags=1 ;;
+                    --pwd) cwd=$value; flags=1 ;;
+                    --command) program=$value; flags=1 ;;
+                    --mux) mux=$value ;;
+                    --mux-id) mux_id=$value ;;
+                    --place) place=$value ;;
+                    --name) name=$value; has_name=1 ;;
+                    --env)
+                        key=${value%%=*}
+                        if [[ $value != *=* || ! $key =~ '^[A-Za-z_][A-Za-z0-9_]*$' || $key == LAUNCH_* ]]; then
+                            launch_invalid '--env requires NAME=VALUE with a non-reserved name'
+                            return
+                        fi
+                        env_names+=( "$key" )
+                        env_values[$key]=$value
+                        ;;
+                esac
+                ;;
+            --in-shell) in_shell=1 ;;
+            --no-focus) no_focus=1 ;;
+            --dry-run) dry_run=1 ;;
+            --quiet) quiet=1 ;;
+            --) launch_argv=( "$@" ); break ;;
+            -*) launch_invalid "unknown option: $option"; return ;;
+            *)
+                if (( flags )); then
+                    launch_invalid 'use -- before command arguments in flag form'
+                    return
+                elif (( positional )); then
+                    launch_argv=( "$option" "$@" )
+                    break
+                fi
+                [[ -n $option ]] || { launch_invalid 'empty target'; return; }
+                target=$option
+                positional=1
+                ;;
+        esac
+    done
+    if (( flags && positional )); then
+        launch_invalid 'positional target conflicts with --host, --pwd, or --command'
+        return
+    fi
+    if (( positional )); then
+        cwd=$target
+        if [[ $target == *:* ]]; then
+            value=${target#*:}
+            key=${target%%:*}
+            if [[ $value == (''|'~'*|/*) ]] && _ms_hosts_valid_name "$key"; then
+                host=$key
+                cwd=$value
+            fi
+        fi
+    fi
+    [[ -z $program ]] || launch_argv=( "$program" "${launch_argv[@]}" )
+    if (( $#launch_argv )) && [[ -z $launch_argv[1] ]]; then
+        launch_invalid 'empty command'
+        return
+    fi
+    [[ -z $host ]] || _ms_hosts_valid_name "$host" || { launch_invalid "invalid host: $host"; return; }
+    [[ $mux != herdr-core ]] || mux=hc
+    [[ $mux == (''|hc|herdr|tmux) ]] || { launch_invalid "unknown multiplexer: $mux"; return; }
+    [[ $mux_id != *[[:cntrl:]]* ]] || { launch_invalid 'invalid --mux-id'; return; }
+    if [[ $mux == hc && -n $mux_id && ! $mux_id =~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*$' ]]; then
+        launch_invalid "invalid hc instance: $mux_id"
+        return
+    fi
+    return 0
+}
+
+# The CLI adapter uses herdr-core internally. The public kind is always hc.
+launch_mux() {
+    local operation=$1 kind=$2
+    shift 2
+    [[ $kind != hc ]] || kind=herdr-core
+    "$mux_cli" "$operation" "$kind" "$@"
+}
+
+launch_discover() {
+    local kind caller_tty=''
+    if [[ -t 0 ]]; then
+        caller_tty=$(command tty <&0)
+    elif [[ -t 2 ]]; then
+        caller_tty=$(command tty <&2)
+    elif [[ -t 1 ]]; then
+        caller_tty=$(command tty <&1)
+    fi
+    for kind in "${discovery_kinds[@]}"; do
+        if [[ $kind == herdr && -x ${HERDR_BIN_PATH-} ]] || (( $+commands[$kind] )); then
+            installed[$kind]=1
+            current[$kind]=$(MARKSHARC_MUX_CALLER_TTY=$caller_tty launch_mux current "$kind" 2>/dev/null)
+            if [[ $kind == tmux && -z $current[$kind] ]]; then
+                # Outside the verified pane, discover and use the default server.
+                unset TMUX TMUX_PANE
+            fi
+            inventories[$kind]=$(launch_mux instances "$kind" 2>/dev/null)
+        fi
+    done
+    return 0
+}
+
+# Limit rows to an explicit instance or the caller's own instance when present.
+launch_instance_rows() {
+    local kind=$1 row id description
+    if [[ -n $current[$kind] && ( -z $mux_id || $mux_id == "$current[$kind]" ) ]]; then
+        printf '%s\t%s\n' "$current[$kind]" "$current[$kind]"
+        return
+    fi
+    for row in "${(@f)inventories[$kind]}"; do
+        [[ $row == *$'\t'* ]] || continue
+        id=${row%%$'\t'*}
+        description=${row#*$'\t'}
+        if [[ -z $mux_id || $id == "$mux_id" || ( $kind == tmux && $description == "$mux_id" ) ]]; then
+            printf '%s\t%s\n' "$id" "${description:-$id}"
+        fi
+    done
+}
+
+launch_pick_host() {
+    local kind instance_row machine_row id rows machines candidates
+    local -a machine_rows=()
+    for kind in "${discovery_kinds[@]}"; do
+        [[ -n $mux || -n $current[$kind] ]] || (( ${preferred[(Ie)$kind]} )) || continue
+        [[ -n $installed[$kind] ]] && launch_mux supports "$kind" remote || continue
+        rows=$(launch_instance_rows "$kind")
+        for instance_row in "${(@f)rows}"; do
+            [[ -n $instance_row ]] || continue
+            id=${instance_row%%$'\t'*}
+            machines=$(launch_mux machines "$kind" "$id" 2>/dev/null) || continue
+            for machine_row in "${(@f)machines}"; do
+                [[ -z $machine_row ]] || machine_rows+=( "$kind/$id"$'\t'"$machine_row" )
+            done
+        done
+    done
+    candidates=$(_ms_launch_host_candidates "$mux" <<< "${(F)machine_rows}")
+    host=$(_ms_pick --header 'Host' --flag '--host <name>' --terminal-fd "$terminal_fd" <<< "$candidates") || return
+    [[ -n $host ]]
+}
+
+launch_find_machine() {
+    local kind=$1 REPLY
+    [[ $kind != hc ]] || kind=herdr-core
+    _ms_launch_machine "$kind" "$2" "$3" && print -r -- "$REPLY"
+}
+
+launch_running_choices() {
+    local kind=$1 row id rows result
+    [[ -n $installed[$kind] ]] || { attempts+=( "$kind is not installed" ); return 1; }
+    if [[ $host_kind == remote ]] && ! launch_mux supports "$kind" remote; then
+        attempts+=( "$kind does not support remote launch" )
+        return 1
+    fi
+    rows=$(launch_instance_rows "$kind")
+    if [[ -z $rows ]]; then
+        attempts+=( "$kind: no running instance${mux_id:+ named $mux_id}" )
+        return 1
+    fi
+    for row in "${(@f)rows}"; do
+        id=${row%%$'\t'*}
+        if [[ $host_kind == remote ]]; then
+            if ! result=$(launch_mux machines "$kind" "$id" 2>/dev/null); then
+                attempts+=( "$kind/$id: could not list machines" )
+                continue
+            fi
+            if ! result=$(launch_find_machine "$kind" "$host" "$result" 2>&1); then
+                attempts+=( "$kind/$id: $result" )
+                continue
+            fi
+            machines[$id]=$result
+        fi
+        choices+=( "$row" )
+    done
+    (( $#choices ))
+}
+
+launch_select() {
+    local kind
+    local -aU order=()
+    local -a autostart_order=()
+    local -a choices=() attempts=()
+    local -A machines=()
+    if [[ -n $mux ]]; then
+        order=( "$mux" )
+        autostart_order=( "$mux" )
+    else
+        for kind in tmux herdr hc; do
+            [[ -z $current[$kind] ]] || order+=( "$kind" )
+        done
+        order+=( "${preferred[@]}" )
+        autostart_order=( "${preferred[@]}" )
+    fi
+    for kind in "${order[@]}"; do
+        launch_running_choices "$kind" || continue
+        selected_kind=$kind
+        if (( $#choices > 1 )); then
+            selected_id=$(_ms_pick --header "$kind instance" --flag '--mux-id <instance>' \
+                --terminal-fd "$terminal_fd" <<< "${(F)choices}") || return
+            [[ -n $selected_id ]] || return 1
+        else
+            selected_id=${choices[1]%%$'\t'*}
+        fi
+        machine=${machines[$selected_id]-}
+        return 0
+    done
+
+    if [[ $host_kind == local ]]; then
+        # A nested instance affects the running order only. Autostart uses the configured order.
+        for kind in "${autostart_order[@]}"; do
+            [[ -n $installed[$kind] ]] && launch_mux supports "$kind" autostart || continue
+            if [[ $kind == hc ]]; then
+                [[ -z $mux_id || $mux_id =~ '^[A-Za-z0-9_][A-Za-z0-9_.-]*$' ]] || continue
+                selected_id=$mux_id
+            elif [[ -n $mux_id ]]; then
+                # tmux IDs select running sessions. Only a session name can start a new one.
+                [[ $mux_id != (\$<->|*[:.]*|[-]*) ]] || continue
+                start_id=$mux_id
+            fi
+            selected_kind=$kind
+            return 0
+        done
+    fi
+    print -ru2 -- "launch-session: no usable multiplexer (tried ${(j:, :)order:-none})"
+    (( ! $#attempts )) || printf '%s\n' "${attempts[@]}" >&2
+    return 1
+}
+
+launch_create() {
+    local key encoded='' run_exec='' result
+    local -a args=() assignments=()
+    if [[ $host_kind == remote && $selected_kind == herdr ]]; then
+        [[ $cwd != '~' ]] || cwd=''
+        [[ -z $cwd || $cwd == /* ]] || { launch_invalid 'use an absolute --pwd for a remote Herdr workspace'; return; }
+    fi
+    if (( $#launch_argv )) && [[ $selected_kind == herdr || $in_shell == 1 ]]; then
+        encoded=$(_ms_directive_fields "${launch_argv[@]}") || return 1
+        (( in_shell )) || run_exec=1
+        launch_argv=()
+    fi
+    assignments=(
+        "LAUNCH_PARENT_PID=$PPID"
+        "LAUNCH_PARENT_HOST=$MARKSHARC_HOST"
+        "LAUNCH_PARENT_SSH_AUTH_SOCK=${SSH_AUTH_SOCK-}"
+        "LAUNCH_PARENT_DISPLAY=${DISPLAY-}"
+        "LAUNCH_RUN=$encoded"
+        "LAUNCH_RUN_EXEC=$run_exec"
+        'LAUNCH_WORKTREE='
+    )
+    if [[ $host_kind == local ]]; then
+        for key in DISPLAY XAUTHORITY SSH_AUTH_SOCK; do
+            (( ${+parameters[$key]} && ! ${+env_values[$key]} )) || continue
+            assignments+=( "$key=${(P)key}" )
+        done
+    fi
+    for key in "${env_names[@]}"; do
+        assignments+=( "$env_values[$key]" )
+    done
+    args=( --instance "$selected_id" --machine "$machine" --cwd "$cwd" --name "$name" --place "$place" )
+    [[ -z $start_id ]] || args+=( --start-instance "$start_id" )
+    (( ! no_focus )) || args+=( --no-focus )
+    for key in "${assignments[@]}"; do
+        args+=( --env "$key" )
+    done
+    if (( dry_run )); then
+        launch_mux launch "$selected_kind" "${args[@]}" --dry-run -- "${launch_argv[@]}" || return 1
+        return 0
+    fi
+    # An autostarted server inherits the launcher process's environment.
+    for key in "${_ms_agent_markers_default[@]}" ${=_ms_cfg_set[agent.markers]-}; do
+        [[ $key =~ '^[A-Za-z_][A-Za-z0-9_]*$' ]] || continue
+        unset -- "$key" 2>/dev/null
+    done
+    result=$(launch_mux launch "$selected_kind" "${args[@]}" -- "${launch_argv[@]}") || return 1
+    (( quiet )) || printf '%s\t%s\t%s\t%s\n' "$selected_kind" "${result%%$'\t'*}" "$machine" "${result#*$'\t'}"
+    return 0
+}
+
+launch_main() {
+    local host='' cwd='' mux='' mux_id='' place='' name='' host_kind terminal_fd REPLY
+    local selected_kind='' selected_id='' start_id='' machine='' kind
+    local -i has_name=0 in_shell=0 no_focus=0 dry_run=0 quiet=0 help_requested=0
+    local -a launch_argv=()
+    local -aU env_names=() preferred=() discovery_kinds=()
+    local -A env_values=() installed=() current=() inventories=()
+
+    launch_parse "$@" || return
+    if (( help_requested )); then
+        launch_usage
+        return
+    fi
+    _ms_config_load || return 1
+    place=${place:-${_ms_cfg_set[launch.place]-workspace}}
+    [[ $place == (workspace|tab|hidden) ]] || { launch_invalid "unknown placement: $place"; return; }
+    if (( ! no_focus )); then
+        case ${_ms_cfg_set[launch.focus]-on} in
+            off) no_focus=1 ;;
+            on) ;;
+            *) launch_invalid 'launch.focus must be on or off'; return ;;
+        esac
+    fi
+    _ms_launch_host_kind "$host"
+    host_kind=$REPLY
+    if [[ $host_kind != local && $cwd != (''|'~'|'~/'*|/*) ]]; then
+        launch_invalid 'remote --pwd must be absolute, ~, or start with ~/'
+        return
+    fi
+    if [[ $host_kind == local ]]; then
+        case $cwd in
+            ''|'~') cwd=$HOME ;;
+            '~/'*) cwd=$HOME/${cwd#\~/} ;;
+        esac
+        cwd=${cwd:a}
+    else
+        cwd=${cwd:-'~'}
+    fi
+    (( has_name )) || name=${${cwd%%[/]#}:t}
+
+    if [[ -n $mux ]]; then
+        discovery_kinds=( "$mux" )
+    else
+        for kind in ${=${_ms_cfg_set[launch.prefer]-hc herdr tmux}}; do
+            [[ $kind != herdr-core ]] || kind=hc
+            [[ $kind == (hc|herdr|tmux) ]] || { launch_invalid "unknown kind in launch.prefer: $kind"; return; }
+            preferred+=( "$kind" )
+        done
+        discovery_kinds=( tmux herdr hc )
+    fi
+    if [[ $host_kind != local ]]; then
+        _ms_hosts_read || return 1
+    fi
+    # Keep the original stdin available when passing a candidate list to the picker.
+    exec {terminal_fd}<&0 || return 1
+    launch_discover
+    if [[ $host_kind == prompt ]]; then
+        launch_pick_host || return
+        host_kind=remote
+    fi
+    launch_select || return
+    launch_create
+}
+
+source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh" || exit 1
+source "$MARKSHARC_HOME/core/zsh/lib/pick.zsh" || exit 1
+source "$MARKSHARC_HOME/core/zsh/lib/directives.zsh" || exit 1
+source "$MARKSHARC_HOME/core/zsh/lib/session.zsh" || exit 1
+launch_main "$@"

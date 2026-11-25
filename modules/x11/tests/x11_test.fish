@@ -45,4 +45,15 @@ set -gx DISPLAY ''
 @test "clearing an empty DISPLAY is silent too" -z "$(ms_module x11 2>&1)"
 @test "nothing was probed or slept during init" ! -s "$OPLOG"
 
+set -gx LAUNCH_PARENT_HOST (/bin/zsh -f -c 'print -r -- "${HOST%%.*}"')
+set -gx LAUNCH_PARENT_DISPLAY :10
+set -gx DISPLAY :9
+setup-x11-display --startup
+@test "startup uses the same-host launch parent display" "$DISPLAY" = :10
+@test "the parent display becomes DISPLAY_ORIG" "$DISPLAY_ORIG" = :10
+set -gx LAUNCH_PARENT_HOST elsewhere
+set -gx DISPLAY :9
+setup-x11-display --startup
+@test "startup ignores the other-host launch parent display" "$DISPLAY" = :9
+
 ms_cleanup

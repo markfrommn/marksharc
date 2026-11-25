@@ -95,10 +95,13 @@ this table to cover every module.
 | Modules | Bands, double-source idempotency, layout, interactive load | `spec/zsh/modules_spec.sh` |
 | Modules | module.conf contract; module tests linkage (every module `tests/` directory is linked from `spec/zsh/modules/<name>`) | `spec/zsh/module_specs_spec.sh` |
 | agent | Agent marker option declared by the module, core classification reads it | `spec/zsh/modules/agent/agent_spec.sh` |
-| ssh-agent | Cache in the state dir, one-time migration from the legacy path, insecure source/state parents refused, probing, parsing, cleanup | `spec/zsh/modules/ssh-agent/agents_spec.sh` |
-| x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
+| ssh-agent | Cache in the state dir, one-time migration from the legacy path, insecure source/state parents refused, probing, parsing, cleanup, same-host launch parent socket after inherited socket and before cache and discovery | `spec/zsh/modules/ssh-agent/agents_spec.sh` |
+| x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, same-host launch parent display before the inherited display at startup when the mux has no client value, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
 | mux | Adapter contracts, nested title updates, tmux reattach and bounded forwarding recovery | `spec/zsh/modules/mux/`, `modules/mux/tests/mux_test.fish` |
+| launch | Positional and flag syntax, validation and results, mux and machine selection, dry-run argv, session metadata and forwarding | `spec/zsh/modules/launch/launch_session_spec.sh` |
+| Run after init | One-shot zsh and fish startup hooks, encoded and empty argv words, exec mode, and interactive class only | `spec/contract/launch_run_spec.sh` |
+| Launch completions | Host and mux candidates, positional host syntax, and options | `spec/zsh/launch_completions_spec.sh`, `fish/completions_test.fish` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
 | herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |

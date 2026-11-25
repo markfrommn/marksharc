@@ -34,7 +34,7 @@ mux_launch() {
     local -a launch_env=() launch_argv=()
     while (( $# )); do
         case $1 in
-            --instance|--machine|--cwd|--name|--place)
+            --instance|--start-instance|--machine|--cwd|--name|--place)
                 (( $# >= 2 )) || { mux_usage; return 2; }
                 key=${1#--}
                 launch_req[$key]=$2
@@ -58,6 +58,11 @@ mux_launch() {
     done
     if [[ $launch_req[place] != (workspace|tab|hidden) ]]; then
         print -ru2 -- "marksharc-mux launch: unknown placement: $launch_req[place]"
+        return 2
+    fi
+    if [[ -n ${launch_req[start-instance]} &&
+        ( $kind != tmux || -n $launch_req[instance] || ${launch_req[start-instance]} == (\$<->|*[:.[:cntrl:]]*|[-]*) ) ]]; then
+        print -ru2 -- 'marksharc-mux launch: --start-instance requires a new tmux session name'
         return 2
     fi
     mux_adapter "$kind" launch

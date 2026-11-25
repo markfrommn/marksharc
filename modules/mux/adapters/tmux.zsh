@@ -46,12 +46,31 @@ case $1 in
         case $operation in
             current)
                 [[ -n $TMUX && $TMUX_PANE == %<-> ]] || return 1
-                command "${tmux_cmd[@]}" display-message -p -t "$TMUX_PANE" '#{session_id}' 2>/dev/null
-                return $?
+                local caller_tty=${MARKSHARC_MUX_CALLER_TTY-}
+                if (( ! ${+MARKSHARC_MUX_CALLER_TTY} )); then
+                    if [[ -t 0 ]]; then
+                        caller_tty=$(command tty <&0)
+                    elif [[ -t 2 ]]; then
+                        caller_tty=$(command tty <&2)
+                    elif [[ -t 1 ]]; then
+                        caller_tty=$(command tty <&1)
+                    fi
+                fi
+                result=$(command "${tmux_cmd[@]}" display-message -p -t "$TMUX_PANE" \
+                    '#{session_id}:#{pane_tty}' 2>/dev/null) || return 1
+                [[ $result == \$<->:* ]] || return 1
+                [[ -z $caller_tty || ${result#*:} == "$caller_tty" ]] || return 1
+                print -r -- "${result%%:*}"
+                return 0
                 ;;
             instances)
-                command "${tmux_cmd[@]}" list-sessions -F $'#{session_id}\t#{session_name}' 2>/dev/null
-                return $?
+                # tmux can replace literal tabs in format strings. Emit TSV ourselves.
+                result=$(command "${tmux_cmd[@]}" list-sessions -F '#{session_id}:#{session_name}' 2>/dev/null) || return 1
+                for word in "${(@f)result}"; do
+                    [[ $word == \$<->:* ]] || continue
+                    printf '%s\t%s\n' "${word%%:*}" "${word#*:}"
+                done
+                return 0
                 ;;
             machines) return 0 ;;
         esac
@@ -60,6 +79,7 @@ case $1 in
             print -ru2 -- 'tmux: remote launch is not supported'
             return 1
         fi
+        local new_session=${launch_req[start-instance]:-marksharc}
         if [[ -n ${launch_req[instance]} ]]; then
             args=( new-window -t "${launch_req[instance]}:" )
             [[ ${launch_req[focus]} != 0 && ${launch_req[place]} != hidden ]] || args+=( -d )
@@ -67,13 +87,13 @@ case $1 in
                 print -ru2 -- 'tmux: workspace placement uses a tab'
             fi
         else
-            args=( new-session -d -s marksharc )
+            args=( new-session -d -s "$new_session" )
         fi
         # tmux expands format expressions in directory and window-name options.
         [[ -z ${launch_req[cwd]} ]] || args+=( -c "${launch_req[cwd]//\#/##}" )
         [[ -z ${launch_req[name]} ]] || args+=( -n "${launch_req[name]//\#/##}" )
         for word in "${launch_env[@]}"; do args+=( -e "$word" ); done
-        args+=( -P -F $'#{session_id}\t#{session_id}:#{window_id}.#{pane_id}' )
+        args+=( -P -F '#{session_id}:#{window_id}.#{pane_id}' )
         if (( $#launch_argv == 1 )); then
             # A single tmux command argument is interpreted as a shell line.
             args+=( -- /bin/sh -c 'exec "$@"' sh "${launch_argv[@]}" )
@@ -101,16 +121,16 @@ case $1 in
             fi
             return 1
         fi
-        [[ $result == \$<->$'\t'\$<->:@<->.%<-> ]] || {
+        [[ $result == \$<->:@<->.%<-> ]] || {
             print -ru2 -- 'tmux: launch returned an invalid address'
             return 1
         }
         if [[ -z ${launch_req[instance]} ]]; then
-            print -ru2 -- 'tmux: attach with tmux attach -t marksharc'
+            print -ru2 -- "tmux: attach with tmux attach -t ${(q)new_session}"
         elif [[ ${launch_req[place]} == hidden ]]; then
-            local window=${${result#*$'\t'}%.%*}
+            local window=${result%.%*}
             print -ru2 -- "tmux: hidden window. Select with $(_ms_mux_preview "${tmux_cmd[@]}" select-window -t "$window")"
         fi
-        print -r -- "$result"
+        printf '%s\t%s\n' "${result%%:*}" "$result"
         ;;
 esac

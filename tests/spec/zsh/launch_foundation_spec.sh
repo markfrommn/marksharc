@@ -115,7 +115,7 @@ Describe 'launch host resolution'
     source "$MARKSHARC_ROOT/core/cli/hosts-lib.zsh"
     typeset -a _ms_host_names=( own alias disconnected )
     typeset -A _ms_host_targets=( [own]=own [alias]=ops@box [disconnected]=dead )
-    local rows=$'herdr-core\tpeer\tops@box\tother\nherdr\twork\twork\t'
+    local rows=$'herdr-core/one\tpeer\tops@box\tother\nherdr-core/two\tpeer\tops@box\tother\nherdr\twork\twork\t'
     local all='' filtered=''
     all=$(print -r -- "$rows" | _ms_launch_host_candidates) || return 1
     [[ $all == *$'alias\talias (ops@box) [herdr-core]'* && $all == *$'disconnected\tdisconnected (dead) []'* && $all == *$'work\twork (work) [herdr]'* ]] || { print -r -- "$all"; return 2; }
