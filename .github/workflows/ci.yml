@@ -2,8 +2,41 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
+    paths:
+      # Exclude docs
+      # This comes first - last match wins
+      # So to include things like package.json this
+      # has to come first
+      - "!**.md"
+      - "!**.json"
+      - "!**.xml"
+      - "**"
+      - ".gitignore"
+      - ".cwf**"
+
   push:
     branches: [main]
+    paths:
+      # Exclude docs
+      # This comes first - last match wins
+      # So to include things like package.json this
+      # has to come first
+      - "!**.md"
+      - "!**.json"
+      - "!**.xml"
+      - "**"
+      - ".gitignore"
+      - ".cwf**"
+
+  workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: "Reason for manual build"
+        type: string
+        required: false
+        default: "Manual trigger"
 
 permissions:
   contents: read
@@ -15,13 +48,20 @@ concurrency:
 jobs:
   check:
     name: check (${{ matrix.os }})
+    # Avoid double dispatch and skip for closed events
+    # If push and no PR or if PR and merge or open so we skip closed w/o merge
+    if: |
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.event.pull_request == null) ||
+       (github.event.pull_request != null &&
+         (github.event.pull_request.merged == true || github.event.pull_request.state == 'open')))
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Install shells and linters (Ubuntu)
         if: runner.os == 'Linux'
@@ -83,13 +123,20 @@ jobs:
   # Exercise Day 0 startup and uninstall in fresh and preconfigured homes.
   install-e2e:
     name: install e2e (${{ matrix.os }})
+    # Avoid double dispatch and skip for closed events
+    # If push and no PR or if PR and merge or open so we skip closed w/o merge
+    if: |
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && github.event.pull_request == null) ||
+       (github.event.pull_request != null &&
+         (github.event.pull_request.merged == true || github.event.pull_request.state == 'open')))
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Install zsh and Fish (Ubuntu)
         if: runner.os == 'Linux'
