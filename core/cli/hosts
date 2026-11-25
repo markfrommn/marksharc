@@ -1,0 +1,217 @@
+#!/usr/bin/env zsh
+# Manage the overlay hosts.conf inventory used by `marksharc push`.
+emulate -L zsh
+
+usage() {
+    cat <<'EOF'
+Usage: marksharc hosts [command] [options]
+
+Commands:
+  list                          list configured hosts in hosts.conf (default)
+  populate [--all] [--source ssh|hc]
+                                discover hosts from ~/.ssh/config and `hc machine ls`
+                                and add selected entries via gum or fzf
+  add <name> [<ssh-target>]     add a host to hosts.conf
+  remove <name>                 remove a host from hosts.conf
+  help                          print this help
+EOF
+}
+
+source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh"
+
+typeset REPLY=
+_ms_hosts_file
+typeset hosts_file=$REPLY
+
+cmd=${1:-list}
+(( $# )) && shift
+
+case $cmd in
+    -h|--help|help)
+        usage
+        exit 0
+        ;;
+    list)
+        (( $# == 0 )) || { print -ru2 -- 'Usage: marksharc hosts list'; exit 2; }
+        _ms_hosts_read "$hosts_file" || exit 1
+        if (( ! $#_ms_host_names )); then
+            print -r -- "hosts: none configured ($hosts_file)"
+            exit 0
+        fi
+        local h t
+        for h in "${_ms_host_names[@]}"; do
+            t=${_ms_host_targets[$h]}
+            if [[ $t != "$h" ]]; then
+                print -r -- "$h	$t"
+            else
+                print -r -- "$h"
+            fi
+        done
+        exit 0
+        ;;
+    add)
+        (( $# >= 1 && $# <= 2 )) || { print -ru2 -- 'Usage: marksharc hosts add <name> [<ssh-target>]'; exit 2; }
+        local name=$1 target=${2:-$1}
+        _ms_hosts_valid_name "$name" || { print -ru2 -- "hosts: invalid host name: $name"; exit 2; }
+        _ms_hosts_valid_target "$target" || { print -ru2 -- "hosts: invalid ssh target: $target"; exit 2; }
+        _ms_hosts_read "$hosts_file" || exit 1
+        if [[ -n ${_ms_host_targets[$name]-} ]]; then
+            print -r -- "hosts: already present: $name"
+            exit 0
+        fi
+        local existing= line=
+        if [[ -r $hosts_file ]]; then
+            existing=$(<"$hosts_file")
+            [[ -n $existing && $existing != *$'\n' ]] && existing+=$'\n'
+        else
+            existing=$'# MarkSharc host inventory for `marksharc push`.\n'
+        fi
+        _ms_hosts_format_line "$name" "$target"; line=$REPLY
+        _ms_hosts_save_text "$hosts_file" "${existing}${line}"$'\n' || exit 1
+        print -r -- "hosts: added $name ($hosts_file)"
+        exit 0
+        ;;
+    remove|rm)
+        (( $# == 1 )) || { print -ru2 -- 'Usage: marksharc hosts remove <name>'; exit 2; }
+        local name=$1
+        _ms_hosts_valid_name "$name" || { print -ru2 -- "hosts: invalid host name: $name"; exit 2; }
+        [[ -r $hosts_file ]] || { print -ru2 -- "hosts: not found: $name"; exit 1; }
+        local line out=
+        integer removed=0
+        while IFS= read -r line || [[ -n $line ]]; do
+            if _ms_words "$line"; then
+                if { [[ ${reply[1]} == host && ${reply[2]-} == "$name" ]]; } || { (( $#reply == 1 )) && [[ ${reply[1]} == "$name" ]]; }; then
+                    removed=1
+                    continue
+                fi
+            fi
+            out+="$line"$'\n'
+        done < "$hosts_file"
+        if (( ! removed )); then
+            print -ru2 -- "hosts: not found: $name"
+            exit 1
+        fi
+        _ms_hosts_save_text "$hosts_file" "$out" || exit 1
+        print -r -- "hosts: removed $name ($hosts_file)"
+        exit 0
+        ;;
+    populate|init)
+        integer select_all=0
+        local source_filter=all
+        while (( $# )); do
+            case $1 in
+                --all) select_all=1 ;;
+                --source)
+                    shift
+                    (( $# )) || { print -ru2 -- 'hosts populate: --source requires ssh or hc'; exit 2; }
+                    case $1 in
+                        ssh|hc|all) source_filter=$1 ;;
+                        *) print -ru2 -- "hosts populate: unknown source: $1 (expected ssh, hc, or all)"; exit 2 ;;
+                    esac ;;
+                -h|--help)
+                    print -r -- 'Usage: marksharc hosts populate [--all] [--source ssh|hc]'
+                    exit 0 ;;
+                *)
+                    print -ru2 -- "hosts populate: unknown argument: $1"
+                    exit 2 ;;
+            esac
+            shift
+        done
+
+        _ms_hosts_read "$hosts_file" || exit 1
+        typeset -ga _ms_disc_names=()
+        typeset -gA _ms_disc_targets=() _ms_disc_sources=()
+
+        if [[ $source_filter == all || $source_filter == hc ]]; then
+            _ms_hosts_discover_hc
+        fi
+        if [[ $source_filter == all || $source_filter == ssh ]]; then
+            _ms_hosts_discover_ssh
+        fi
+
+        if (( ! $#_ms_disc_names )); then
+            print -ru2 -- 'hosts populate: no candidate hosts discovered from ~/.ssh/config or hc'
+            exit 1
+        fi
+
+        typeset -a candidates=() selected_lines=() selected_names=()
+        local h t s label
+        for h in "${_ms_disc_names[@]}"; do
+            t=${_ms_disc_targets[$h]}
+            s=${_ms_disc_sources[$h]}
+            if [[ $t != "$h" ]]; then
+                label="$h ($t) [$s]"
+            else
+                label="$h [$s]"
+            fi
+            [[ -n ${_ms_host_targets[$h]-} ]] && label+=" (configured)"
+            candidates+=( "$label" )
+        done
+
+        if (( select_all )); then
+            selected_names=( "${_ms_disc_names[@]}" )
+        elif whence -p -- gum >/dev/null 2>&1; then
+            local raw
+            raw=$(print -r -l -- "${candidates[@]}" | command gum choose --no-limit --header "Select hosts for $hosts_file") || {
+                print -r -- 'hosts populate: cancelled'
+                exit 0
+            }
+            [[ -n $raw ]] && selected_lines=( "${(@f)raw}" )
+        elif whence -p -- fzf >/dev/null 2>&1; then
+            local raw
+            raw=$(print -r -l -- "${candidates[@]}" | command fzf --multi --prompt='hosts> ' --header='Tab to toggle, Enter to confirm') || {
+                print -r -- 'hosts populate: cancelled'
+                exit 0
+            }
+            [[ -n $raw ]] && selected_lines=( "${(@f)raw}" )
+        else
+            print -ru2 -- 'hosts populate: neither gum nor fzf was found on PATH (install gum/fzf or pass --all)'
+            print -r -l -- "${candidates[@]}"
+            exit 1
+        fi
+
+        if (( ! select_all )); then
+            local sel
+            for sel in "${selected_lines[@]}"; do
+                [[ -n $sel ]] || continue
+                selected_names+=( "${sel%% *}" )
+            done
+        fi
+
+        if (( ! $#selected_names )); then
+            print -r -- 'hosts populate: no hosts selected'
+            exit 0
+        fi
+
+        local existing= line=
+        if [[ -r $hosts_file ]]; then
+            existing=$(<"$hosts_file")
+            [[ -n $existing && $existing != *$'\n' ]] && existing+=$'\n'
+        else
+            existing=$'# MarkSharc host inventory for `marksharc push`.\n'
+        fi
+
+        integer added=0
+        typeset -A added_seen=()
+        for h in "${selected_names[@]}"; do
+            [[ -n ${_ms_disc_targets[$h]-} ]] || continue
+            [[ -n ${_ms_host_targets[$h]-} || -n ${added_seen[$h]-} ]] && continue
+            added_seen[$h]=1
+            _ms_hosts_format_line "$h" "${_ms_disc_targets[$h]}"; line=$REPLY
+            existing+="$line"$'\n'
+            (( ++added ))
+        done
+
+        if (( added == 0 )); then
+            print -r -- "hosts populate: all selected hosts are already in $hosts_file"
+            exit 0
+        fi
+        _ms_hosts_save_text "$hosts_file" "$existing" || exit 1
+        print -r -- "hosts populate: added $added host(s) to $hosts_file"
+        exit 0
+        ;;
+    *)
+        print -ru2 -- "hosts: unknown command: $cmd (try: marksharc hosts help)"
+        exit 2
+        ;;
+esac

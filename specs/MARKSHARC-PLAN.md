@@ -873,6 +873,8 @@ Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux
 - A commit pushed from the Mac reaches sol within the timer interval with no action.
 - `marksharc push` updates every reachable regular host.
 
+**Outcome:** Implemented in DEV-56 (task plan [DEV-56-PLAN.md](DEV-56-PLAN.md)): `marksharc update` adds `-y`/`--yes` (passed only to commands that accept it, never `brew upgrade`) and `--system` (Linux `apt`/`dnf`/`yum` via `sudo`, no-op on macOS); `marksharc sync` adds `--auto` (quiet, flock-locked, logged to state dir, skips dirty trees), `--update [--system] [-y]`, and `timer on|off|status` (launchd plist on macOS, systemd user units on Linux, rejecting `--update`/`--system`); the overlay gains `hosts.conf` with `marksharc hosts populate` (`gum`/`fzf` picker over `~/.ssh/config` and `hc machine ls --json`); and `marksharc push` fans out `marksharc sync [--update] [--system] [-y]` over SSH in parallel with per-host timeouts, regex host matching, and a result table. Live Mac-to-sol timer and SSH push runs remain manual acceptance steps after merge.
+
 ### Phase 4: Fish
 
 #### P4.1 — Fish core: loader, rendered env, plugin loader (DEV-57)

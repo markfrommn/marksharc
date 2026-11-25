@@ -1,0 +1,343 @@
+#!/usr/bin/env zsh
+# Push marksharc sync (or sync --update [--system] [-y]) to hosts over SSH in parallel.
+emulate -L zsh
+unsetopt bg_nice monitor notify
+
+usage() {
+    cat <<'EOF'
+Usage: marksharc push [options] [host-or-regex...]
+
+Run `marksharc sync` over SSH across matching hosts in parallel and print a result table.
+
+Options:
+  --update              run `marksharc sync --update` on each host
+  --system              run `marksharc sync --update --system` on each host
+  -y, --yes             with --update/--system, pass -y to commands that support it
+  --timeout <seconds>   per-host timeout in seconds (default: 60, or 300 with --update)
+  --max-parallel <n>    maximum concurrent SSH jobs (default: 8)
+  --dry-run             show matched hosts and SSH commands without executing them
+  -v, --verbose         print full per-host output below the result table
+  --populate            populate hosts.conf from ~/.ssh/config and `hc machine ls`
+  -h, --help            print this help
+EOF
+}
+
+source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh"
+_ms_config_load
+
+integer with_update=0 with_system=0 assume_yes=0 dry_run=0 verbose=0
+typeset timeout_arg= parallel_arg=
+typeset -a patterns=()
+
+while (( $# )); do
+    case $1 in
+        --update) with_update=1 ;;
+        --system) with_system=1; with_update=1 ;;
+        -y|--yes) assume_yes=1 ;;
+        --timeout)
+            shift
+            (( $# )) && [[ $1 == <1-> ]] || { print -ru2 -- 'push: --timeout requires a positive integer (seconds)'; exit 2; }
+            timeout_arg=$1 ;;
+        --max-parallel)
+            shift
+            (( $# )) && [[ $1 == <1-> ]] || { print -ru2 -- 'push: --max-parallel requires a positive integer'; exit 2; }
+            parallel_arg=$1 ;;
+        --dry-run) dry_run=1 ;;
+        -v|--verbose) verbose=1 ;;
+        --populate)
+            shift
+            exec zsh -f "$MARKSHARC_HOME/core/cli/hosts" populate "$@" ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; patterns+=( "$@" ); break ;;
+        -*) print -ru2 -- "push: unknown option: $1"; exit 2 ;;
+        *) patterns+=( "$1" ) ;;
+    esac
+    shift
+done
+
+if (( assume_yes && ! with_update )); then
+    print -ru2 -- 'push: -y requires --update or --system'
+    exit 2
+fi
+
+typeset default_timeout=${_ms_cfg_set[sync.push_timeout]-}
+if [[ -z $default_timeout || $default_timeout != <1-> ]]; then
+    if (( with_update )); then default_timeout=300; else default_timeout=60; fi
+fi
+integer timeout=${timeout_arg:-$default_timeout}
+
+typeset default_parallel=${_ms_cfg_set[sync.push_parallel]-8}
+[[ $default_parallel == <1-> ]] || default_parallel=8
+integer max_parallel=${parallel_arg:-$default_parallel}
+
+typeset REPLY=
+_ms_hosts_file
+typeset hosts_file=$REPLY
+_ms_hosts_read "$hosts_file" || exit 1
+
+typeset self_host=${MARKSHARC_HOST:-${HOST%%.*}}
+typeset -a selected_names=()
+typeset -A selected_targets=() selected_seen=()
+typeset h= pat= regex_err= target= now= elapsed= pid= child= rc_text=
+
+if (( ! $#patterns )); then
+    for h in "${_ms_host_names[@]}"; do
+        [[ $h == "$self_host" ]] && continue
+        selected_names+=( "$h" )
+        selected_targets[$h]=${_ms_host_targets[$h]}
+        selected_seen[$h]=1
+    done
+    if (( ! $#selected_names )); then
+        print -ru2 -- "push: no remote hosts configured in $hosts_file (run \`marksharc hosts populate\` to add hosts)"
+        exit 1
+    fi
+else
+    integer hits rc
+    for pat in "${patterns[@]}"; do
+        [[ -n $pat ]] || { print -ru2 -- 'push: empty host pattern'; exit 2; }
+        # Validate regex syntax before matching (zsh reports compile errors on stderr).
+        regex_err=$( { [[ "" =~ $pat ]]; } 2>&1 )
+        if [[ -n $regex_err ]]; then
+            print -ru2 -- "push: invalid regex: $pat"
+            exit 2
+        fi
+        hits=0
+        for h in "${_ms_host_names[@]}"; do
+            if [[ $h == "$pat" ]] || [[ $h =~ $pat ]]; then
+                (( ++hits ))
+                if [[ -z ${selected_seen[$h]-} ]]; then
+                    selected_seen[$h]=1
+                    selected_names+=( "$h" )
+                    selected_targets[$h]=${_ms_host_targets[$h]}
+                fi
+            fi
+        done
+        if (( hits == 0 )); then
+            if [[ $pat == *[\^\$\*\+\?\[\]\(\)\|\\\\]* ]]; then
+                print -ru2 -- "push: no hosts in $hosts_file matched regex: $pat"
+                exit 1
+            fi
+            if ! _ms_hosts_valid_target "$pat"; then
+                print -ru2 -- "push: invalid host target: $pat"
+                exit 2
+            fi
+            if [[ -z ${selected_seen[$pat]-} ]]; then
+                selected_seen[$pat]=1
+                selected_names+=( "$pat" )
+                selected_targets[$pat]=$pat
+            fi
+        fi
+    done
+fi
+
+# Shell-agnostic remote command: works under zsh, bash, and fish login shells.
+typeset -a remote_cmd=( marksharc sync )
+(( with_update )) && remote_cmd+=( --update )
+(( with_system )) && remote_cmd+=( --system )
+(( assume_yes )) && remote_cmd+=( -y )
+
+integer connect_timeout=$(( timeout < 10 ? timeout : 10 ))
+
+if (( dry_run )); then
+    typeset -a ssh_cmd=()
+    for h in "${selected_names[@]}"; do
+        target=${selected_targets[$h]}
+        ssh_cmd=( ssh -o BatchMode=yes -o "ConnectTimeout=$connect_timeout" -n -- "$target" "${remote_cmd[@]}" )
+        print -r -- "$h: ${(j: :)${(@q)ssh_cmd}}"
+    done
+    exit 0
+fi
+
+whence -p -- ssh >/dev/null 2>&1 || { print -ru2 -- 'push: ssh not found on PATH'; exit 1; }
+
+zmodload zsh/datetime 2>/dev/null || true
+zmodload zsh/zselect 2>/dev/null || true
+
+typeset tmpdir
+tmpdir=$(command mktemp -d "${TMPDIR:-/tmp}/marksharc-push.XXXXXXXX") || exit 1
+
+typeset -A idx_pid=() idx_child_file=() idx_start=() idx_done=() idx_rc=() idx_dur=() idx_timed_out=()
+
+_push_cleanup() {
+    local idx pid child
+    for idx in "${(@k)idx_pid}"; do
+        [[ -n ${idx_done[$idx]-} ]] && continue
+        pid=${idx_pid[$idx]}
+        if [[ -r "$tmpdir/$idx.child" ]]; then
+            child=$(<"$tmpdir/$idx.child")
+            [[ $child == <-> ]] && kill -TERM "$child" 2>/dev/null
+        fi
+        kill -TERM "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+    done
+    command rm -rf -- "$tmpdir"
+}
+trap '_push_cleanup' EXIT
+trap '_push_cleanup; exit 130' INT TERM HUP
+
+_push_now() {
+    if (( $+EPOCHREALTIME )); then
+        REPLY=$EPOCHREALTIME
+    else
+        REPLY=$(command date +%s 2>/dev/null || print -r -- 0)
+    fi
+}
+
+integer total=$#selected_names next_idx=1 active=0 idx
+
+while (( next_idx <= total || active > 0 )); do
+    while (( next_idx <= total && active < max_parallel )); do
+        idx=$next_idx
+        (( ++next_idx ))
+        h=${selected_names[$idx]}
+        target=${selected_targets[$h]}
+        _push_now
+        idx_start[$idx]=$REPLY
+        (
+            child=
+            trap '[[ -n $child ]] && kill -TERM "$child" 2>/dev/null; wait "$child" 2>/dev/null; exit 143' TERM INT
+            command ssh -o BatchMode=yes -o "ConnectTimeout=$connect_timeout" -n -- "$target" "${remote_cmd[@]}" \
+                > "$tmpdir/$idx.out" 2>&1 </dev/null &
+            child=$!
+            print -r -- "$child" > "$tmpdir/$idx.child"
+            wait "$child"
+            rc=$?
+            print -r -- "$rc" > "$tmpdir/$idx.rc.tmp" && command mv -f -- "$tmpdir/$idx.rc.tmp" "$tmpdir/$idx.rc"
+        ) &
+        idx_pid[$idx]=$!
+        (( ++active ))
+    done
+
+    _push_now
+    now=$REPLY
+    integer progressed=0
+    for idx in "${(@k)idx_pid}"; do
+        [[ -n ${idx_done[$idx]-} ]] && continue
+        pid=${idx_pid[$idx]}
+        if [[ -f "$tmpdir/$idx.rc" ]]; then
+            wait "$pid" 2>/dev/null
+            rc_text=$(<"$tmpdir/$idx.rc")
+            [[ $rc_text == <-> ]] || rc_text=1
+            idx_rc[$idx]=$rc_text
+            idx_timed_out[$idx]=0
+            idx_dur[$idx]=$(( now - idx_start[$idx] ))
+            idx_done[$idx]=1
+            (( --active ))
+            progressed=1
+            continue
+        fi
+        elapsed=$(( now - idx_start[$idx] ))
+        if (( elapsed >= timeout )); then
+            if [[ -r "$tmpdir/$idx.child" ]]; then
+                child=$(<"$tmpdir/$idx.child")
+                [[ $child == <-> ]] && kill -TERM "$child" 2>/dev/null
+            fi
+            kill -TERM "$pid" 2>/dev/null
+            if (( $+builtins[zselect] )); then
+                zselect -t 20 2>/dev/null
+            else
+                command sleep 0.2 2>/dev/null || true
+            fi
+            if [[ -r "$tmpdir/$idx.child" ]]; then
+                child=$(<"$tmpdir/$idx.child")
+                [[ $child == <-> ]] && kill -KILL "$child" 2>/dev/null
+            fi
+            kill -KILL "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null
+            idx_rc[$idx]=124
+            idx_timed_out[$idx]=1
+            idx_dur[$idx]=$elapsed
+            idx_done[$idx]=1
+            (( --active ))
+            progressed=1
+        fi
+    done
+
+    if (( active > 0 && ! progressed )); then
+        if (( $+builtins[zselect] )); then
+            zselect -t 5 2>/dev/null
+        else
+            command sleep 0.05 2>/dev/null || true
+        fi
+    fi
+done
+
+_push_detail() {
+    local out_file=$1 rc=$2 timed_out=$3
+    if (( timed_out )); then
+        REPLY="timed out after ${timeout}s"
+        return 0
+    fi
+    local content= line= first_nonempty=
+    [[ -r $out_file ]] && content=$(<"$out_file")
+    if (( rc == 0 )); then
+        if [[ $content == *'sync: updated:'* ]]; then
+            REPLY='updated'
+        elif (( with_update )); then
+            local -a lines=( "${(@f)content}" )
+            local last_line=
+            for line in "${lines[@]}"; do
+                [[ -n ${line//[[:space:]]/} ]] && last_line=$line
+            done
+            REPLY=${last_line:-updated}
+        elif [[ $content == *'sync: current:'* ]]; then
+            REPLY='current'
+        else
+            REPLY='ok'
+        fi
+        return 0
+    fi
+    local -a lines=( "${(@f)content}" )
+    for line in "${lines[@]}"; do
+        line=${line#"${line%%[![:space:]]*}"}
+        line=${line%"${line##*[![:space:]]}"}
+        [[ -n $line ]] || continue
+        first_nonempty=$line
+        if [[ $line == sync:* || $line == update:* || $line == *failed* || $line == *error* || $line == *Error* || $line == ssh:* ]]; then
+            break
+        fi
+    done
+    if [[ -n $first_nonempty ]]; then
+        REPLY="$first_nonempty (exit $rc)"
+    else
+        REPLY="exit $rc"
+    fi
+}
+
+integer host_width=4
+for h in "${selected_names[@]}"; do
+    (( ${#h} > host_width )) && host_width=${#h}
+done
+
+printf "%-${host_width}s  %-8s  %-8s  %s\n" HOST STATUS DURATION DETAIL
+
+integer failed=0
+typeset status_word dur_str detail
+for (( idx = 1; idx <= total; idx++ )); do
+    h=${selected_names[$idx]}
+    rc=${idx_rc[$idx]}
+    if (( idx_timed_out[$idx] )); then
+        status_word=timeout
+        failed=1
+    elif (( rc == 0 )); then
+        status_word=ok
+    else
+        status_word=failed
+        failed=1
+    fi
+    printf -v dur_str '%.1fs' "${idx_dur[$idx]}"
+    _push_detail "$tmpdir/$idx.out" "$rc" "${idx_timed_out[$idx]}"
+    detail=$REPLY
+    printf "%-${host_width}s  %-8s  %-8s  %s\n" "$h" "$status_word" "$dur_str" "$detail"
+done
+
+if (( verbose )); then
+    for (( idx = 1; idx <= total; idx++ )); do
+        h=${selected_names[$idx]}
+        print -r -- ""
+        print -r -- "=== $h ==="
+        [[ -s "$tmpdir/$idx.out" ]] && command cat -- "$tmpdir/$idx.out"
+    done
+fi
+
+exit $failed

@@ -1,29 +1,137 @@
 #!/usr/bin/env zsh
 emulate -L zsh
+
+usage() {
+    cat <<'EOF'
+Usage: marksharc update [options]
+
+Options:
+  --list            list available update step labels
+  --dry-run         print commands without running them
+  --only <label>    run only the named update step
+  -y, --yes         pass -y to update commands that support it
+  --system          also run the native OS package manager update (via sudo; no-op on macOS)
+  -h, --help        print this help
+EOF
+}
+
 typeset only= mode=run
+integer assume_yes=0 with_system=0
 while (( $# )); do
     case $1 in
         --list) mode=list ;;
         --dry-run) mode=dry ;;
         --only) shift; (( $# )) && [[ -n $1 ]] || { print -ru2 -- 'update: --only requires a nonempty label'; exit 2; }; only=$1 ;;
+        -y|--yes) assume_yes=1 ;;
+        --system) with_system=1 ;;
+        -h|--help) usage; exit 0 ;;
         *) print -ru2 -- "update: unknown argument: $1"; exit 2 ;;
     esac
     shift
 done
+
+[[ $only == system ]] && with_system=1
+export MARKSHARC_YES=$assume_yes
+
 source "$MARKSHARC_HOME/core/cli/day2-lib.zsh"
 typeset -a results=() step_args=() step_lengths=()
 integer failed=0 selected=0
-typeset -A labels=( sync 1 pins 1 render 1 )
+typeset -A labels=( sync 1 pins 1 system 1 render 1 )
+
+# Append -y only for commands known to accept it (never brew update/upgrade).
+_update_apply_yes() {
+    reply=( "$@" )
+    (( assume_yes )) || return 0
+    local cmd=${1:t} sub=${2-} arg
+    for arg in "${@:2}"; do
+        [[ $arg == -y || $arg == --yes || $arg == --assume-yes ]] && return 0
+    done
+    case $cmd in
+        mise)
+            [[ $sub == upgrade ]] && reply+=( -y ) ;;
+        apt|apt-get)
+            [[ $sub == (upgrade|dist-upgrade|full-upgrade|install|autoremove) ]] && reply+=( -y ) ;;
+        dnf|yum)
+            [[ $sub == (upgrade|update|install|autoremove) ]] && reply+=( -y ) ;;
+    esac
+}
+
 _day2_step() {
     local label=$1; shift
     [[ -z $only || $label == $only ]] || return 0
     (( selected++ ))
     if [[ $mode == list ]]; then print -r -- "$label"; return 0; fi
-    if [[ $mode == dry ]]; then print -r -- "$label: ${(j: :)${(@q)@}}"; return 0; fi
-    if ! whence -p -- "$1" >/dev/null 2>&1; then results+=( "$label: skipped (command unavailable)" ); return 0; fi
-    if "$@"; then results+=( "$label: ok" ); else results+=( "$label: failed" ); failed=1; fi
+    typeset -a reply=()
+    _update_apply_yes "$@"
+    if [[ $mode == dry ]]; then print -r -- "$label: ${(j: :)${(@q)reply}}"; return 0; fi
+    if ! whence -p -- "${reply[1]}" >/dev/null 2>&1; then results+=( "$label: skipped (command unavailable)" ); return 0; fi
+    if "${reply[@]}"; then results+=( "$label: ok" ); else results+=( "$label: failed" ); failed=1; fi
     return 0
 }
+
+_update_system_step() {
+    (( with_system )) || return 0
+    [[ -z $only || $only == system ]] || return 0
+    (( selected++ ))
+    if [[ $mode == list ]]; then print -r -- system; return 0; fi
+    if [[ $MARKSHARC_OS == darwin ]]; then
+        if [[ $mode == dry ]]; then
+            print -r -- 'system: no-op (macOS)'
+        else
+            results+=( 'system: ok (no-op on macOS)' )
+        fi
+        return 0
+    fi
+    if [[ $MARKSHARC_OS != linux ]]; then
+        if [[ $mode == dry ]]; then
+            print -r -- "system: skipped (unsupported OS: $MARKSHARC_OS)"
+        else
+            results+=( "system: skipped (unsupported OS: $MARKSHARC_OS)" )
+        fi
+        return 0
+    fi
+    typeset -a cmd1=() cmd2=()
+    if whence -p -- apt >/dev/null 2>&1; then
+        cmd1=( sudo apt update )
+        cmd2=( sudo apt upgrade )
+        (( assume_yes )) && cmd2+=( -y )
+    elif whence -p -- dnf >/dev/null 2>&1; then
+        cmd1=( sudo dnf upgrade --refresh )
+        (( assume_yes )) && cmd1+=( -y )
+    elif whence -p -- yum >/dev/null 2>&1; then
+        cmd1=( sudo yum update )
+        cmd2=( sudo yum upgrade )
+        (( assume_yes )) && { cmd1+=( -y ); cmd2+=( -y ); }
+    else
+        if [[ $mode == dry ]]; then
+            print -r -- 'system: skipped (no supported system package manager)'
+        else
+            results+=( 'system: skipped (no supported system package manager)' )
+        fi
+        return 0
+    fi
+    if [[ $mode == dry ]]; then
+        if (( $#cmd2 )); then
+            print -r -- "system: ${(j: :)${(@q)cmd1}} && ${(j: :)${(@q)cmd2}}"
+        else
+            print -r -- "system: ${(j: :)${(@q)cmd1}}"
+        fi
+        return 0
+    fi
+    if ! whence -p -- sudo >/dev/null 2>&1; then
+        results+=( 'system: failed (sudo unavailable)' )
+        failed=1
+        return 0
+    fi
+    if "${cmd1[@]}" && { (( ! $#cmd2 )) || "${cmd2[@]}"; }; then
+        results+=( 'system: ok' )
+    else
+        results+=( 'system: failed' )
+        failed=1
+    fi
+    return 0
+}
+
 _day2_directive() {
     [[ $1 == update ]] || return 0
     (( $# >= 3 )) || { print -ru2 -- 'update: invalid directive'; return 1; }
@@ -34,6 +142,7 @@ _day2_directive() {
     step_lengths+=( $# )
     step_args+=( "$@" )
 }
+
 _day2_collect || exit 1
 _day2_step sync env MARKSHARC_SYNC_PART=repositories zsh -f "$MARKSHARC_HOME/core/cli/sync"
 _day2_step pins env MARKSHARC_SYNC_PART=pins zsh -f "$MARKSHARC_HOME/core/cli/sync"
@@ -44,6 +153,7 @@ for length in "${step_lengths[@]}"; do
     _day2_step "${step[@]}"
     (( offset += length ))
 done
+_update_system_step
 _day2_step render zsh -f "$MARKSHARC_HOME/core/cli/render"
 if [[ $mode == run ]]; then print -r -l -- "${results[@]}"; fi
 (( selected )) || { print -ru2 -- "update: unknown step: $only"; exit 1; }

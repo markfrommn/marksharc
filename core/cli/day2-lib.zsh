@@ -1,6 +1,8 @@
 source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 _ms_trace() { :; }
-case $OSTYPE in darwin*) MARKSHARC_OS=darwin ;; linux*) MARKSHARC_OS=linux ;; *) MARKSHARC_OS=${OSTYPE%%[0-9.-]*} ;; esac
+if [[ -z ${MARKSHARC_OS-} ]]; then
+    case $OSTYPE in darwin*) MARKSHARC_OS=darwin ;; linux*) MARKSHARC_OS=linux ;; *) MARKSHARC_OS=${OSTYPE%%[0-9.-]*} ;; esac
+fi
 MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 _day2_collect() {

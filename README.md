@@ -83,8 +83,14 @@ marksharc reload                   # apply it in this shell (--verbose to trace)
 marksharc render                   # refresh cached env, completions and command shims
 marksharc bootstrap                # install declared packages
 marksharc sync                     # fast-forward safe checkouts and refresh pins
+marksharc sync --auto              # quiet, locked sync for timers (skips dirty trees)
+marksharc sync --update [--system] # run full marksharc update (with optional OS updates)
+marksharc sync timer on|off|status # manage launchd (macOS) or systemd user (Linux) timer
+marksharc hosts populate           # pick push hosts from ~/.ssh/config and `hc machine ls`
+marksharc push [options] [regex…]  # run sync (or --update/--system) over SSH in parallel
 marksharc doctor                   # report local health
 marksharc update                   # sync, plugin pins and module update steps
+marksharc update --system [-y]     # include native OS updates via sudo (no-op on macOS)
 marksharc update --list            # list available step labels
 marksharc update --only <label>    # run one step; --dry-run previews commands
 marksharc install <name>           # run a registered explicit installer
@@ -106,6 +112,9 @@ paths in `config.conf`, quoting paths that contain spaces:
 ```text
 set sync.repos "$HOME/work/one" "$HOME/work/two"
 set sync.check_hours 12
+set sync.timer_minutes 60
+set sync.push_timeout 60
+set sync.push_parallel 8
 set doctor.startup_ms 500
 set doctor.startup_timeout_ms 5000
 ```

@@ -54,7 +54,7 @@ Describe 'template overlay'
 
   skeleton_case() {
     emulate -L zsh
-    [[ -f $template/README.md && -f $template/local/post.zsh && -f $template/hosts/.gitkeep ]] || return 1
+    [[ -f $template/README.md && -f $template/hosts.conf && -f $template/local/post.zsh && -f $template/hosts/.gitkeep ]] || return 1
     [[ ! -e $template/.gitkeep && ! -e $template/local/pre.zsh ]] || return 2
     zsh -n "$template/local/post.zsh" || return 3
     # The sample hook does nothing until the user edits it.

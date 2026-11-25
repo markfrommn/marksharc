@@ -10,6 +10,7 @@ lives here.
 | `hosts/<short-host-name>.conf` | Per-host additions and overrides, read after `config.conf` |
 | `modules/<name>/` | Private modules, same contract as the public ones |
 | `packages/` | Optional Brewfile fragments and apt/dnf package lists |
+| `hosts.conf` | Host inventory for `marksharc push` (`host <name> [<ssh-target>]`) |
 | `local/post.zsh` | Native zsh run at the end of interactive startup |
 
 Useful commands:
