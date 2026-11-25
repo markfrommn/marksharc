@@ -7,6 +7,7 @@
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
 | Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
+| Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
 
@@ -143,6 +144,7 @@ Counts are Mac / sol.
 - A coherent colour baseline (vivid, bat as man pager, delta, fzf previews).
 - Carapace as an opt-in completion module, evaluated without fzf-tab.
 - Push sync: a poll-pull timer and an ssh fan-out.
+- Launch commands: `launch-session`, `launch-repo`, and `cwf-new` in a launched terminal, over the multiplexer adapters ([LAUNCH-SPEC.md](LAUNCH-SPEC.md)).
 - Fish, brought forward onto the same structure.
 
 ### 4.3 Maybe later
@@ -407,6 +409,7 @@ When a command must change the caller's state, a native wrapper function sets `M
 | `pushd <dir>` | Push onto the directory stack |
 | `setenv <NAME> <value>` | Export a variable |
 | `unsetenv <NAME>` | Unset a variable |
+| `exit [<status>]` | Exit the calling shell once the remaining directives are applied ([LAUNCH-SPEC.md](LAUNCH-SPEC.md) 9.3) |
 
 Fields are tab-separated. Tab, newline, and `%` inside a value are percent-encoded. The applier is about 20 lines per shell and never evaluates text as code. A wrapper that needs no state change is not written at all; the executable is called directly.
 
@@ -434,6 +437,8 @@ Multiplexers change faster than the rest of the environment, so they sit behind 
 Adapters: `tmux`, `herdr` (TUI and app/core), `wezterm`, and `plain` (OSC 0/1/2). A new multiplexer is one adapter file. The `titles` module computes the workspace, tab, and pane strings once (repository, branch, cwf session, path tail) and hands them to every active adapter. The `x11` module asks the active adapter for the client DISPLAY first and falls back to the SSH-derived guess; the ping and the one-second sleep go away.
 
 In the MVP the existing `chdir-set-title`, `setup-herdr-sessions`, and `fix-tmux` are lifted as they are. The adapter refactor is a Modernization issue.
+
+Opening a new terminal is a further set of adapter operations (`supports`, `current`, `instances`, `machines`, `launch`), specified in [LAUNCH-SPEC.md](LAUNCH-SPEC.md) section 5.4.
 
 ### 6.14 Sync across hosts
 
@@ -516,6 +521,7 @@ changes fetched by sync apply to the next invocation.
 | `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins at 95 and 99, after fzf-tab and atuin; an atuin suggestion strategy when atuin is installed; syntax highlighting loads last of all | |
 | `theme` | Modernization | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include through `GIT_CONFIG_COUNT`, fzf defaults and previews (fzf-tab included); order 21, before completion reads `LS_COLORS` | |
 | `completion-carapace` | Modernization | Opt-in zsh completion via cached `carapace _carapace zsh` at order 72 with `enable`, `bridges`, `excludes`, and `allow_fzf_tab` options; disables `completion-fzf-tab` unless forced; `completion-ui` / `MARKSHARC_COMPLETION_UI` switches between UIs for a fresh shell (`exec zsh -l`) | |
+| `launch` | Modernization | `launch-session` and `launch-repo`: a new terminal session on a chosen host, directory, or repository under tmux, the Herdr TUI, or Herdr Core; launch metadata and run-after-init ([LAUNCH-SPEC.md](LAUNCH-SPEC.md)) | |
 | `cloud` | Later | kubectl, krew, kubectx, gcloud, aws, helm | k8s and gcloud blocks |
 
 ### 7.2 Private modules (author's overlay)
@@ -628,3 +634,4 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Test runner | ShellSpec plus a cross-shell contract suite | Research, existing suite |
 | Version managers (revisited) | mise as an opt-in module that owns tools per host; shims for agent and batch shells, activation for interactive ones; nvm, gvm, and pyenv remain the default and the fallback | Operator, DEV-62 |
 | Version-manager PATH order | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order | Operator, DEV-38 |
+| Launch commands | `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue precedes the command. Full log in [LAUNCH-SPEC.md](LAUNCH-SPEC.md) section 13 | Operator, DEV-78 |

@@ -8,7 +8,7 @@
 
 **Tech stack:** zsh 5.9+, fish 4.x, bash 5.x (env only); ShellSpec 0.28.1; GitHub Actions on macOS and Ubuntu; atuin, starship, fzf, zoxide; git for distribution and sync.
 
-**Spec:** [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md). The plan argues from the spec; read both.
+**Spec:** [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md). The plan argues from the spec; read both. The launch commands (P3.9) have their own [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 
 **Tracking:** Linear project MarkSharc, team Development. Planning issue DEV-33. Milestones match the phases below.
 
@@ -31,12 +31,12 @@
 |---|---|---|---|
 | 1. Pre-migration | mark-desktop-files | zsh runs in the target module layout, without Oh-My-Zsh, in place | DEV-34, DEV-35, DEV-36, DEV-37, DEV-38, DEV-39, DEV-40 |
 | 2. MVP | marksharc | Every regular host runs zsh from `marksharc` | DEV-41, DEV-42, DEV-43, DEV-44, DEV-45, DEV-46, DEV-47, DEV-48 |
-| 3. Modernization | marksharc | Rendered env, bash env, write-once commands, Day 0 / Day 2 commands, multiplexers, upgrades, push sync | DEV-49, DEV-50, DEV-51, DEV-52, DEV-53, DEV-54, DEV-55, DEV-56 |
+| 3. Modernization | marksharc | Rendered env, bash env, write-once commands, Day 0 / Day 2 commands, multiplexers, upgrades, push sync, launch commands | DEV-49, DEV-50, DEV-51, DEV-52, DEV-53, DEV-54, DEV-55, DEV-56, DEV-78, DEV-79, DEV-74, DEV-75, DEV-76 |
 | 4. Fish | marksharc | Fish on the same structure | DEV-57, DEV-58 |
 | 6. Cleanup | mark-desktop-files | No shell code left outside the overlay | DEV-59 |
 | 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64, DEV-72 (L6) |
 
-Rough size: 95 estimate points across 26 scheduled PRs, plus 6 unscheduled candidates.
+Rough size: 110 estimate points across 31 scheduled PRs, plus 6 unscheduled candidates.
 
 ## Dependencies
 
@@ -65,6 +65,11 @@ flowchart LR
   P3_6["P3.6 DEV-54"]
   P3_7["P3.7 DEV-55"]
   P3_8["P3.8 DEV-56"]
+  P3_9_0["P3.9.0 DEV-78"]
+  P3_9_1["P3.9.1 DEV-79"]
+  P3_9_2["P3.9.2 DEV-74"]
+  P3_9_3["P3.9.3 DEV-75"]
+  P3_9_4["P3.9.4 DEV-76"]
   P4_1["P4.1 DEV-57"]
   P4_2["P4.2 DEV-58"]
   P6_1["P6.1 DEV-59"]
@@ -101,6 +106,13 @@ flowchart LR
   P2_6 --> P3_6
   P3_6 --> P3_7
   P2_5 --> P3_8
+  P3_3 --> P3_9_0
+  P3_5 --> P3_9_0
+  P3_8 --> P3_9_0
+  P3_9_0 --> P3_9_1
+  P3_9_1 --> P3_9_2
+  P3_9_2 --> P3_9_3
+  P3_9_3 --> P3_9_4
   P3_1 --> P4_1
   P4_1 --> P4_2
   P3_3 --> P4_2
@@ -124,6 +136,7 @@ flowchart LR
 - P1.5 and P1.6 split the interactive file by area and can run side by side. They both delete from `zsh.zshrc.interactive`, so merge one, rebase the other.
 - P2.4 and P2.7 run beside P2.3. P2.8 follows P2.3.
 - After cutover (P2.6): P3.1, P3.5, and P3.6 are independent of each other. P3.2, P3.3, P3.4, and P4.1 all wait on P3.1.
+- P3.9.0 to P3.9.4 run in order after P3.3, P3.5, and P3.8.
 
 ## Gates
 
@@ -875,6 +888,26 @@ Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux
 
 **Outcome:** Implemented in DEV-56 (task plan [DEV-56-PLAN.md](DEV-56-PLAN.md)): `marksharc update` adds `-y`/`--yes` (passed only to commands that accept it, never `brew upgrade`) and `--system` (Linux `apt`/`dnf`/`yum` via `sudo`, no-op on macOS); `marksharc sync` adds `--auto` (quiet, flock-locked, logged to state dir, skips dirty trees), `--update [--system] [-y]`, and `timer on|off|status` (launchd plist on macOS, systemd user units on Linux, rejecting `--update`/`--system`); the overlay gains `hosts.conf` with `marksharc hosts populate` (`gum`/`fzf` picker over `~/.ssh/config` and `hc machine ls --json`); and `marksharc push` fans out `marksharc sync [--update] [--system] [-y]` over SSH in parallel with per-host timeouts, regex host matching, and a result table. Live Mac-to-sol timer and SSH push runs remain manual acceptance steps after merge.
 
+#### P3.9 — Launch commands (DEV-78, DEV-79, DEV-74, DEV-75, DEV-76)
+
+- **Repo:** marksharc
+- **Estimate:** 15 across five entries
+- **Depends on:** P3.3 (DEV-51), P3.5 (DEV-53), P3.8 (DEV-56)
+
+**Goal:** Open a terminal session on any host, in a directory, a repository, or a new `cwf` worktree, under whichever multiplexer is in use, and close it when the work is merged.
+
+| Entry | Issue | Delivers | Estimate | Depends on |
+|---|---|---|---|---|
+| P3.9.0 | DEV-78 | The design: [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md) | 3 | P3.3, P3.5, P3.8 |
+| P3.9.1 | DEV-79 | A shared picker, host-to-machine resolution, adapter launch operations, and the remaining live multiplexer checks | 3 | P3.9.0 |
+| P3.9.2 | DEV-74 | `launch-session`, launch metadata, and run-after-init | 3 | P3.9.1 |
+| P3.9.3 | DEV-75 | `launch-repo` and the cached repository inventory | 3 | P3.9.2 |
+| P3.9.4 | DEV-76 | `cwf-new` launch options, `gwt-clean` launched mode, and the `exit` directive | 3 | P3.9.3 |
+
+Scope, tests, and done-when for each entry are in [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
+
+**Outcome (P3.9.0):** DEV-78 reviewed DEV-74, DEV-75, and DEV-76 as one design and recorded the `hc`, Herdr TUI, and tmux launch behaviour, including live checks against the Herdr app that settled placement by `herdr.space` label. Operator decisions: the names `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue (DEV-79) precedes DEV-74.
+
 ### Phase 4: Fish
 
 #### P4.1 — Fish core: loader, rendered env, plugin loader (DEV-57)
@@ -1123,6 +1156,7 @@ on the Mac and sol is a manual acceptance step after merge.
 | 6.15 Day 0 and Day 2 | DEV-44, DEV-45, DEV-52 |
 | 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60, L6 (DEV-72) |
 | 8 Testing and quality | Every PR; DEV-41 (CI), DEV-48 (inventory) |
+| [LAUNCH-SPEC.md](LAUNCH-SPEC.md) | DEV-78 (design), DEV-79, DEV-74, DEV-75, DEV-76; per section in [LAUNCH-PLAN.md](LAUNCH-PLAN.md) |
 | 9 Migration map | DEV-42, DEV-43, DEV-46, DEV-59 |
 | 10 Design rules | DEV-47 |
 | 4.3 Maybe later | DEV-60, DEV-61, DEV-62 (decision) and L6 (mise module), DEV-63, DEV-64; the Go helper has no issue yet |
