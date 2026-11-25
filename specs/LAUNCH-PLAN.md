@@ -17,8 +17,9 @@ DEV-78 reviewed DEV-74, DEV-75, and DEV-76 as one design. It changed four things
 | Finding | Effect |
 |---|---|
 | No multiplexer passes the caller's environment to a new terminal, and `hc run` has no environment option. | Launch metadata is passed explicitly; on `hc` through an `env` wrapper (4.2, 5.4, 7.1). |
-| A terminal started with `hc` is hidden from the Herdr app unless it carries `herdr.space`, and `herdr-app` only reaches a window on the same host. | A placement model with defined fallbacks, and live checks before the command is built (5.4, 4.6). |
-| Each multiplexer keeps its own machine list, beside `hosts.conf`. | Host-to-machine resolution in the foundation (5.2). |
+| A terminal started with `hc` is hidden from the Herdr app unless it carries `herdr.space`. Live checks showed that an unused id creates a space, from any core the app watches. | Placement by label alone, with no dependence on `herdr-app` (5.4, 4.6). |
+| `hc run --cwd` does not expand `~`, and any `hc` command starts a core. | The wrapper changes directory for a path under a remote home, and adapters read the socket to see whether a core runs (4.2, 5.4). |
+| Each multiplexer keeps its own machine list, beside `hosts.conf`, and machine names are local to each core. | Host-to-machine resolution in the foundation, by name, reported hostname, then target (5.2). |
 | `cwf-new` hooks register during interactive init, so a non-interactive remote run would skip them. | Launch, then create: the new terminal runs `cwf-new` itself (9.1). This needs run-after-init (6.4) and removes the need to pass `cwf` exports or run setup over ssh. |
 
 Functionality the three issues did not anticipate, and where it lands:
@@ -81,10 +82,10 @@ DEV-74 and DEV-75 each asked for a `specs/DEV-<id>-PLAN.md` holding the design. 
 **Scope**
 
 - `core/zsh/lib/pick.zsh` with `_ms_pick` (5.3). Move `marksharc hosts populate` onto it.
-- `core/zsh/lib/json.zsh`: the reader extracted from `core/cli/hosts-lib.zsh`, extended to the `herdr machine list`, `hc get`, `hc run`, and Herdr creation replies, plus the argv encoder.
+- `core/zsh/lib/json.zsh`: the reader extracted from `core/cli/hosts-lib.zsh`, extended to the `herdr machine list`, `hc get`, `hc run`, and Herdr creation replies.
 - Host resolution in `core/cli/hosts-lib.zsh`: reserved names, ssh targets, and machine matching (5.2).
 - The `supports`, `current`, `instances`, `machines`, and `launch` operations in the `tmux`, `herdr`, and `herdr-core` adapters, with the placement fallbacks and `dry_run` (5.4). `marksharc-mux` dispatches them.
-- Run checks V1 to V10 (4.6) with the operator present for the ones that change the app window. Record each result in LAUNCH-SPEC and amend 5.4 where a result requires it.
+- Run the checks still open in 4.6 (V7, V11, and the Herdr TUI half of V8), with the operator present for the ones that change a window. DEV-78 ran the rest. Record each result in LAUNCH-SPEC and amend 5.4 where a result requires it.
 - Add the launch operations to `docs/MUX-ADAPTERS.md`.
 
 **Tests**
@@ -205,7 +206,7 @@ DEV-74 and DEV-75 each asked for a `specs/DEV-<id>-PLAN.md` holding the design. 
 
 | Gate | Check before moving on |
 |---|---|
-| After P3.9.1 | The table in 4.6 is complete and 5.4 matches it. The command is not built on an unverified placement. |
+| After P3.9.1 | The table in 4.6 has no open row and 5.4 matches it. |
 | After P3.9.2 | A few days of launching by hand on the Mac and sol, in the Herdr app and in tmux. |
 | Before P3.9.4 | The overlay's post-create hooks are confirmed to run in a session started through run-after-init on sol. |
 
@@ -213,7 +214,7 @@ DEV-74 and DEV-75 each asked for a `specs/DEV-<id>-PLAN.md` holding the design. 
 
 | LAUNCH-SPEC section | Delivered by |
 |---|---|
-| 4 Multiplexer behaviour | DEV-78 (review), DEV-79 (checks in 4.6) |
+| 4 Multiplexer behaviour | DEV-78 (review and most live checks), DEV-79 (the open checks in 4.6) |
 | 5.1 to 5.4 Parts, hosts, picker, adapters | DEV-79 |
 | 5.5 Choosing the multiplexer | DEV-74 |
 | 6 launch-session | DEV-74 |

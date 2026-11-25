@@ -57,7 +57,7 @@ Excluded:
 
 ## 4. Multiplexer behaviour
 
-Reviewed on Linux on 2026-11-25 with `hc` 0.1.22, `herdr-app` 0.1.12, `herdr` 0.9.5, and `tmux` 3.5a. "Verified" marks behaviour confirmed by a live run on a disposable instance; the rest comes from each tool's own help and manual. Section 4.6 lists the checks that need an open Herdr app window or a second host.
+Reviewed on 2026-11-25 on Linux with `hc` 0.1.22, `herdr-app` 0.1.12, `herdr` 0.9.5, and `tmux` 3.5a, and against a Herdr app window on macOS that shows terminals from a Linux core, with `hc` 0.1.21 and 0.1.22 on three other machines and `tmux` 3.8 on macOS. "Verified" marks behaviour confirmed by a live run on a disposable terminal or instance; the rest comes from each tool's own help and manual. Section 4.6 records the live checks and the ones still open.
 
 ### 4.1 Terms
 
@@ -73,19 +73,24 @@ Reviewed on Linux on 2026-11-25 with `hc` 0.1.22, `herdr-app` 0.1.12, `herdr` 0.
 Herdr Core runs terminals and keeps them alive. The Herdr app shows them and arranges them in spaces and tabs. `hc` does not arrange windows.
 
 - **Markers.** A terminal's program sees `HC_TERMINAL_ID` (an address such as `t7`), `HC_TERMINAL_SOCKET`, and `HC_SCOPE`. Verified.
-- **Instances.** A user can run more than one core per host. Each is a session with its own socket, `<runtime dir>/herdr-core/<session>.sock`, named `default` unless chosen. `HC_SESSION` selects one, as do `hc connect --session` and `hc machine add --session`. `hc server status --json` reports the core's identity, version, and live terminal count.
+- **Instances.** A user can run more than one core per host. Each is a session, named `default` unless chosen, with its own core identity, terminals, and socket. `HC_SESSION=<name>` selects one, as do `hc connect --session` and `hc machine add --session`. The socket is `$XDG_RUNTIME_DIR/herdr-core/<session>.sock` on Linux; on macOS the default session's is `~/.local/state/herdr-core/default/default.sock`. `hc server status --json` reports the core's identity, version, and live terminal count. Verified.
+- **Starting.** Any `hc` command starts the session's core when it is not running, including `hc server status`. Whether a core is running is therefore read from its socket, not asked of `hc`. Verified.
 - **New terminal.** `hc run [--bg] [--name N] [--cwd D] [--on M] [--label K=V]… [--no-parent] [--no-notify] [--keep] [--rm] [--] [argv…]`.
   - With no argv the terminal runs that machine's own shell as a login shell (`zsh -l` observed). One argument that contains spaces or shell characters is a shell line; several arguments are an argv run as given. Verified.
-  - `--cwd` defaults to the directory `hc` runs in. With `--on` it defaults to that machine's home.
+  - `--cwd` defaults to the directory `hc` runs in. With `--on` it defaults to that machine's home. `--cwd` does not expand `~`: `--cwd '~'` and `--cwd '~/dir'` fail with `spawn_failed`, locally and with `--on`. Verified.
   - The terminal's environment is the core's environment, not the caller's. `hc run` has no environment option; the `terminal.run` API method has `env`, but the CLI does not expose it. An argv of `env NAME=VALUE … program` sets variables, including empty values and values with spaces and semicolons. Verified.
-  - A terminal started from inside another terminal is its child. It ends when the parent's program ends, and `hc` types notes about it into the parent, unless it is started with `--no-parent` and `--no-notify`.
+  - A terminal started from inside another terminal is its child. It ends when the parent's program ends, and `hc` types notes about it into the parent, unless it is started with `--no-parent` and `--no-notify`. A `--no-parent` terminal outlives the terminal it was started from; a child is killed with it. Verified.
   - `--bg` returns at once. Without it `hc` waits and streams the output.
   - Piped output is JSON: `{"address":"t21","agent":"env","cwd":"/tmp","state":"live",…}`. Verified.
   - `--name` must be 1 to 32 of `a-z 0-9 - _` and unique among live terminals.
-- **Machines.** `hc machine ls --json` prints `{"machines":[{"name":…,"target":…,"via":…,"temporary":…,"session":…,"state":…}]}`. `hc machine add <ssh-target> [--name N] [--via <command>] [--temp] [--session S]` adds one. A remote terminal's address is `machine/t7`.
+- **Machines.** `hc machine ls --json` prints `{"machines":[{"name":…,"target":…,"host":…,"id":…,"via":…,"temporary":…,"session":…,"state":…}]}`. `host` is the hostname the other core reports and `id` is its permanent identity. `name` is local to the core that holds the entry: two cores can call the same machine by different names. `hc machine add <ssh-target> [--name N] [--via <command>] [--temp] [--session S]` adds one. A remote terminal's address is `machine/t7`, and the reply to `hc run --on` carries it in that form. Verified.
 - **No terminal.** `hc exec [--on M] [--cwd D] [--env K=V] argv…` runs one program without a terminal and returns its output and exit code. Its timeout defaults to 60 seconds and cannot exceed 600.
-- **Visibility.** The app shows a terminal only when it carries the label `herdr.space=<space id>`. `herdr.tab=<tab id>` picks its tab; without it the app makes a tab in that space. An unlabelled terminal stays hidden and is reached with `hc attach <address>`. `hc get <address> --json` returns a terminal's labels; an app-shown terminal carries `herdr.space` and `herdr.tab`. Verified for reading labels.
-- **The app's own CLI.** `herdr-app do space.new --name N --folder D --machine M --argv '<json array>'` makes a space; `tab.new` takes `--name`, `--space`, `--folder`, and `--argv`; `terminal.open` takes `--argv`, `--folder`, `--place tab|right|down`, and `--name`. `--machine ''` means this computer. There is no environment argument. The commands talk to the open window on the same host through `~/.config/herdr-app/herdr-app.sock` (`HERDR_APP_HOME` picks another home). They fail when no window is open on that host, which is the usual case in a shell on a remote machine whose terminals the app shows. `herdr-app status` reports whether a window answers. Verified for the no-window failure.
+- **Visibility.** The app shows a terminal only when it carries the label `herdr.space=<space id>`. `herdr.tab=<tab id>` picks its tab; without it the app makes a tab in that space. An unlabelled terminal stays hidden and is reached with `hc attach <address>`. `hc get <address> --json` returns a terminal's labels.
+  - With the id of an existing space, the terminal appears as a new tab there. Verified.
+  - With an unused id of the same shape, `sp` and 32 hexadecimal digits, the app creates a space for it, named after the directory the terminal is in. Verified.
+  - Both work from a core on another host than the app, and for a terminal on a third machine started with `--on`; the app files that space under its own name for the machine. Verified.
+  - The app adds a `where` label. Neither case moves the focus. The tab, and a space left empty, disappear when the terminal ends. Verified.
+- **The app's own CLI.** `herdr-app do space.new --name N --folder D --machine M --argv '<json array>'` makes a space; `tab.new` takes `--name`, `--space`, `--folder`, and `--argv`; `terminal.open` takes `--argv`, `--folder`, `--place tab|right|down`, and `--name`. `--machine ''` means this computer. There is no environment argument. The commands talk to the open window on the same host through `~/.config/herdr-app/herdr-app.sock` (`HERDR_APP_HOME` picks another home). They fail when no window is open on that host, which is the usual case in a shell on a remote machine whose terminals the app shows. `herdr-app status` reports whether a window answers. Verified for the no-window failure. Placement does not need these commands; only focus does (5.4).
 
 ### 4.3 Herdr TUI
 
@@ -117,26 +122,28 @@ Herdr Core runs terminals and keeps them alive. The Herdr app shows them and arr
 | Runs a program instead of a shell | Yes, an argv | No | Yes, an argv |
 | Remote host | `--on <machine>` | `--machine <label>` | No |
 | Several instances per user | Yes, sessions | Yes, sessions | Yes, sessions and sockets |
-| Starts without a running server | To be checked (V5) | No | Yes, `new-session -d` |
-| Visible on creation | Only with `herdr.space`, or through `herdr-app` | Yes | Yes, when a client is attached |
-| Focus control | None in `hc` | `--focus`, `--no-focus` | `-d` |
+| Starts without a running server | Yes, on any command | No | Yes, `new-session -d` |
+| Visible on creation | Only with a `herdr.space` label | Yes | Yes, when a client is attached |
+| Focus control | None in `hc`; the app's own CLI on the app's host | `--focus`, `--no-focus` | `-d` |
+| Expands `~` in the directory | No | Yes for remote paths, by its help | Local only; the caller expands it |
 
-### 4.6 Checks still to run
+### 4.6 Live checks
 
-These need an open Herdr app window, a second host, or macOS. DEV-79 runs them and records each result in the last column. A result that contradicts section 5 amends that section in the same pull request.
+DEV-78 ran these on 2026-11-25 with the operator at the app window. The terminals, the probe core, and the tmux server they used were removed afterwards. DEV-79 runs the open ones and records the results here. A result that contradicts section 5 amends that section in the same pull request.
 
-| # | Check | Affects | Result |
-|---|---|---|---|
-| V1 | From a shell on a remote core, `hc run --label herdr.space=<caller's space>` shows a new tab in that space of the app; note whether it takes focus. | `tab` placement on `hc` | |
-| V2 | Whether an unused `herdr.space` id creates a space, or any other core-side route does. | `workspace` placement without a local app window | |
-| V3 | `hc run --on <machine> --cwd '~/dir'` and `herdr-app do space.new --machine <machine> --folder '~/dir'` expand `~` on the remote. | Remote directories | |
-| V4 | `herdr-app do space.new --argv '["env","NAME=VALUE","sh","-c",…]'` starts the wrapped login shell, and what `keep` and the tab title look like. | `workspace` placement with a local app window | |
-| V5 | `hc run` with no core running starts one; the exit status of `hc server status` when none runs. | Starting `hc` on demand | |
-| V6 | `HC_SESSION=<name> hc run` reaches a non-default core; where the socket lives on macOS. | `--mux-id` on `hc` | |
-| V7 | `herdr --machine <label> workspace create --cwd --env` works against a running remote server, including `--env NAME=` with an empty value. | Remote launches on the Herdr TUI | |
-| V8 | A shell's `exit` closes the app tab, the Herdr pane, and the tmux window. | `gwt-clean` launched mode | |
-| V9 | `tmux new-session -e` on the macOS Homebrew tmux. | Minimum tmux version | |
-| V10 | A terminal started with `--no-parent` from inside another terminal outlives it. | Independence on `hc` | |
+| # | Check | Result |
+|---|---|---|
+| V1 | From a shell on a remote core, `hc run --label herdr.space=<caller's space>` shows a new tab in that space. | Pass. The tab appears, the app adds `where`, and the focus does not move. |
+| V2 | An unused `herdr.space` id creates a space. | Pass, for a local terminal and for terminals started with `--on` on two other machines. The space is named after the terminal's directory and goes when the terminal ends. |
+| V3 | `hc run --cwd '~/dir'` expands `~` on the target. | Fail, locally and with `--on`: `spawn_failed`. Section 5.4 changes directory inside the wrapper instead; that form is verified on a remote machine. |
+| V4 | `herdr-app do space.new` with a wrapped argv. | Not run. Placement no longer needs it. |
+| V5 | `hc run` with no core running starts one. | Pass. Every `hc` command does, including `hc server status`. |
+| V6 | `HC_SESSION=<name>` reaches a separate core. | Pass. The probe core had its own identity and terminal list, and stopping it left the default core untouched. Socket paths are in 4.2. |
+| V7 | `herdr --machine <label> workspace create --cwd --env` against a running remote server, including an empty `--env` value. | Open. No saved machine had a ready Herdr TUI server. |
+| V8 | A shell's `exit` closes its terminal's view. | Pass in the app: the terminal finished with status 0 and its tab went. tmux closes the window by its manual. The Herdr TUI pane is open. |
+| V9 | `tmux new-session -e` on the macOS Homebrew tmux. | Pass with tmux 3.8, including an empty value. |
+| V10 | A `--no-parent` terminal outlives the terminal that started it. | Pass. A child started without it was killed with its parent. |
+| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Open. |
 
 ## 5. Architecture
 
@@ -145,7 +152,7 @@ These need an open Herdr app window, a second host, or macOS. DEV-79 runs them a
 | Part | Location | Role |
 |---|---|---|
 | Picker | `core/zsh/lib/pick.zsh` | One interactive selection helper for hosts, repositories, and instances (5.3). |
-| JSON helpers | `core/zsh/lib/json.zsh` | The pure-zsh reader extracted from the `hc machine ls` scanner, plus a string encoder for argv arrays. No parser dependency on a host. |
+| JSON helpers | `core/zsh/lib/json.zsh` | The pure-zsh reader extracted from the `hc machine ls` scanner, extended to the other replies the adapters read. No parser dependency on a host. |
 | Host resolution | `core/cli/hosts-lib.zsh` | Reserved names, ssh targets, and host-to-machine matching (5.2). |
 | Launch adapters | `modules/mux/adapters/<kind>.zsh` | New operations beside `detect`, `set_titles`, `refresh_env`, and `sessions` (5.4). |
 | `launch` module | `modules/launch/` | `bin/launch-session`, `bin/launch-repo`, the run-after-init hook in `init.zsh` and `init.fish`, completions, and options (section 10). It needs the `mux` module. |
@@ -171,8 +178,11 @@ The host picker lists the union of `hosts.conf` and the machines of the candidat
 A remote launch needs the host as the chosen multiplexer names it. The adapter's `machines` operation lists that instance's machines, and resolution takes the first rule that matches:
 
 1. A machine whose name equals the host name.
-2. A machine whose target equals the host's ssh target in `hosts.conf`, or equals the host name. More than one such machine is an error that lists them.
-3. No match is an error that names the command to add the machine, such as `hc machine add <target> --name <host>`.
+2. A machine whose own hostname equals the host name, where the multiplexer reports one (the `host` field of `hc machine ls`).
+3. A machine whose target equals the host's ssh target in `hosts.conf`, or equals the host name.
+4. No match is an error that names the command to add the machine, such as `hc machine add <target> --name <host>`.
+
+More than one machine matching at rule 2 or 3 is an error that lists them. Machine names are local to each core, so a name is resolved against the instance that runs the launch and is never copied from another host's list.
 
 `marksharc hosts populate` already copies `hc` machine names into `hosts.conf`, so rule 1 is the common case. `hosts.conf` keeps its format.
 
@@ -188,8 +198,8 @@ Each adapter gains these operations. An adapter that cannot launch (`wezterm`, `
 |---|---|
 | `supports <feature>` | Succeed when the kind has the feature: `launch`, `remote`, `autostart`, `argv`, `place-workspace`, `place-tab`, `place-hidden`. |
 | `current` | When the caller is inside a live instance of this kind, print its instance id. A marker whose server does not answer does not count. |
-| `instances` | Print the running local instances, one per line as `<id><TAB><description>`. |
-| `machines [<instance>]` | Print that instance's machines as `<name><TAB><target>`. |
+| `instances` | Print the running local instances, one per line as `<id><TAB><description>`. Neither this nor `current` may start a server. |
+| `machines [<instance>]` | Print that instance's machines as `<name><TAB><target><TAB><hostname>`, with an empty hostname when the kind reports none. |
 | `launch` | Open one terminal from the request and print `<instance><TAB><address>`. |
 
 The request is data in the caller's scope, like `client_env` for `refresh_env`: the associative array `launch_req` with the keys `instance`, `machine`, `cwd`, `name`, `place`, `focus`, and `dry_run`, the array `launch_env` of `NAME=VALUE` words, and the array `launch_argv`. With `dry_run` set the adapter prints each command it would run, one per line with every word quoted, and runs none of them. An adapter passes every value as one argument and never builds a shell line from request data.
@@ -200,10 +210,10 @@ How each kind carries the request:
 |---|---|---|---|
 | Instance | `HC_SOCKET` from `HC_TERMINAL_SOCKET` inside a terminal; `HC_SESSION=<id>` otherwise | The inherited context inside a pane; `--session <id>` otherwise | `-S <socket>` from `TMUX` inside a pane, else the default socket; `-t <id>:` |
 | Machine | `--on <machine>` | `--machine <label>` | Not supported |
-| Directory | `--cwd` | `--cwd` | `-c` |
+| Directory | `--cwd` for an absolute path. A path under the remote home gets no `--cwd`; the wrapper changes into it | `--cwd` | `-c` |
 | Variables | `env NAME=VALUE …` in front of the program | `--env NAME=VALUE` | `-e NAME=VALUE` |
-| Program | The argv. With none: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`, because the `env` wrapper needs a program | None; a command travels in `LAUNCH_RUN` (6.4) | The argv. With none: the default shell |
-| Name | The space or tab name through the app; the label `marksharc.name` otherwise | `--label` | `-n` |
+| Program | The argv. With none: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`, because the `env` wrapper needs a program. For a path under the remote home: `sh -c 'cd -- "$1" && shift && exec "$@"' sh <dir> <argv…>`, the directory being an argument | None; a command travels in `LAUNCH_RUN` (6.4) | The argv. With none: the default shell |
+| Name | The label `marksharc.name`. The app names a space after its first terminal's directory | `--label` | `-n` |
 | Always | `--bg --no-parent --no-notify` | | `-P -F` to read the address |
 | Address | `address` in the JSON reply, as `machine/address` when remote | `pane_id` | `<session>:<window id>.<pane id>` |
 
@@ -211,15 +221,15 @@ Placement:
 
 | `--place` | Herdr Core (`hc`) | Herdr TUI | tmux |
 |---|---|---|---|
-| `workspace` | With an app window on the calling host: `herdr-app do space.new --name --folder --machine --argv`. Otherwise as `tab`. | `workspace create` | As `tab`: a session is the instance, so a window is the top level. |
-| `tab` | When the caller's terminal carries `herdr.space`: `hc run --label herdr.space=<that id>`. Else with an app window: `herdr-app do tab.new`. Otherwise as `hidden`. | `tab create --workspace <caller's>`; with no caller workspace, as `workspace`. | `new-window` |
+| `workspace` | `hc run --label herdr.space=<new id>`, the id being `sp` and 32 random hexadecimal digits. | `workspace create` | As `tab`: a session is the instance, so a window is the top level. |
+| `tab` | When the caller's terminal carries `herdr.space` and the launch is on the caller's machine: `hc run --label herdr.space=<that id>`. Otherwise as `workspace`. | `tab create --workspace <caller's>`; with no caller workspace, as `workspace`. | `new-window` |
 | `hidden` | `hc run` with no `herdr.*` label | `workspace create --no-focus` | `new-window -d` |
 
-When a placement falls back, the command prints one line on standard error naming the placement used. For a hidden terminal the line includes how to reach it, such as `hc attach t21`. Checks V1, V2, and V4 can widen the Herdr Core rows; they cannot remove the fallbacks.
+When a placement falls back, the command prints one line on standard error naming the placement used. For a hidden terminal the line includes how to reach it, such as `hc attach t21`. A labelled Herdr Core terminal is shown by whichever app windows watch that core. With none watching it stays reachable by its address, which the result line carries.
 
-`--no-focus` maps to `--no-focus` on the Herdr TUI and `-d` on tmux. Herdr Core has no focus control; the app decides.
+`--no-focus` maps to `--no-focus` on the Herdr TUI and `-d` on tmux. A terminal placed by label on Herdr Core appears without taking the focus. When focus is wanted and an app window answers on the calling host, the adapter then runs `herdr-app do agent.focus --terminal <address>`, once check V11 confirms it. From any other host the focus stays where it was.
 
-Starting a kind with no running instance: tmux creates a detached session with `new-session -d -s <name>` and prints `tmux attach -t <name>` on standard error. Herdr Core starts through `hc run` when V5 confirms it. The Herdr TUI is never started.
+Starting a kind with no running instance: tmux creates a detached session with `new-session -d -s <name>` and prints `tmux attach -t <name>` on standard error. Herdr Core starts its core on the first `hc` command. The Herdr TUI is never started.
 
 ### 5.5 Choosing the multiplexer
 
@@ -247,7 +257,7 @@ The third line is the flag form, selected by any of `--host`, `--pwd`, or `--com
 | Option | Meaning |
 |---|---|
 | `--host <name>` | The host (5.2). Default: this host. |
-| `--pwd <dir>` | The starting directory. Default: the home directory. For a remote host it must be `~`, start with `~/`, or be absolute. A local relative path is made absolute before the launch. |
+| `--pwd <dir>` | The starting directory. Default: the home directory. For a remote host it must be `~`, start with `~/`, or be absolute. A local path, relative or under `~`, is made absolute before the launch. |
 | `--command <program>` | The program to run. Default: the login shell. |
 | `--mux hc\|herdr\|tmux` | The kind (5.5). |
 | `--mux-id <instance>` | The instance: a Herdr Core session, a Herdr TUI session, or a tmux session name or id. |
@@ -410,7 +420,7 @@ The rules of MARKSHARC-SPEC section 8 apply: a temporary HOME, command stubs, an
 
 | Area | What the specs prove |
 |---|---|
-| Adapters | The contract in 5.4 for every adapter against stub `hc`, `herdr`, `herdr-app`, and `tmux` that record their argv. Each placement, local and remote, with and without an app window. Values with spaces, semicolons, dollar signs, quotes, and newlines arrive as single arguments. |
+| Adapters | The contract in 5.4 for every adapter against stub `hc`, `herdr`, `herdr-app`, and `tmux` that record their argv. Each placement, local and remote, and each directory form. Values with spaces, semicolons, dollar signs, quotes, and newlines arrive as single arguments. |
 | Selection | Every branch of 5.5: `--mux`, nesting, a stale marker, preference order, autostart, several instances with and without a terminal. |
 | Hosts | Reserved names, both matching rules, the ambiguous and missing cases, and the picker's union. |
 | Picker | `gum`, `fzf`, neither, no terminal, cancel. `marksharc hosts populate` behaves as before. |
@@ -428,7 +438,9 @@ Each behaviour gets a row in the contract inventory in `tests/README.md`. Live a
 
 | Risk or question | Handling |
 |---|---|
-| Showing a new space in the Herdr app from a remote core is unverified. | Checks V1, V2, and V4 in DEV-79. The fallbacks in 5.4 hold whatever the result. |
+| Creating a space through an unused `herdr.space` id is observed behaviour, not a documented interface. | The label logic sits in one adapter. If the app stops honouring it, the terminal still exists and is reachable by the address in the result line. |
+| A launch cannot tell whether any app window shows the core. | The result line always carries the address, and the documentation gives `hc attach`. |
+| `hc server status` starts a core, so a careless probe leaves one running. | Adapters read the socket instead (4.2, 5.4). |
 | `hc` and `herdr-app` are young and change quickly. | All tool syntax lives in the adapters. `--dry-run` shows the exact commands. Section 4 records the reviewed versions. |
 | `LAUNCH_RUN` runs a command named by the environment. | Interactive sessions only, once, cleared before it runs, and never evaluated as text. Whoever controls a shell's environment already controls the shell. |
 | A shell without the `launch` module ignores `LAUNCH_RUN`, so `--in-shell`, launched `cwf-new`, and any command on the Herdr TUI silently open a plain shell there. | `marksharc push` keeps hosts current. The user documentation states the requirement. |
@@ -436,7 +448,7 @@ Each behaviour gets a row in the contract inventory in `tests/README.md`. Live a
 | A host named `local`, `localhost`, or `remote`. | Reserved and documented. |
 | A multiplexer server inherits launch variables from the shell that started it. | Every variable is passed on every launch, empty when unused (7.1). `gwt-clean` compares paths, not presence (9.2). |
 | `hc`'s own `shell` setting is bypassed when variables must be set. | The session runs `$SHELL` as a login shell. Revisit if `hc run` gains an environment option. |
-| tmux older than 3.2 lacks `new-session -e`. | Check V9. The tmux adapter reports the version when a launch fails for that reason. |
+| tmux older than 3.2 lacks `new-session -e`. | Homebrew tmux on macOS is 3.8 (V9). The tmux adapter reports the version when a launch fails for that reason. |
 
 ## 13. Decision log
 
@@ -449,6 +461,8 @@ Each behaviour gets a row in the contract inventory in `tests/README.md`. Live a
 | Picker alias | The reserved host name `remote`; an omitted repository. No option takes an optional value. | DEV-78 |
 | Variable names | `LAUNCH_PARENT_*` as proposed in DEV-74, with `LAUNCH_RUN`, `LAUNCH_RUN_EXEC`, and `LAUNCH_WORKTREE` beside them. | DEV-74, DEV-78 |
 | Environment on `hc` | An `env` wrapper, because `hc run` has no environment option. | Review, DEV-78 |
+| Placement on `hc` | `herdr.space` labels alone: the caller's id for a tab, a new id for a space. `herdr-app` is used only for focus. | Live checks, DEV-78 |
+| Remote home paths on `hc` | The wrapper changes directory, because `--cwd` does not expand `~`. | Live checks, DEV-78 |
 | Independence on `hc` | Always `--no-parent --no-notify`; `LAUNCH_PARENT_PID` carries the relationship. | Review, DEV-78 |
 | Several `hc` cores per user | Supported through `--mux-id`. The DEV-74 assumption of one core per user does not hold. | Review, DEV-78 |
 | Remote tmux | Later. | DEV-74 |

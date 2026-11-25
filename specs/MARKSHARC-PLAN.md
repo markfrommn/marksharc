@@ -899,14 +899,14 @@ Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux
 | Entry | Issue | Delivers | Estimate | Depends on |
 |---|---|---|---|---|
 | P3.9.0 | DEV-78 | The design: [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md) | 3 | P3.3, P3.5, P3.8 |
-| P3.9.1 | DEV-79 | A shared picker, host-to-machine resolution, adapter launch operations, and the live multiplexer checks | 3 | P3.9.0 |
+| P3.9.1 | DEV-79 | A shared picker, host-to-machine resolution, adapter launch operations, and the remaining live multiplexer checks | 3 | P3.9.0 |
 | P3.9.2 | DEV-74 | `launch-session`, launch metadata, and run-after-init | 3 | P3.9.1 |
 | P3.9.3 | DEV-75 | `launch-repo` and the cached repository inventory | 3 | P3.9.2 |
 | P3.9.4 | DEV-76 | `cwf-new` launch options, `gwt-clean` launched mode, and the `exit` directive | 3 | P3.9.3 |
 
 Scope, tests, and done-when for each entry are in [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 
-**Outcome (P3.9.0):** DEV-78 reviewed DEV-74, DEV-75, and DEV-76 as one design and recorded the `hc`, Herdr TUI, and tmux launch behaviour. Operator decisions: the names `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue (DEV-79) precedes DEV-74.
+**Outcome (P3.9.0):** DEV-78 reviewed DEV-74, DEV-75, and DEV-76 as one design and recorded the `hc`, Herdr TUI, and tmux launch behaviour, including live checks against the Herdr app that settled placement by `herdr.space` label. Operator decisions: the names `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue (DEV-79) precedes DEV-74.
 
 ### Phase 4: Fish
 
