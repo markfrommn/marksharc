@@ -21,4 +21,15 @@ printf 'host alpha\nhost beta ops@beta\n' >"$XDG_CONFIG_HOME/marksharc/hosts.con
 @test "push offers hosts from hosts.conf" (contains -- alpha (complete -C 'marksharc push al' | string replace -r '\t.*' ''); and echo yes) = yes
 @test "reload offers --verbose" (contains -- --verbose (complete -C 'marksharc reload --' | string replace -r '\t.*' ''); and echo yes) = yes
 
+ms_stub launch-session 'exit 0'
+ms_module launch
+printf 'host\tgamma\tops@gamma\n' >>"$XDG_CONFIG_HOME/marksharc/hosts.conf"
+set -l launch_hosts (complete -C 'launch-session --host ' | string replace -r '\t.*' '')
+@test "launch completes configured and reserved hosts" (string join ' ' $launch_hosts) = 'alpha beta fixture gamma local localhost remote'
+@test "launch completes positional hosts with a colon" (complete -C 'launch-session --place tab ga' | string replace -r '\t.*' '') = gamma:
+@test "launch flag form does not offer positional hosts" (count (complete -C 'launch-session --pwd / ga' | string match -r '^gamma:')) -eq 0
+@test "launch offers multiplexer kinds and the Core alias" (complete -C 'launch-session --mux ' | string replace -r '\t.*' '' | string join ' ') = 'hc herdr herdr-core tmux'
+@test "launch offers all placements" (complete -C 'launch-session --place ' | string replace -r '\t.*' '' | string join ' ') = 'hidden tab workspace'
+@test "launch offers run-after-init" (complete -C 'launch-session --in-' | string replace -r '\t.*' '') = --in-shell
+
 ms_cleanup

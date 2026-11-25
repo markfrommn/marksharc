@@ -11,21 +11,26 @@ _ms_agent_cache_file || return 1
 cache=$REPLY
 if ! _ms_agent_probe; then
     unset SSH_AUTH_SOCK SSH_AGENT_PID
-    if [[ -f $cache && -O $cache && ! -L $cache ]]; then
-        _ms_agent_parse < "$cache"
-        # A different SSH connection can still have a live forwarded socket in the cache.
-        if [[ -n ${SSH_CONNECTION}${TMUX} && $SSH_AUTH_SOCK == */ssh-*/agent.* && -z $SSH_AGENT_PID ]]; then
-            unset SSH_AUTH_SOCK
+    if [[ -n $LAUNCH_PARENT_HOST && $LAUNCH_PARENT_HOST == "${MARKSHARC_HOST:-${HOST%%.*}}" ]] &&
+        SSH_AUTH_SOCK="$LAUNCH_PARENT_SSH_AUTH_SOCK" _ms_agent_probe; then
+        SSH_AUTH_SOCK=$LAUNCH_PARENT_SSH_AUTH_SOCK
+    else
+        if [[ -f $cache && -O $cache && ! -L $cache ]]; then
+            _ms_agent_parse < "$cache"
+            # A different SSH connection can still have a live forwarded socket in the cache.
+            if [[ -n ${SSH_CONNECTION}${TMUX} && $SSH_AUTH_SOCK == */ssh-*/agent.* && -z $SSH_AGENT_PID ]]; then
+                unset SSH_AUTH_SOCK
+            fi
         fi
-    fi
-    if ! _ms_agent_probe; then
-        unset SSH_AUTH_SOCK SSH_AGENT_PID
-        if _ms_agent_discover; then
-            SSH_AUTH_SOCK=$REPLY
-        else
-            output=$(ssh-agent -s) || { print -ru2 'Unable to start SSH agent'; return 1; }
-            _ms_agent_parse <<< "$output"
-            _ms_agent_probe || { unset SSH_AUTH_SOCK SSH_AGENT_PID; print -ru2 'New SSH agent is unreachable'; return 1; }
+        if ! _ms_agent_probe; then
+            unset SSH_AUTH_SOCK SSH_AGENT_PID
+            if _ms_agent_discover; then
+                SSH_AUTH_SOCK=$REPLY
+            else
+                output=$(ssh-agent -s) || { print -ru2 'Unable to start SSH agent'; return 1; }
+                _ms_agent_parse <<< "$output"
+                _ms_agent_probe || { unset SSH_AUTH_SOCK SSH_AGENT_PID; print -ru2 'New SSH agent is unreachable'; return 1; }
+            fi
         fi
     fi
 fi

@@ -6,9 +6,9 @@ Describe 'tmux launch adapter'
   tmux_stub() {
     stub_command tmux 'printf "%s\0" "$@" >> "$OPLOG"
 case "$*" in
-  *display-message*) printf "\0443\n" ;;
-  *list-sessions*) printf "\0443\twork\n" ;;
-  *new-window*|*new-session*) printf "\0443\t\0443:@4.%%5\n" ;;
+  *display-message*) printf "\0443:/dev/pts/5\n" ;;
+  *list-sessions*) printf "\0443:work\n" ;;
+  *new-window*|*new-session*) printf "\0443:@4.%%5\n" ;;
 esac'
   }
 
@@ -17,6 +17,8 @@ esac'
     tmux_stub
     export TMUX='/tmp/server,socket name,42,0' TMUX_PANE='%5'
     [[ $(tmux_adapter current) == '$3' ]] || return 1
+    [[ $(MARKSHARC_MUX_CALLER_TTY=/dev/pts/5 tmux_adapter current) == '$3' ]] || return 9
+    MARKSHARC_MUX_CALLER_TTY=/dev/pts/6 tmux_adapter current && return 10
     [[ $(tmux_adapter instances) == $'$3\twork' ]] || return 2
     [[ -z $(tmux_adapter machines) ]] || return 3
     tmux_adapter supports launch || return 4
@@ -41,7 +43,7 @@ esac'
     local -a launch_env=( 'EMPTY=' 'DATA=space; $";' )
     local -a launch_argv=( /bin/echo $'line one\nline two;' '$HOME' )
     [[ $(tmux_adapter launch) == $'$3\t$3:@4.%5' ]] || return 1
-    printf '%s\0' -S '/tmp/server,socket name' new-window -t '$3:' -d -c '/tmp/##literal\;' -n 'name ##{}\;' -e 'EMPTY=' -e 'DATA=space; $"\;' -P -F $'#{session_id}\t#{session_id}:#{window_id}.#{pane_id}' -- /bin/echo $'line one\nline two'\\\; '$HOME' > "$TEST_ROOT/expected"
+    printf '%s\0' -S '/tmp/server,socket name' new-window -t '$3:' -d -c '/tmp/##literal\;' -n 'name ##{}\;' -e 'EMPTY=' -e 'DATA=space; $"\;' -P -F '#{session_id}:#{window_id}.#{pane_id}' -- /bin/echo $'line one\nline two'\\\; '$HOME' > "$TEST_ROOT/expected"
     cmp "$TEST_ROOT/expected" "$OPLOG"
   }
   It 'passes every launch value as one tmux argument'
@@ -56,7 +58,7 @@ esac'
     local -a launch_env=() launch_argv=( 'a; $command' )
     [[ $(tmux_adapter launch 2> "$TEST_ROOT/err") == $'$3\t$3:@4.%5' ]] || return 1
     [[ $(<"$TEST_ROOT/err") == *'tmux attach -t marksharc'* ]] || return 2
-    printf '%s\0' new-session -d -s marksharc -P -F $'#{session_id}\t#{session_id}:#{window_id}.#{pane_id}' -- /bin/sh -c 'exec "$@"' sh 'a; $command' > "$TEST_ROOT/expected"
+    printf '%s\0' new-session -d -s marksharc -P -F '#{session_id}:#{window_id}.#{pane_id}' -- /bin/sh -c 'exec "$@"' sh 'a; $command' > "$TEST_ROOT/expected"
     cmp "$TEST_ROOT/expected" "$OPLOG" || return 3
     : > "$OPLOG"
     launch_req[dry_run]=1
@@ -76,7 +78,7 @@ esac'
     local place=$1 detached=''
     [[ $place != hidden ]] || detached=" '-d'"
     local expected="'tmux' 'new-window' '-t' '\$3:'$detached '-c' '/work dir' '-e' 'EMPTY=' '-P' "
-    expected+="'-F' \$'#{session_id}\\t#{session_id}:#{window_id}.#{pane_id}' '--' '/bin/echo' 'space; \$ \"quote\"'"
+    expected+="'-F' '#{session_id}:#{window_id}.#{pane_id}' '--' '/bin/echo' 'space; \$ \"quote\"'"
     [[ $(mux_cli launch tmux --instance '$3' --place "$place" --cwd '/work dir' --env EMPTY= --dry-run -- /bin/echo 'space; $ "quote"' 2> "$TEST_ROOT/err") == "$expected" ]] || return 1
     [[ ! -s $OPLOG ]]
   }

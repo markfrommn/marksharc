@@ -225,10 +225,11 @@ _ms_launch_machine() {
     return 1
 }
 
-# Read kind<TAB>name<TAB>target<TAB>hostname rows and print picker candidates.
+# Read kind[/instance]<TAB>name<TAB>target<TAB>hostname rows and print candidates.
 _ms_launch_host_candidates() {
-    local filter=${1-} row kind machine remainder target host kind_rows REPLY
-    local -a names=( "${_ms_host_names[@]}" ) kinds=() reachable=()
+    local filter=${1-} row inventory kind machine remainder target host REPLY
+    local -a names=( "${_ms_host_names[@]}" ) ids=()
+    local -aU reachable=()
     local -A inventories=() seen=() targets=()
     for host in "${names[@]}"; do
         seen[$host]=1
@@ -236,17 +237,17 @@ _ms_launch_host_candidates() {
     done
     while IFS= read -r row || [[ -n $row ]]; do
         [[ $row == *$'\t'* ]] || continue
-        kind=${row%%$'\t'*}
+        inventory=${row%%$'\t'*}
         remainder=${row#*$'\t'}
         [[ $remainder == *$'\t'* ]] || continue
         machine=${remainder%%$'\t'*}
         target=${remainder#*$'\t'}
         target=${target%%$'\t'*}
-        [[ -n $kind && -n $machine ]] || continue
-        if [[ -z ${inventories[$kind]-} ]]; then
-            kinds+=( "$kind" )
+        [[ -n $inventory && -n $machine ]] || continue
+        if [[ -z ${inventories[$inventory]-} ]]; then
+            ids+=( "$inventory" )
         fi
-        inventories[$kind]+="$remainder"$'\n'
+        inventories[$inventory]+="$remainder"$'\n'
         if [[ -z ${seen[$machine]-} ]]; then
             seen[$machine]=1
             names+=( "$machine" )
@@ -257,10 +258,10 @@ _ms_launch_host_candidates() {
         _ms_launch_host_kind "$host"
         [[ $REPLY == remote ]] || continue
         reachable=()
-        for kind in "${kinds[@]}"; do
+        for inventory in "${ids[@]}"; do
+            kind=${inventory%%/*}
             [[ -z $filter || $kind == $filter ]] || continue
-            kind_rows=${inventories[$kind]}
-            _ms_launch_machine "$kind" "$host" "$kind_rows" 2>/dev/null && reachable+=( "$kind" )
+            _ms_launch_machine "$kind" "$host" "${inventories[$inventory]}" 2>/dev/null && reachable+=( "$kind" )
         done
         [[ -z $filter || $#reachable -gt 0 ]] || continue
         print -r -- "$host"$'\t'"$host (${targets[$host]}) [${(j:, :)reachable}]"

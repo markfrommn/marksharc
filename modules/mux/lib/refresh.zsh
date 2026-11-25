@@ -123,8 +123,13 @@ mux_refresh() {
     fi
     if (( ${+client_env[DISPLAY]} )) || [[ $mode != client ]]; then
         display=${client_env[DISPLAY]-${DISPLAY-}}
-        if (( ! ${+client_env[DISPLAY]} )) && [[ $mode == all || $mode == display ]] && (( persistent )); then
-            mux_display_fallback "$display"
+        if (( ! ${+client_env[DISPLAY]} )); then
+            if [[ $mode == display-startup && -n $LAUNCH_PARENT_HOST && -n $LAUNCH_PARENT_DISPLAY &&
+                $LAUNCH_PARENT_HOST == "${MARKSHARC_HOST:-${HOST%%.*}}" ]]; then
+                display=$LAUNCH_PARENT_DISPLAY
+            elif [[ $mode == all || $mode == display ]] && (( persistent )); then
+                mux_display_fallback "$display"
+            fi
         fi
         mux_emit_env DISPLAY "$display"
         mux_emit_env DISPLAY_ORIG "$display"

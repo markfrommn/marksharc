@@ -65,6 +65,51 @@ DATA
     When run interactive_case 17
     The status should be success
   End
+  launch_parent_case() {
+    emulate -L zsh
+    local mode=$1 expected cache_host=fixture state="$XDG_STATE_HOME/marksharc/ssh-agent"
+    local socket
+    mkdir -p "$HOME/.ssh" "$state"
+    chmod 700 "$state"
+    for socket in inherited parent cached; do
+      "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/$socket agent" || return 1
+    done
+    export SSH_AUTH_SOCK="$HOME/inherited agent" MARKSHARC_HOST=fixture SSH_TEST_MODE=$mode
+    export LAUNCH_PARENT_HOST=fixture LAUNCH_PARENT_SSH_AUTH_SOCK="$HOME/parent agent"
+    case $mode in
+      inherited) expected=inherited ;;
+      usable) expected=parent ;;
+      shell-host) expected=parent; cache_host=${HOST%%.*}; LAUNCH_PARENT_HOST=$cache_host; unset MARKSHARC_HOST ;;
+      dead) expected=cached ;;
+      foreign) expected=cached; LAUNCH_PARENT_HOST=elsewhere ;;
+      missing-host) expected=cached; unset LAUNCH_PARENT_HOST ;;
+    esac
+    printf 'SSH_AUTH_SOCK=%s; export SSH_AUTH_SOCK;\n' "${(q):-"$HOME/cached agent"}" > "$state/agent.$cache_host.sh"
+    chmod 600 "$state/agent.$cache_host.sh"
+    stub_command ssh-add 'printf "%s\n" "${SSH_AUTH_SOCK##*/}" >> "$OPLOG"
+case "$SSH_AUTH_SOCK:$SSH_TEST_MODE" in
+  "$HOME/inherited agent:inherited"|"$HOME/parent agent:usable"|"$HOME/parent agent:shell-host"|"$HOME/cached agent:"*) exit 0 ;;
+  *) exit 2 ;;
+esac'
+    source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+    load_mfn ssh-agent setup-ssh-agent
+    PATH="$MARKSHARC_ROOT/modules/ssh-agent/bin:$PATH"
+    setup-ssh-agent || return 2
+    [[ $SSH_AUTH_SOCK == "$HOME/$expected agent" ]] || return 3
+    case $mode in
+      inherited) [[ $(<"$OPLOG") == $'inherited agent\ninherited agent' ]] ;;
+      usable|shell-host) [[ $(<"$OPLOG") == $'inherited agent\nparent agent\nparent agent' ]] ;;
+      dead) [[ $(<"$OPLOG") == $'inherited agent\nparent agent\ncached agent\ncached agent' ]] ;;
+      foreign|missing-host) [[ $(<"$OPLOG") == $'inherited agent\ncached agent\ncached agent' ]] ;;
+    esac
+  }
+  Describe 'launch-parent sockets'
+    Parameters:value inherited usable shell-host dead foreign missing-host
+    It "handles a $1 socket before discovery"
+      When run launch_parent_case "$1"
+      The status should be success
+    End
+  End
   agent_case() {
     emulate -L zsh
     local mode=$1
