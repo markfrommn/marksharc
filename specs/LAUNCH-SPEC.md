@@ -74,7 +74,7 @@ Herdr Core runs terminals and keeps them alive. The Herdr app shows them and arr
 
 - **Markers.** A terminal's program sees `HC_TERMINAL_ID` (an address such as `t7`), `HC_TERMINAL_SOCKET`, and `HC_SCOPE`. Verified.
 - **Instances.** A user can run more than one core per host. Each is a session, named `default` unless chosen, with its own core identity, terminals, and socket. `HC_SESSION=<name>` selects one, as do `hc connect --session` and `hc machine add --session`. The socket is `$XDG_RUNTIME_DIR/herdr-core/<session>.sock` on Linux; on macOS the default session's is `~/.local/state/herdr-core/default/default.sock`. `hc server status --json` reports the core's identity, version, and live terminal count. Verified.
-- **Starting.** Any `hc` command starts the session's core when it is not running, including `hc server status`. Whether a core is running is therefore read from its socket, not asked of `hc`. Verified.
+- **Starting.** Any `hc` command starts the session's core when it is not running, including `hc server status`. Whether a core is running is therefore read without `hc`: `~/.local/state/herdr-core/<session>/core.lock` holds that session's socket path, on Linux and macOS alike, and the socket exists only while the core runs. The lock file stays after a stop, so the test is the socket, not the file. Verified.
 - **New terminal.** `hc run [--bg] [--name N] [--cwd D] [--on M] [--label K=V]… [--no-parent] [--no-notify] [--keep] [--rm] [--] [argv…]`.
   - With no argv the terminal runs that machine's own shell as a login shell (`zsh -l` observed). One argument that contains spaces or shell characters is a shell line; several arguments are an argv run as given. Verified.
   - `--cwd` defaults to the directory `hc` runs in. With `--on` it defaults to that machine's home. `--cwd` does not expand `~`: `--cwd '~'` and `--cwd '~/dir'` fail with `spawn_failed`, locally and with `--on`. Verified.
@@ -224,6 +224,8 @@ Placement:
 | `workspace` | `hc run --label herdr.space=<new id>`, the id being `sp` and 32 random hexadecimal digits. | `workspace create` | As `tab`: a session is the instance, so a window is the top level. |
 | `tab` | When the caller's terminal carries `herdr.space` and the launch is on the caller's machine: `hc run --label herdr.space=<that id>`. Otherwise as `workspace`. | `tab create --workspace <caller's>`; with no caller workspace, as `workspace`. | `new-window` |
 | `hidden` | `hc run` with no `herdr.*` label | `workspace create --no-focus` | `new-window -d` |
+
+Running Herdr Core instances are found without waking one: the adapter lists the sessions that have a `core.lock` and counts a session as running when the socket named in it exists (4.2).
 
 When a placement falls back, the command prints one line on standard error naming the placement used. For a hidden terminal the line includes how to reach it, such as `hc attach t21`. A labelled Herdr Core terminal is shown by whichever app windows watch that core. With none watching it stays reachable by its address, which the result line carries.
 
@@ -440,7 +442,7 @@ Each behaviour gets a row in the contract inventory in `tests/README.md`. Live a
 |---|---|
 | Creating a space through an unused `herdr.space` id is observed behaviour, not a documented interface. | The label logic sits in one adapter. If the app stops honouring it, the terminal still exists and is reachable by the address in the result line. |
 | A launch cannot tell whether any app window shows the core. | The result line always carries the address, and the documentation gives `hc attach`. |
-| `hc server status` starts a core, so a careless probe leaves one running. | Adapters read the socket instead (4.2, 5.4). |
+| `hc server status` starts a core, so a careless probe leaves one running. | Adapters read `core.lock` and test the socket it names (4.2, 5.4). |
 | `hc` and `herdr-app` are young and change quickly. | All tool syntax lives in the adapters. `--dry-run` shows the exact commands. Section 4 records the reviewed versions. |
 | `LAUNCH_RUN` runs a command named by the environment. | Interactive sessions only, once, cleared before it runs, and never evaluated as text. Whoever controls a shell's environment already controls the shell. |
 | A shell without the `launch` module ignores `LAUNCH_RUN`, so `--in-shell`, launched `cwf-new`, and any command on the Herdr TUI silently open a plain shell there. | `marksharc push` keeps hosts current. The user documentation states the requirement. |
@@ -463,6 +465,7 @@ Each behaviour gets a row in the contract inventory in `tests/README.md`. Live a
 | Environment on `hc` | An `env` wrapper, because `hc run` has no environment option. | Review, DEV-78 |
 | Placement on `hc` | `herdr.space` labels alone: the caller's id for a tab, a new id for a space. `herdr-app` is used only for focus. | Live checks, DEV-78 |
 | Remote home paths on `hc` | The wrapper changes directory, because `--cwd` does not expand `~`. | Live checks, DEV-78 |
+| Detecting a running `hc` core | The session's `core.lock` names the socket, and the socket's presence is the test. No `hc` command is used, because each one starts the core. | Operator, DEV-78 |
 | Independence on `hc` | Always `--no-parent --no-notify`; `LAUNCH_PARENT_PID` carries the relationship. | Review, DEV-78 |
 | Several `hc` cores per user | Supported through `--mux-id`. The DEV-74 assumption of one core per user does not hold. | Review, DEV-78 |
 | Remote tmux | Later. | DEV-74 |
