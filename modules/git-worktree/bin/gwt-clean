@@ -5,10 +5,13 @@ source "${MARKSHARC_HOME:-${0:A:h:h:h:h}}/core/zsh/lib/directives.zsh" || exit 1
 # Hooks: functions named in gwt_clean_pre_remove_hooks run as `hook <worktree> <base> <branch>` after
 # every preflight, the confirmation and the merge check, before the CWF environment is destroyed.
 # A failing or undefined hook aborts with the worktree retained.
-local target base branch basebranch line listed='' answer origin target_head target_status base_status worktrees hook
+local target base branch basebranch line listed='' answer origin target_head target_status base_status worktrees hook launch_target=''
 target=$(git rev-parse --show-toplevel 2>/dev/null) || { print -ru2 'Not in a Git worktree'; return 1; }
+[[ -z ${LAUNCH_WORKTREE-} ]] || launch_target=${LAUNCH_WORKTREE:A}
+target=${target:A}
 worktrees=$(git worktree list --porcelain) || return 1
 base=$(print -r -- "$worktrees" | sed -n 's/^worktree //p' | head -1) || return 1
+base=${base:A}
 [[ -n $base && $target != $base ]] || { print -ru2 'Run from a linked worktree'; return 1; }
 branch=$(git symbolic-ref --quiet --short HEAD) || { print -ru2 'Detached HEAD; refusing cleanup'; return 1; }
 target_head=$(git rev-parse HEAD) || return 1
@@ -102,7 +105,7 @@ for hook in "${(@f)MARKSHARC_GWT_CLEAN_HOOKS}"; do
     "$hook" "$target" "$base" "$branch" || { print -ru2 "Pre-remove hook failed: $hook; worktree retained"; return 1; }
 done
 if command -v cwf >/dev/null 2>&1; then
-    cwf_msg=$(cd -- "$target" && cwf env status)
+    cwf_msg=$(cd -- "$target" && cwf env status) || { print -ru2 'Environment status failed; worktree retained'; return 1; }
     if [[ "$cwf_msg" != *"no cwf environment"* ]]; then
         (cd -- "$target" && cwf env destroy --data delete --yes) || { print -ru2 'Environment destruction failed; worktree retained'; return 1; }
     fi
@@ -116,3 +119,4 @@ if [[ $delete_flag == -D && $(git rev-parse --verify "refs/heads/$branch") != $t
     print -ru2 'Worktree removed but branch tip changed; branch retained'; return 1
 fi
 git branch "$delete_flag" -- "$branch" || { print -ru2 'Worktree removed but branch deletion failed'; return 1; }
+[[ -z $launch_target || $launch_target != $target ]] || _ms_directive_emit exit 0

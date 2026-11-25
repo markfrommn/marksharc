@@ -44,3 +44,11 @@ before a later command failure. The command's failure status is preserved. Envir
 accept writable scalar targets, including `PATH`; numeric, array and readonly targets are rejected
 before assignment so directive data cannot be evaluated as arithmetic. Bash invokes the same
 executables directly; applying directives to the calling bash shell remains later work.
+
+Zsh and fish wrappers also recognize `exit` with an optional decimal status
+from 0 to 255 (default 0). They defer the exit until all remaining directives
+have been applied and the private directive file has been removed. Invalid
+statuses print a message and are ignored. A failed command or directive
+application keeps the caller open and preserves the failure status.
+`gwt-clean` uses this directive after successful cleanup of the worktree named
+by `LAUNCH_WORKTREE`; direct executable calls cannot close their parent shell.

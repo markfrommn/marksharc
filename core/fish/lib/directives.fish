@@ -1,5 +1,5 @@
 # Apply the caller-state protocol as data in the current fish process.
-function _ms_apply_directives
+function _ms_apply_directives --no-scope-shadowing
     while read -l _ms_line
         set -l _ms_fields (string split \t -- "$_ms_line")
         set -l _ms_op $_ms_fields[1]
@@ -33,6 +33,18 @@ function _ms_apply_directives
                 if set -q -g "$_ms_fields[2]"
                     set -e -g "$_ms_fields[2]"; or return 1
                 end
+            case exit
+                if test (count $_ms_fields) -eq 1
+                    set _ms_exit_status 0
+                else
+                    set -l normalized (string replace -r '^0+' '' -- "$_ms_fields[2]")
+                    test -n "$normalized"; or set normalized 0
+                    if test (count $_ms_fields) -eq 2; and string match -qr '^[0-9]+$' -- "$_ms_fields[2]"; and test (string length -- "$normalized") -le 3; and test $normalized -le 255
+                        set _ms_exit_status $normalized
+                    else
+                        printf 'marksharc: invalid exit directive status\n' >&2
+                    end
+                end
             case '*'
                 printf 'marksharc: unknown directive: %s\n' "$_ms_op" >&2
         end
@@ -40,6 +52,7 @@ function _ms_apply_directives
 end
 
 function _ms_fish_run_with_directives
+    set -l _ms_exit_status ''
     set -l tmp /tmp
     set -q TMPDIR; and test -n "$TMPDIR"; and set tmp "$TMPDIR"
     set -lx MARKSHARC_DIRECTIVES (command mktemp "$tmp/marksharc-directives.XXXXXXXX"); or return 1
@@ -48,6 +61,11 @@ function _ms_fish_run_with_directives
     _ms_apply_directives "$MARKSHARC_DIRECTIVES"
     set -l apply_status $status
     command rm -f -- "$MARKSHARC_DIRECTIVES"
+    set -l remove_status $status
+    if test $command_status -eq 0; and test $apply_status -eq 0; and test $remove_status -eq 0; and test -n "$_ms_exit_status"
+        builtin exit $_ms_exit_status
+    end
     test $command_status -ne 0; and return $command_status
-    return $apply_status
+    test $apply_status -ne 0; and return $apply_status
+    return $remove_status
 end

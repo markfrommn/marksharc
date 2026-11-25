@@ -107,8 +107,9 @@ this table to cover every module.
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
 | cc-providers | Data-only provider files, secret-free executable shims, bash invocation and private cache | `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options; repo-list inventory and remote cache | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
-| cwf | cwf-new executable creation checks, unmanaged copies, executable post-create hooks and copy-exclude; render generates zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
-| Commands | Encoded caller-state directives, hostile values, state wrappers and private staged shims | `spec/zsh/directives_spec.sh`, `spec/zsh/render_spec.sh` |
+| cwf | cwf-new creation, unmanaged copies, executable hooks and copy-exclude; launched handoff, base repository selection and successful worktree marker; cached integration during interactive init and reload, quiet batch/agent | `spec/zsh/modules/cwf/cwf_spec.sh` |
+| Launched cleanup | Resolved worktree marker match, terminal exit after complete cleanup, absent/different marker and failure keep the caller open | `spec/zsh/modules/git-worktree/cleanup_spec.sh` |
+| Commands | Encoded caller-state directives, hostile values, state wrappers, deferred validated exit after file removal, and private staged shims | `spec/zsh/directives_spec.sh`, `spec/contract/fish_directives_spec.sh`, `spec/zsh/render_spec.sh` |
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |
 | cloud | install-krew failure propagation and artifact cleanup | `spec/zsh/modules/cloud/cloud_spec.sh` |
 | System modules | Real-tree wiring (functions, hooks, options via synthesized overlay), env/init load order, quiet agent/batch/PTY startup | `spec/zsh/system_modules_spec.sh` |

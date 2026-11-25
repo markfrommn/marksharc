@@ -145,6 +145,44 @@ Describe 'repository inventory and launcher'
     The status should be success
   End
 
+  base_only_case() {
+    [[ -n $PYTHON ]] || return 0
+    export MARKSHARC_HOST=test
+    mkdir -p "$HOME/repos/alpha" "$XDG_CONFIG_HOME/marksharc"
+    git -C "$HOME/repos/alpha" init -q || return 1
+    git -C "$HOME/repos/alpha" -c user.name=Test -c user.email=test@example.test commit --allow-empty -qm initial || return 2
+    git -C "$HOME/repos/alpha" worktree add -qb feature "$HOME/linked" || return 3
+    print "set git-worktree.roots $HOME/repos" > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command gum 'tee "$TEST_ROOT/picker" | head -n 1'
+    stub_command tmux 'case "$*" in *list-sessions*) printf "%s\n" "\0443:work" ;; *display-message*) exit 1 ;; esac'
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty "$MARKSHARC_ROOT/modules/launch/bin/launch-repo" --base-only --mux tmux --dry-run > "$TEST_ROOT/out" || return 4
+    [[ $(<"$TEST_ROOT/picker") == *"$HOME/repos/alpha"* && $(<"$TEST_ROOT/picker") != *"$HOME/linked"* ]] || return 5
+    launch_repo --base-only --mux tmux --dry-run "$HOME/linked" > "$TEST_ROOT/out" 2>&1 || return 6
+    [[ $(<"$TEST_ROOT/out") == *"$HOME/repos/alpha"* && $(<"$TEST_ROOT/out") != *"$HOME/linked"* ]]
+  }
+  It 'restricts a creation picker and linked path to the base repository'
+    When run base_only_case
+    The status should be success
+  End
+
+  remote_base_only_case() {
+    export MARKSHARC_HOST=test
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    print 'host peer user@server' > "$XDG_CONFIG_HOME/marksharc/hosts.conf"
+    stub_command ssh 'printf "alpha\t/srv/alpha\tbase\t/srv/alpha\tmain\nlinked\t/srv/linked\tworktree\t/srv/alpha\tfeature\n"'
+    stub_command tmux 'exit 1'
+    # A missing path is rejected before selection of a multiplexer.
+    launch_repo --base-only --host peer --repo /srv/missing > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 1 && $(<"$TEST_ROOT/err") == *'remote repository path not in inventory'* ]] || return 1
+    # A mapped linked path reaches launch-session, where tmux cannot serve a remote host.
+    launch_repo --base-only --host peer --repo /srv/linked --mux tmux --dry-run > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 1 && $(<"$TEST_ROOT/err") == *'no usable multiplexer'* ]]
+  }
+  It 'validates remote creation paths against the target inventory'
+    When run remote_base_only_case
+    The status should be success
+  End
+
   validation_case() {
     launch_repo --pwd /tmp >/dev/null 2>&1; [[ $? == 2 ]] || return 1
     launch_repo alpha --repo beta >/dev/null 2>&1; [[ $? == 2 ]] || return 2

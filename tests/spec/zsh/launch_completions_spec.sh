@@ -21,3 +21,23 @@ DATA
     The status should be success
   End
 End
+Describe 'cwf-new completion'
+  cwf_completion_case() {
+    emulate -L zsh
+    mkdir -p "$HOME/.cache/marksharc/test/repos"
+    printf 'alpha\t/tmp/alpha\tbase\t/tmp/alpha\tmain\nlinked\t/tmp/linked\tworktree\t/tmp/alpha\tfeature\n' > "$HOME/.cache/marksharc/test/repos/local.tsv"
+    cat > "$HOME/.zshrc" <<'DATA'
+fpath=( "$MARKSHARC_ROOT/modules/cwf/completions/zsh" $fpath )
+autoload -Uz compinit
+compinit -i -D
+cwf-new() { printf '%s\n' "$*" >> "$OPLOG"; }
+DATA
+    local typed=$'cwf-new --repo al\t\ncwf-new --mux tmu\t\ncwf-new --place hi\t\ncwf-new --lau\t\nexit\n'
+    PTY_INPUT=$typed ms_pty MARKSHARC_ROOT="$MARKSHARC_ROOT" MARKSHARC_HOST=test XDG_CACHE_HOME="$HOME/.cache" -di || { cat "$TEST_ROOT/out"; return 1; }
+    [[ $(<"$OPLOG") == $'--repo alpha\n--mux tmux\n--place hidden\n--launch' ]] || { cat "$TEST_ROOT/out" "$OPLOG"; return 2; }
+  }
+  It 'completes cached base repositories and launch options'
+    When run cwf_completion_case
+    The status should be success
+  End
+End

@@ -71,8 +71,12 @@ DATA
       command cp "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh" "$framework/core/zsh/lib/directives.zsh"
     fi
     path=( "$MARKSHARC_ROOT/modules/cwf/bin" $path )
-    export FIXTURE_MODE=$fixture_mode FIXTURE_WORKDIR=$fixture_workdir MARKSHARC_HOME=$framework
-    cwf-new demo > "$TEST_ROOT/output" 2>&1
+    export FIXTURE_MODE=$fixture_mode FIXTURE_WORKDIR=$fixture_workdir MARKSHARC_HOME=$framework REPLY=off
+    if [[ $fixture_mode == launched ]]; then
+      cwf-new --launched demo > "$TEST_ROOT/output" 2>&1
+    else
+      cwf-new demo > "$TEST_ROOT/output" 2>&1
+    fi
     local rc=$?
     case $fixture_mode in
       creation-fail|malformed)
@@ -97,6 +101,12 @@ DATA
           [[ -f "$fixture_workdir/.env.local" && $(<"$fixture_workdir/.env.local") == secret ]] || return 13
         fi
         [[ $rc == 0 ]] || { cat "$TEST_ROOT/output"; return 9; }
+        [[ $(<"$TEST_ROOT/output") != *$'REPLY='* && $(<"$TEST_ROOT/output") != *$'repo='* ]] || return 27
+        if [[ $fixture_mode == launched ]]; then
+          [[ $LAUNCH_WORKTREE == "$fixture_workdir" ]] || return 25
+        else
+          [[ -z ${LAUNCH_WORKTREE-} ]] || return 26
+        fi
         if [[ $fixture_mode == hook-ok ]]; then
           [[ $(<"$OPLOG") == "hook_a:$repo|$fixture_workdir|12|${fixture_workdir:t}|copied|base"$'\nhook_b' ]] || { cat "$OPLOG"; return 10; }
         else
@@ -104,9 +114,45 @@ DATA
         fi;;
     esac
   }
-  Parameters:value success semicolon creation-fail malformed copy-fail hook-ok hook-fail hook-missing exclude no-git-worktree
+  Parameters:value success launched semicolon creation-fail malformed copy-fail hook-ok hook-fail hook-missing exclude no-git-worktree
   It "handles $1 with spaced output as data"
     When run cwf_case "$1"
+    The status should be success
+  End
+End
+Describe 'cwf-new launch handoff'
+  launch_case() {
+    emulate -L zsh
+    local mode=$1 framework=$TEST_ROOT/launch-framework
+    mkdir -p "$framework/modules/launch/bin"
+    ln -s "$MARKSHARC_ROOT/core" "$framework/core"
+    cat > "$framework/modules/launch/bin/launch-repo" <<'DATA'
+#!/bin/sh
+printf '%s\n' "$@" > "$OPLOG"
+DATA
+    chmod +x "$framework/modules/launch/bin/launch-repo"
+    git_fixture || return 1
+    cd "$TEST_ROOT/worktree" || return 2
+    export MARKSHARC_HOME=$framework MARKSHARC_HOST=test
+    case $mode in
+      local) /bin/zsh -f "$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" --launch 'feature/a b' ;;
+      remote) /bin/zsh -f "$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" --host peer --mux herdr --mux-id default --place tab 'feature/a b' ;;
+      explicit) /bin/zsh -f "$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" --repo 'some repo' --launch 'feature/a b' ;;
+      pick) /bin/zsh -f "$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" --repo ignored --pick 'feature/a b' ;;
+      outside) cd "$TEST_ROOT"; /bin/zsh -f "$MARKSHARC_ROOT/modules/cwf/bin/cwf-new" --launch 'feature/a b' ;;
+    esac || return 3
+    local actual=$(<"$OPLOG") expected
+    case $mode in
+      local) expected=$'--repo\n'"$TEST_ROOT/base"$'\n';;
+      remote) expected=$'--host\npeer\n--mux\nherdr\n--mux-id\ndefault\n--place\ntab\n--repo\nbase\n';;
+      explicit) expected=$'--repo\nsome repo\n';;
+      *) expected='';;
+    esac
+    [[ $actual == "${expected}"$'--base-only\n--in-shell\n--\ncwf-new\n--launched\nfeature/a b' ]]
+  }
+  Parameters:value local remote explicit pick outside
+  It 'forwards $1 selection and literal branch to launch-repo'
+    When run launch_case "$1"
     The status should be success
   End
 End

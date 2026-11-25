@@ -6,7 +6,7 @@ export MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}
 source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh" || exit 1
 source "$MARKSHARC_HOME/core/zsh/lib/pick.zsh" || exit 1
 local host='' repo='' worktree='' program='' option value target='' kind line repo_path name selected base row wanted attempt terminal_fd
-local -i flagform=0 positional=0 rescan=0 has_name=0
+local -i flagform=0 positional=0 rescan=0 has_name=0 base_only=0
 local -a passthrough=() command_args=() records=() fields=() choices=() matches=() list_args=() suggestions=()
 invalid() { print -ru2 -- "launch-repo: $*"; return 2; }
 while (( $# )); do
@@ -15,6 +15,7 @@ while (( $# )); do
         -h|--help) print 'Usage: launch-repo [options] [[host:]repo[/worktree] [command [args ...]]]'; print '       launch-repo [options] [--host H] [--repo R] [--worktree W] [--command C] [-- args ...]'; exit 0 ;;
         --pwd) invalid '--pwd is not supported'; exit 2 ;;
         --rescan) rescan=1 ;;
+        --base-only) base_only=1 ;;
         --host|--repo|--worktree|--command|--mux|--mux-id|--place|--name|--env)
             (( $# )) && [[ $1 != -- && ( -n $1 || $option == --name ) ]] || { invalid "$option requires a value"; exit 2; }
             value=$1; shift
@@ -47,6 +48,7 @@ fi
 [[ $worktree != *:* ]] || { invalid 'worktree creation is reserved'; exit 2; }
 [[ -z $worktree || -n $repo ]] || { invalid '--worktree requires --repo'; exit 2; }
 [[ $repo != ('~'|'~/'*|/*) || -z $worktree ]] || { invalid 'paths cannot have a worktree part'; exit 2; }
+(( ! base_only )) || [[ -z $worktree ]] || { invalid 'a base repository is required'; exit 2; }
 _ms_launch_host_kind "$host"; kind=$REPLY
 exec {terminal_fd}<&0 || exit 1
 if [[ $kind == prompt ]]; then
@@ -80,6 +82,21 @@ if [[ $repo == ('~'|'~/'*|/*) ]]; then
         [[ $repo_path != '~/'* ]] || repo_path=$HOME/${repo_path#\~/}
         repo_path=${repo_path:a}
         command git -C "$repo_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { print -ru2 -- "launch-repo: not a work tree: $repo_path"; exit 1; }
+        if (( base_only )); then
+            base=$(command git -C "$repo_path" rev-parse --path-format=absolute --git-common-dir) || exit 1
+            repo_path=${base:A:h}
+        fi
+    elif (( base_only )); then
+        # Remote paths must be present in the target inventory so that a linked
+        # worktree can be mapped to its base without executing remote shell code.
+        output=$("$MARKSHARC_HOME/modules/git-worktree/bin/repo-list" --porcelain --host "$host") || exit $?
+        base=''
+        for line in "${(@f)output}"; do
+            fields=( "${(@ps:\t:)line}" )
+            [[ $fields[2] == "$repo_path" ]] && { base=$fields[4]; break; }
+        done
+        [[ -n $base ]] || { print -ru2 -- "launch-repo: remote repository path not in inventory: $repo_path"; exit 1; }
+        repo_path=$base
     fi
     name=${repo_path:t}
 else
@@ -93,6 +110,7 @@ else
         if [[ -z $repo ]]; then
             for line in "${records[@]}"; do
                 fields=( "${(@ps:\t:)line}" ); name=$fields[1]
+                (( ! base_only )) || [[ $fields[3] == base ]] || continue
                 if [[ $fields[3] == worktree ]]; then name=${fields[4]:t}/$name; fi
                 choices+=( "$fields[2]"$'\t'"$name  $fields[5]  $fields[2]" )
             done

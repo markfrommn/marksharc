@@ -1,4 +1,48 @@
 Describe 'fish caller-state directives'
+  exit_case() {
+    mkdir -p "$TEST_ROOT/tmp"
+    cat > "$TEST_ROOT/bin/exit-helper" <<'DATA'
+#!/bin/sh
+printf '%s' "$MARKSHARC_DIRECTIVES" > "$TEST_ROOT/directive-path"
+case "$EXIT_MODE" in
+  default) printf 'exit\n' ;;
+  explicit) printf 'exit\t00042\n' ;;
+  invalid) printf 'exit\t256\nexit\tnope\n' ;;
+  command-fail|apply-fail|remove-fail) printf 'exit\t0\n' ;;
+esac >> "$MARKSHARC_DIRECTIVES"
+[ "$EXIT_MODE" != apply-fail ] || printf 'cd\t/nonexistent-marksharc-dir\n' >> "$MARKSHARC_DIRECTIVES"
+printf 'setenv\tAFTER\tapplied\n' >> "$MARKSHARC_DIRECTIVES"
+[ "$EXIT_MODE" != command-fail ]
+DATA
+    chmod +x "$TEST_ROOT/bin/exit-helper"
+    if [ "$1" = remove-fail ]; then
+      printf '#!/bin/sh\nexit 9\n' > "$TEST_ROOT/bin/rm"
+      chmod +x "$TEST_ROOT/bin/rm"
+    fi
+    TMPDIR="$TEST_ROOT/tmp" EXIT_MODE="$1" fish --no-config -c '
+      source "$MARKSHARC_ROOT/core/fish/lib/directives.fish"
+      function on_exit --on-event fish_exit
+        set -l remaining 0
+        test -e (cat "$TEST_ROOT/directive-path"); and set remaining 1
+        printf "%s|%s\n" "$AFTER" $remaining > "$TEST_ROOT/exit-state"
+      end
+      _ms_fish_run_with_directives exit-helper
+      echo continued
+    ' > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    result=$?
+    [ "$1" != remove-fail ] || /bin/rm -f "$TEST_ROOT/bin/rm"
+    case "$1" in
+      default) [ "$result" -eq 0 ] && [ ! -s "$TEST_ROOT/out" ] && [ "$(cat "$TEST_ROOT/exit-state")" = 'applied|0' ] ;;
+      explicit) [ "$result" -eq 42 ] && [ ! -s "$TEST_ROOT/out" ] && [ "$(cat "$TEST_ROOT/exit-state")" = 'applied|0' ] ;;
+      invalid) [ "$result" -eq 0 ] && grep -q continued "$TEST_ROOT/out" && grep -q 'invalid exit' "$TEST_ROOT/err" ;;
+      command-fail|apply-fail|remove-fail) [ "$result" -eq 0 ] && grep -q continued "$TEST_ROOT/out" ;;
+    esac
+  }
+  Parameters:value default explicit invalid command-fail apply-fail remove-fail
+  It 'defers exit, removes the file and validates status: $1'
+    When run exit_case "$1"
+    The status should be success
+  End
   apply_case() {
     printf 'setenv\tVALUE\t%%25%%09%%0A$(touch hostile)\nunsetenv\tREMOVE_ME\nunknown\tvalue\n' > "$TEST_ROOT/directives"
     fish -c '

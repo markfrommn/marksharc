@@ -10,6 +10,8 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Added launched `cwf-new` sessions on local or remote hosts, with post-create hooks after interactive startup and terminal closure after successful `gwt-clean` cleanup. (DEV-76)
+
 Added `launch-repo` and `repo-list` to discover configured repositories and open existing local or remote worktrees. (DEV-75)
 
 Added `launch-session` to open terminals in a chosen directory on this host or a Herdr machine, with automation flags, zsh and fish completions, and reuse of local SSH agent and X11 forwarding. (DEV-74)

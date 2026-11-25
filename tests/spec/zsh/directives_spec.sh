@@ -1,4 +1,44 @@
 Describe 'caller-state directives'
+  exit_case() {
+    emulate -L zsh
+    local mode=$1
+    cat > "$TEST_ROOT/exit.zsh" <<'DATA'
+source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh"
+TRAPEXIT() { local -a files=( "$TMPDIR"/marksharc-directives.*(N) ); print -r -- "$AFTER|$#files" > "$TEST_ROOT/exit-state"; }
+helper() {
+  case "$EXIT_MODE" in
+    default) _ms_directive_emit exit ;;
+    explicit) _ms_directive_emit exit 00042 ;;
+    invalid) _ms_directive_emit exit 256; _ms_directive_emit exit nope ;;
+    command-fail|remove-fail) _ms_directive_emit exit 0 ;;
+    apply-fail) _ms_directive_emit exit 0; _ms_directive_emit cd /nonexistent-marksharc-dir ;;
+  esac
+  _ms_directive_emit setenv AFTER applied
+  [[ $EXIT_MODE != command-fail ]]
+}
+_ms_run_with_directives helper
+print continued
+DATA
+    mkdir -p "$TEST_ROOT/tmp"
+    if [[ $mode == remove-fail ]]; then
+      print -r -- $'#!/bin/sh\nexit 9' > "$TEST_ROOT/bin/rm"
+      chmod +x "$TEST_ROOT/bin/rm"
+    fi
+    TMPDIR="$TEST_ROOT/tmp" EXIT_MODE="$mode" /bin/zsh -f "$TEST_ROOT/exit.zsh" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local rc=$?
+    [[ $mode != remove-fail ]] || /bin/rm -f "$TEST_ROOT/bin/rm"
+    case $mode in
+      default) [[ $rc == 0 && ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/exit-state") == 'applied|0' ]] ;;
+      explicit) [[ $rc == 42 && ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/exit-state") == 'applied|0' ]] ;;
+      invalid) [[ $rc == 0 && $(<"$TEST_ROOT/out") == continued && $(<"$TEST_ROOT/err") == *'invalid exit'* ]] ;;
+      command-fail|apply-fail|remove-fail) [[ $rc == 0 && $(<"$TEST_ROOT/out") == continued ]] ;;
+    esac
+  }
+  Parameters:value default explicit invalid command-fail apply-fail remove-fail
+  It 'defers exit, removes the file and validates status: $1'
+    When run exit_case "$1"
+    The status should be success
+  End
   apply_case() {
     emulate -L zsh
     source "$MARKSHARC_ROOT/core/zsh/lib/directives.zsh" || return 1

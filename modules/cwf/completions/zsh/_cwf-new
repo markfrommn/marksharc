@@ -1,0 +1,25 @@
+#compdef cwf-new
+
+_cwf_new_repos() {
+    local host=${opt_args[--host]-local} cache name repo_path kind base branch
+    local -a names=()
+    case $host in ''|local|localhost|$MARKSHARC_HOST) host=local ;; esac
+    [[ $host != */* && $host != (.|..) ]] || return
+    cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/repos/$host.tsv
+    [[ -r $cache ]] || return
+    while IFS=$'\t' read -r name repo_path kind base branch; do
+        [[ $kind != base ]] || names+=( "$name" )
+    done < "$cache"
+    compadd -a names
+}
+
+local context state state_descr line
+local -A opt_args
+_arguments -S \
+    '--repo[Select base repository]:repository:_cwf_new_repos' \
+    '--host[Select host]:host:' \
+    '--mux[Select multiplexer]:multiplexer:(hc herdr tmux herdr-core)' \
+    '--mux-id[Select instance]:instance:' \
+    '--place[Set placement]:placement:(workspace tab hidden)' \
+    '--launch[Launch in a new terminal]' '--pick[Choose a repository]' \
+    '1:branch:__git_branch_names'
