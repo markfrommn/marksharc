@@ -1,0 +1,132 @@
+#!/bin/zsh -f
+emulate -L zsh
+setopt extendedglob
+export MARKSHARC_HOME=${MARKSHARC_HOME:-${0:A:h:h:h:h}}
+export MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}
+source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh" || exit 1
+_ms_config_load || exit 1
+local host='' requested='' rescan=0 arg target='' timeout roots_key cache header line now kind repo_path base root
+local wt='' wtbranch='' prune=0 raw name_base
+local -a roots=( ${=${_ms_cfg_set[git-worktree.roots]-}} ) records=() fields=()
+while (( $# )); do
+    arg=$1; shift
+    case $arg in
+        --porcelain) ;;
+        --rescan) rescan=1 ;;
+        --host|--name) (( $# )) && [[ -n $1 && $1 != -- ]] || { print -ru2 -- "repo-list: $arg requires a value"; exit 2; }; if [[ $arg == --host ]]; then host=$1; else requested=$1; fi; shift ;;
+        -h|--help) print 'Usage: repo-list [--porcelain] [--host HOST] [--name NAME] [--rescan]'; exit 0 ;;
+        *) print -ru2 -- "repo-list: unknown argument: $arg"; exit 2 ;;
+    esac
+done
+[[ -z $host ]] || _ms_hosts_valid_name "$host" || { print -ru2 'repo-list: invalid host'; exit 2; }
+[[ $host != (.|..) ]] || { print -ru2 'repo-list: invalid host'; exit 2; }
+_ms_launch_host_kind "$host"; kind=$REPLY
+[[ $kind != prompt ]] || { print -ru2 'repo-list: select a specific host'; exit 2; }
+[[ $MARKSHARC_HOST != */* && $MARKSHARC_HOST != (.|..) ]] || exit 2
+roots_key=${(j: :)${(q)roots}}
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/$MARKSHARC_HOST/repos
+if [[ $kind == local ]]; then cache=$cache/local.tsv; else cache=$cache/$host.tsv; fi
+zmodload zsh/datetime
+now=$EPOCHSECONDS
+local minutes=${_ms_cfg_set[launch.repo_cache_minutes]-60}
+[[ $minutes == <-> ]] || { print -ru2 'repo-list: invalid launch.repo_cache_minutes'; exit 2; }
+valid_row() {
+    local row=$1
+    local -a f=( "${(@ps:\t:)row}" )
+    (( $#f == 5 )) || return 1
+    [[ -n $f[1] && $f[1] != *[[:cntrl:]]* && $f[2] == /* && $f[2] != *[[:cntrl:]]* && $f[3] == (base|worktree) && $f[4] == /* && $f[4] != *[[:cntrl:]]* && $f[5] != *[[:cntrl:]]* ]]
+}
+if [[ -r $cache && $rescan == 0 ]]; then
+    IFS= read -r header < "$cache"
+    local -a h=( "${(@ps:\t:)header}" )
+    if (( $#h == 4 )) && [[ $h[1] == '# marksharc-repos' && $h[2] == 1 && $h[3] == <-> && $h[3] -le $now && $((now-h[3])) -lt $((minutes*60)) && ( $kind != local || $h[4] == "$roots_key" ) ]]; then
+        records=( "${(@f)$(command tail -n +2 -- "$cache")}" )
+        for line in "${records[@]}"; do
+            valid_row "$line" || { rescan=1; break; }
+            fields=( "${(@ps:\t:)line}" )
+            if [[ $kind == local && ! -d $fields[2] ]]; then rescan=1; break; fi
+        done
+        if [[ -n $requested && $rescan == 0 ]]; then
+            local found=0
+            for line in "${records[@]}"; do [[ ${line%%$'\t'*} == "$requested" ]] && found=1; done
+            (( found )) || rescan=1
+        fi
+    else rescan=1
+    fi
+else rescan=1
+fi
+local remote_rescan=$rescan
+# The remote host alone can validate its roots and paths. Always ask it, while
+# retaining our last successful result for offline completion.
+[[ $kind != remote ]] || rescan=1
+if (( rescan )); then
+    records=()
+    if [[ $kind == local ]]; then
+        for root in "${roots[@]}"; do
+            [[ $root != '~/'* ]] || root=$HOME/${root#\~/}
+            for repo_path in "$root"/*(N-/); do
+                [[ -d $repo_path/.git && ! -L $repo_path/.git ]] || continue
+                repo_path=${repo_path:A}; base=$repo_path
+                wt=''; wtbranch=''; prune=0; raw=''; name_base=${repo_path:t}
+                while IFS= read -r -d '' raw || [[ -n $raw ]]; do
+                    case $raw in
+                        'worktree '*) wt=${raw#worktree } ;;
+                        'branch refs/heads/'*) wtbranch=${raw#branch refs/heads/} ;;
+                        prunable*) prune=1 ;;
+                        '')
+                            if [[ -n $wt && -d $wt && $prune == 0 ]]; then
+                                if [[ $wt == "$base" ]]; then line=$name_base$'\t'$wt$'\t'base$'\t'$base$'\t'$wtbranch
+                                else line=${wt:t}$'\t'$wt$'\t'worktree$'\t'$base$'\t'$wtbranch; fi
+                                valid_row "$line" && records+=( "$line" )
+                            fi
+                            wt=''; wtbranch=''; prune=0 ;;
+                    esac
+                done < <(command git -C "$base" worktree list --porcelain -z)
+            done
+        done
+    else
+        _ms_hosts_read || exit 1
+        target=${_ms_host_targets[$host]-}
+        if [[ -z $target ]]; then
+            local json index lock socket instance
+            local -A json_values=() json_types=()
+            for lock in "${XDG_STATE_HOME:-$HOME/.local/state}"/herdr-core/*/core.lock(N.); do
+                socket=$(<"$lock")
+                [[ -S $socket ]] || continue
+                instance=${lock:h:t}
+                json=$(command env HC_SOCKET= "HC_SESSION=$instance" hc machine ls --json 2>/dev/null) || continue
+                _ms_json_parse "$json" && [[ ${json_types[/machines]-} == array ]] || continue
+                for (( index = 0; index < ${json_values[/machines]}; ++index )); do
+                    [[ ${json_values[/machines/$index/via]-false} == false && ${json_values[/machines/$index/temporary]-false} == false ]] || continue
+                    [[ ${json_values[/machines/$index/name]-} == "$host" || ${json_values[/machines/$index/host]-} == "$host" ]] || continue
+                    target=${json_values[/machines/$index/target]-}
+                    break
+                done
+                [[ -z $target ]] || break
+            done
+            if [[ -z $target ]] && (( $+commands[herdr] )); then
+                local json_root=''
+                json=$(command herdr machine list --json 2>/dev/null) || json=''
+                if [[ -n $json ]] && _ms_json_parse "$json" && [[ ${json_types[$json_root]-} == array ]]; then
+                    for (( index = 0; index < ${json_values[$json_root]}; ++index )); do
+                        [[ ${json_values[/$index/enabled]-} == true && ${json_values[/$index/label]-} == "$host" && ${json_values[/$index/via]-false} == false ]] || continue
+                        target=${json_values[/$index/target]-}
+                        break
+                    done
+                fi
+            fi
+        fi
+        [[ -n $target ]] && _ms_hosts_valid_target "$target" || { print -ru2 -- "repo-list: no SSH target for $host"; exit 1; }
+        timeout=${_ms_cfg_set[launch.ssh_timeout]-10}
+        [[ $timeout == <-> && $timeout -gt 0 ]] || { print -ru2 'repo-list: invalid launch.ssh_timeout'; exit 2; }
+        local output
+        local -a remote_args=( repo-list --porcelain )
+        (( ! remote_rescan )) || remote_args+=( --rescan )
+        output=$(command ssh -o BatchMode=yes -o "ConnectTimeout=$timeout" -n -- "$target" "${remote_args[@]}") || { print -ru2 -- "repo-list: inventory failed for $host"; exit 1; }
+        records=( "${(@f)output}" )
+        for line in "${records[@]}"; do valid_row "$line" || { print -ru2 -- "repo-list: malformed inventory from $host"; exit 1; }; done
+    fi
+    ( umask 077; command mkdir -p -- "${cache:h}" && local tmp=$(command mktemp "${cache}.XXXXXX") && { printf '# marksharc-repos\t1\t%s\t%s\n' "$now" "$roots_key"; (( ! $#records )) || printf '%s\n' "${records[@]}"; } > "$tmp" && command chmod 600 "$tmp" && command mv -f -- "$tmp" "$cache" ) || { print -ru2 'repo-list: cache write failed'; exit 1; }
+fi
+(( ! $#records )) || printf '%s\n' "${records[@]}"
+exit 0

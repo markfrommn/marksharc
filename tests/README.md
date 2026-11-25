@@ -99,14 +99,14 @@ this table to cover every module.
 | x11 | Inherited DISPLAY remembered as DISPLAY_ORIG, empty DISPLAY dropped, same-host launch parent display before the inherited display at startup when the mux has no client value, no sleep, no network probes | `spec/zsh/modules/x11/x11_spec.sh` |
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
 | mux | Adapter contracts, nested title updates, tmux reattach and bounded forwarding recovery | `spec/zsh/modules/mux/`, `modules/mux/tests/mux_test.fish` |
-| launch | Positional and flag syntax, validation and results, mux and machine selection, dry-run argv, session metadata and forwarding | `spec/zsh/modules/launch/launch_session_spec.sh` |
+| launch | Positional and flag syntax, validation and results, mux and machine selection, dry-run argv, session metadata and forwarding; repository and worktree resolution | `spec/zsh/modules/launch/launch_session_spec.sh`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
 | Run after init | One-shot zsh and fish startup hooks, encoded and empty argv words, exec mode, and interactive class only | `spec/contract/launch_run_spec.sh` |
-| Launch completions | Host and mux candidates, positional host syntax, and options | `spec/zsh/launch_completions_spec.sh`, `fish/completions_test.fish` |
+| Launch completions | Host and mux candidates, positional host syntax, options, and offline cached repository names | `spec/zsh/launch_completions_spec.sh`, `fish/completions_test.fish`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
 | herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/modules/cc-providers/shims_spec.sh` |
 | wezterm | install-wezterm-terminfo failure propagation | `spec/zsh/modules/wezterm/wezterm_spec.sh` |
 | cc-providers | Data-only provider files, secret-free executable shims, bash invocation and private cache | `spec/zsh/modules/cc-providers/shims_spec.sh` |
-| git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh` |
+| git-worktree | gwt-clean preflight, squash/merge detection, pre-remove hook point; repo-sync roots/orgs options; repo-list inventory and remote cache | `spec/zsh/modules/git-worktree/cleanup_spec.sh`, `spec/zsh/modules/git-worktree/repo_sync_spec.sh`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
 | cwf | cwf-new executable creation checks, unmanaged copies, executable post-create hooks and copy-exclude; render generates zsh integration without evaluating it, interactive init sources the cache, reload does not regenerate, batch/agent stays quiet | `spec/zsh/modules/cwf/cwf_spec.sh` |
 | Commands | Encoded caller-state directives, hostile values, state wrappers and private staged shims | `spec/zsh/directives_spec.sh`, `spec/zsh/render_spec.sh` |
 | fish-bridge | run-fish curated environment | `spec/zsh/modules/fish-bridge/fish_bridge_spec.sh` |

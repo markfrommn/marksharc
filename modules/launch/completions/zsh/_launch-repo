@@ -1,0 +1,37 @@
+#compdef launch-repo
+
+_launch_repo_names() {
+    local host=${opt_args[--host]-} cache row name repo_path kind base branch prefix=''
+    local -a names=()
+    if [[ $words[CURRENT] == *:* ]]; then host=${words[CURRENT]%%:*}; prefix=$host:; fi
+    [[ $host != */* && $host != (.|..) ]] || return
+    case $host in ''|local|localhost|$MARKSHARC_HOST) host=local ;; esac
+    cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}/repos/$host.tsv
+    [[ -r $cache ]] || return
+    while IFS=$'\t' read -r name repo_path kind base branch; do
+        [[ $kind == base ]] && names+=( "$name" )
+        if [[ $kind == worktree ]]; then
+            if [[ ${words[CURRENT-1]} == --worktree ]]; then
+                names+=( "$name" ); [[ -z $branch ]] || names+=( "$branch" )
+            else names+=( "${base:t}/$name" ); fi
+        fi
+    done < "$cache"
+    compadd -P "$prefix" -a names
+}
+
+local context state state_descr line
+local -A opt_args
+_arguments -S -A '-*' \
+    '(--help -h)'{--help,-h}'[Show usage]' \
+    '--host[Choose a host]:host:' \
+    '--repo[Choose a repository]:repository:_launch_repo_names' \
+    '--worktree[Choose a worktree]:worktree:_launch_repo_names' \
+    '--command[Choose a program]:program:_command_names' \
+    '--mux[Choose a multiplexer]:multiplexer:(hc herdr tmux herdr-core)' \
+    '--mux-id[Choose an instance]:instance:' \
+    '--place[Set placement]:placement:(workspace tab hidden)' \
+    '--name[Set a display name]:name:' \
+    '*--env[Set a session variable]:NAME=VALUE:' \
+    '--rescan[Refresh the inventory]' '--in-shell[Run after shell init]' \
+    '--no-focus[Keep focus]' '--dry-run[Preview]' '--quiet[Suppress result]' \
+    '1:repository:_launch_repo_names' '*:argument:_files'

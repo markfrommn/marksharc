@@ -1,0 +1,151 @@
+#!/bin/zsh -f
+emulate -L zsh
+setopt extendedglob
+export MARKSHARC_HOME=${MARKSHARC_HOME:-${0:A:h:h:h:h}}
+export MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}
+source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh" || exit 1
+source "$MARKSHARC_HOME/core/zsh/lib/pick.zsh" || exit 1
+local host='' repo='' worktree='' program='' option value target='' kind line repo_path name selected base row wanted attempt terminal_fd
+local -i flagform=0 positional=0 rescan=0 has_name=0
+local -a passthrough=() command_args=() records=() fields=() choices=() matches=() list_args=() suggestions=()
+invalid() { print -ru2 -- "launch-repo: $*"; return 2; }
+while (( $# )); do
+    option=$1; shift
+    case $option in
+        -h|--help) print 'Usage: launch-repo [options] [[host:]repo[/worktree] [command [args ...]]]'; print '       launch-repo [options] [--host H] [--repo R] [--worktree W] [--command C] [-- args ...]'; exit 0 ;;
+        --pwd) invalid '--pwd is not supported'; exit 2 ;;
+        --rescan) rescan=1 ;;
+        --host|--repo|--worktree|--command|--mux|--mux-id|--place|--name|--env)
+            (( $# )) && [[ $1 != -- && ( -n $1 || $option == --name ) ]] || { invalid "$option requires a value"; exit 2; }
+            value=$1; shift
+            case $option in
+                --host) host=$value; flagform=1 ;;
+                --repo) repo=$value; flagform=1 ;;
+                --worktree) worktree=$value; flagform=1 ;;
+                --command) program=$value; flagform=1 ;;
+                --name) passthrough+=( "$option" "$value" ); has_name=1 ;;
+                *) passthrough+=( "$option" "$value" ) ;;
+            esac ;;
+        --in-shell|--no-focus|--dry-run|--quiet) passthrough+=( "$option" ) ;;
+        --) command_args=( "$@" ); break ;;
+        -*) invalid "unknown option: $option"; exit 2 ;;
+        *) if (( flagform )); then invalid 'use -- before command arguments in flag form'; exit 2; fi
+           if (( positional )); then command_args=( "$option" "$@" ); break; fi
+           target=$option; positional=1 ;;
+    esac
+done
+(( ! flagform || ! positional )) || { invalid 'positional target conflicts with flag form'; exit 2; }
+if (( positional )); then
+    if [[ $target == *:* ]] && _ms_hosts_valid_name "${target%%:*}"; then host=${target%%:*}; target=${target#*:}; fi
+    if [[ $target == ('~'|'~/'*|/*) ]]; then repo=$target
+    else repo=${target%%/*}; [[ $target != */* ]] || worktree=${target#*/}; fi
+fi
+[[ -z $program ]] || command_args=( "$program" "${command_args[@]}" )
+(( ! $#command_args )) || [[ -n $command_args[1] ]] || { invalid 'empty command'; exit 2; }
+[[ -z $host ]] || _ms_hosts_valid_name "$host" || { invalid 'invalid host'; exit 2; }
+[[ $host != (.|..) ]] || { invalid 'invalid host'; exit 2; }
+[[ $worktree != *:* ]] || { invalid 'worktree creation is reserved'; exit 2; }
+[[ -z $worktree || -n $repo ]] || { invalid '--worktree requires --repo'; exit 2; }
+[[ $repo != ('~'|'~/'*|/*) || -z $worktree ]] || { invalid 'paths cannot have a worktree part'; exit 2; }
+_ms_launch_host_kind "$host"; kind=$REPLY
+exec {terminal_fd}<&0 || exit 1
+if [[ $kind == prompt ]]; then
+    _ms_hosts_read || exit 1
+    local mux_kind instance inventory machine_rows='' mux_cli="$MARKSHARC_HOME/modules/mux/bin/marksharc-mux"
+    for mux_kind in herdr-core herdr; do
+        inventory=$("$mux_cli" instances "$mux_kind" 2>/dev/null) || continue
+        for line in "${(@f)inventory}"; do
+            instance=${line%%$'\t'*}
+            [[ -n $instance ]] || continue
+            output=$("$mux_cli" machines "$mux_kind" "$instance" 2>/dev/null) || continue
+            for row in "${(@f)output}"; do machine_rows+="$mux_kind/$instance"$'\t'"$row"$'\n'; done
+        done
+    done
+    choices=( "${(@f)$(_ms_launch_host_candidates '' <<< "$machine_rows")}" )
+    host=$(_ms_pick --header Host --flag '--host <name>' --terminal-fd "$terminal_fd" <<< "${(F)choices}") || exit $?
+    [[ -n $host ]] || exit 1
+    kind=remote
+fi
+if [[ $repo == . ]]; then
+    repo_path=$(command git rev-parse --show-toplevel 2>/dev/null) || { print -ru2 'launch-repo: current directory is not in a repository'; exit 1; }
+    if [[ $kind == local ]]; then repo=$repo_path; else
+        base=$(command git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 1
+        repo=${base:h:t}
+    fi
+fi
+if [[ $repo == ('~'|'~/'*|/*) ]]; then
+    repo_path=$repo
+    if [[ $kind == local ]]; then
+        [[ $repo_path != '~' ]] || repo_path=$HOME
+        [[ $repo_path != '~/'* ]] || repo_path=$HOME/${repo_path#\~/}
+        repo_path=${repo_path:a}
+        command git -C "$repo_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { print -ru2 -- "launch-repo: not a work tree: $repo_path"; exit 1; }
+    fi
+    name=${repo_path:t}
+else
+    for attempt in 1 2; do
+        repo_path=''; base=''
+        list_args=( --porcelain )
+        [[ $kind == local ]] || list_args+=( --host "$host" )
+        (( ! rescan && attempt == 1 )) || list_args+=( --rescan )
+        output=$("$MARKSHARC_HOME/modules/git-worktree/bin/repo-list" "${list_args[@]}") || exit $?
+        records=( "${(@f)output}" ); choices=(); matches=()
+        if [[ -z $repo ]]; then
+            for line in "${records[@]}"; do
+                fields=( "${(@ps:\t:)line}" ); name=$fields[1]
+                if [[ $fields[3] == worktree ]]; then name=${fields[4]:t}/$name; fi
+                choices+=( "$fields[2]"$'\t'"$name  $fields[5]  $fields[2]" )
+            done
+            repo_path=$(_ms_pick --header Repository --flag '--repo <name>' --terminal-fd "$terminal_fd" <<< "${(F)choices}") || exit $?
+            [[ -n $repo_path ]] || exit 1
+            name=${repo_path:t}; break
+        fi
+        for line in "${records[@]}"; do
+            fields=( "${(@ps:\t:)line}" )
+            [[ $fields[3] == base && $fields[1] == "$repo" ]] && matches+=( "$fields[2]" )
+        done
+        if (( $#matches )); then
+            if (( $#matches > 1 )); then
+                choices=(); for repo_path in "${matches[@]}"; do choices+=( "$repo_path"$'\t'"$repo_path" ); done
+                print -ru2 -- "launch-repo: multiple repositories named $repo: ${(j:, :)matches}"
+                base=$(_ms_pick --header Repository --flag '--repo <repo_path>' --terminal-fd "$terminal_fd" <<< "${(F)choices}") || exit $?
+                [[ -n $base ]] || exit 1
+            else base=$matches[1]; fi
+            repo_path=$base; name=$repo
+            if [[ -n $worktree ]]; then
+                matches=()
+                for wanted in directory branch; do
+                    for line in "${records[@]}"; do
+                        fields=( "${(@ps:\t:)line}" )
+                        [[ $fields[3] == worktree && $fields[4] == "$base" ]] || continue
+                        if [[ ( $wanted == directory && $fields[1] == "$worktree" ) || ( $wanted == branch && $fields[5] == "$worktree" ) ]]; then matches+=( "$fields[2]" ); fi
+                    done
+                    (( ! $#matches )) || break
+                done
+                if (( $#matches )); then
+                    if (( $#matches > 1 )); then
+                        choices=(); for repo_path in "${matches[@]}"; do choices+=( "$repo_path"$'\t'"$repo_path" ); done
+                        repo_path=$(_ms_pick --header Worktree --flag '--repo <repo_path>' --terminal-fd "$terminal_fd" <<< "${(F)choices}") || exit $?
+                    else repo_path=$matches[1]; fi
+                    name=${repo_path:t}; break
+                fi
+            else break; fi
+        fi
+        (( rescan )) && break
+    done
+    if [[ -z $repo_path || ( -n $worktree && $repo_path == $base ) ]]; then
+        for line in "${records[@]}"; do
+            fields=( "${(@ps:\t:)line}" )
+            if [[ -n $worktree && $fields[3] == worktree && $fields[4] == "$base" ]]; then
+                suggestions+=( "$repo/$fields[1]" )
+                [[ -z $fields[5] || $fields[5] == $fields[1] ]] || suggestions+=( "$repo/$fields[5]" )
+            elif [[ ( -z $worktree || -z $base ) && $fields[3] == base ]]; then
+                suggestions+=( "$fields[1]" )
+            fi
+        done
+        print -ru2 -- "launch-repo: no match for $repo${worktree:+/$worktree}; available: ${(j:, :)suggestions:-none}"
+        exit 1
+    fi
+fi
+(( has_name )) || passthrough+=( --name "$name" )
+exec "$MARKSHARC_HOME/modules/launch/bin/launch-session" "${passthrough[@]}" --host "${host:-local}" --pwd "$repo_path" -- "${command_args[@]}"
