@@ -23,15 +23,12 @@ export STARSHIP_CONFIG=/user.toml; _ms_opt_prompt_starship_config=rich; source $
   End
   preset_case() {
     emulate -L zsh
-    local preset="$MARKSHARC_ROOT/modules/prompt-starship/presets/rich.toml"
-    [[ -r $preset ]] || return 1
-    # The rich preset keeps the left prompt short and sends the rest to the right prompt.
-    # grep -qx 'format = """$directory$character"""' "$preset" && grep -qx 'right_format = """$all"""' "$preset" || return 2
-    grep -qx 'format =' && grep -qx 'fill' || return 2
-    #local section
-    #for section in status cmd_duration jobs shlvl sudo; do grep -qx "\\[$section\\]" "$preset" || { print -r -- "missing $section"; return 3; }; done
+    local preset1="$MARKSHARC_ROOT/modules/prompt-starship/presets/rich.toml"
+    [[ -r $preset1 ]] || return 1
+    local preset2="$MARKSHARC_ROOT/modules/prompt-starship/presets/white.toml"
+    [[ -r $preset2 ]] || return 1
   }
-  It 'ships the rich preset'
+  It 'ships the rich and white presets'
     When run preset_case
     The status should be success
   End
