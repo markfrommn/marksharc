@@ -88,6 +88,7 @@ marksharc sync --update [--system] # run full marksharc update (with optional OS
 marksharc sync timer on|off|status # manage launchd (macOS) or systemd user (Linux) timer
 marksharc hosts populate           # pick push hosts from ~/.ssh/config and `hc machine ls`
 launch-session [host:]directory    # open a terminal in a local or remote directory
+launch-repo [host:]repo[/worktree]  # open an existing repository or worktree
 marksharc push [options] [regex…]  # run sync (or --update/--system) over SSH in parallel
 marksharc doctor                   # report local health
 marksharc update                   # sync, plugin pins and module update steps

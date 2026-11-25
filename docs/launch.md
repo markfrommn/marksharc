@@ -1,5 +1,29 @@
 # Launch a terminal session
 
+`launch-repo` opens an existing repository or worktree by name. Configure
+`git-worktree.roots` with whitespace-separated directories containing base repositories:
+
+```text
+set git-worktree.roots ~/src ~/work
+```
+
+Use `launch-repo project`, `launch-repo project/feature/branch`, or
+`launch-repo build:project/worktree`. With no repository, a terminal picker lists
+the inventory; `.` selects the current worktree. Absolute paths and `~/` paths
+are accepted. For scripts, use `launch-repo --host build --repo project
+--worktree feature/branch --command git -- status --short`. Launch options such
+as `--mux`, `--env`, and `--in-shell` are forwarded to `launch-session`.
+
+`repo-list --porcelain` prints tab-separated name, path, kind, base path, and
+branch fields. `--host HOST` selects a remote inventory, `--rescan` refreshes
+it, and `--name NAME` refreshes a cache missing that name. Remote inventories
+require a configured SSH target and `repo-list` on the remote PATH. Cached
+inventories expire after `launch.repo_cache_minutes` (default 60); remote SSH
+uses `launch.ssh_timeout` (default 10 seconds). Completion reads the cache
+without scanning or connecting. Remote inventory reads contact the remote host
+each time so it can detect changed roots and removed worktrees; the local copy
+serves offline completion.
+
 `launch-session` opens a terminal in a directory on this host or on a machine known to Herdr. The default-enabled `launch` module makes the command available on PATH and provides completions in zsh and fish.
 
 ```sh
