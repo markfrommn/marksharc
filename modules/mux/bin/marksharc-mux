@@ -8,6 +8,61 @@ framework=${mux_dir:h:h}
 # active adapter from receiving titles.
 mux_adapter() { source "$mux_dir/adapters/$1.zsh" "${@:2}"; }
 
+_ms_mux_preview() {
+    local word
+    local -a quoted=()
+    for word in "$@"; do
+        if [[ $word == *[[:cntrl:]]* ]]; then
+            quoted+=( "${(qqqq)word}" )
+        else
+            quoted+=( "${(qq)word}" )
+        fi
+    done
+    print -r -- "${(j: :)quoted}"
+}
+
+mux_usage() {
+    print -ru2 -- 'Usage: marksharc-mux {detect|set_titles|refresh_env|sessions}'
+    print -ru2 -- '       marksharc-mux {supports|current|instances|machines|launch} KIND [ARG ...]'
+    return 2
+}
+
+mux_launch() {
+    local kind=$1 key
+    shift
+    local -A launch_req=( instance '' machine '' cwd '' name '' place workspace focus 1 dry_run 0 )
+    local -a launch_env=() launch_argv=()
+    while (( $# )); do
+        case $1 in
+            --instance|--machine|--cwd|--name|--place)
+                (( $# >= 2 )) || { mux_usage; return 2; }
+                key=${1#--}
+                launch_req[$key]=$2
+                shift
+                ;;
+            --env)
+                (( $# >= 2 )) && [[ $2 =~ '^[A-Za-z_][A-Za-z0-9_]*=' ]] || {
+                    print -ru2 -- 'marksharc-mux launch: --env requires NAME=VALUE'
+                    return 2
+                }
+                launch_env+=( "$2" )
+                shift
+                ;;
+            --focus) launch_req[focus]=1 ;;
+            --no-focus) launch_req[focus]=0 ;;
+            --dry-run) launch_req[dry_run]=1 ;;
+            --) launch_argv=( "${@:2}" ); break ;;
+            *) mux_usage; return 2 ;;
+        esac
+        shift
+    done
+    if [[ $launch_req[place] != (workspace|tab|hidden) ]]; then
+        print -ru2 -- "marksharc-mux launch: unknown placement: $launch_req[place]"
+        return 2
+    fi
+    mux_adapter "$kind" launch
+}
+
 mux_detect() {
     local file adapter
     active=()
@@ -39,10 +94,23 @@ case ${1-} in
         [[ ${2-} =~ '^[a-z][a-z-]*$' && -f $mux_dir/adapters/$2.zsh ]] || exit 2
         mux_adapter "$2" sessions
         ;;
+    supports|current|instances|machines|launch)
+        [[ ${2-} =~ '^[a-z][a-z-]*$' && -f $mux_dir/adapters/$2.zsh ]] || { mux_usage; exit 2; }
+        if [[ $1 != supports ]]; then
+            mux_adapter "$2" supports launch || exit 1
+            source "$framework/core/zsh/lib/json.zsh" || exit 1
+        fi
+        case $1 in
+            supports) (( $# == 3 )) || { mux_usage; exit 2; }; mux_adapter "$2" supports "$3" ;;
+            current|instances) (( $# == 2 )) || { mux_usage; exit 2; }; mux_adapter "$2" "$1" ;;
+            machines) (( $# <= 3 )) || { mux_usage; exit 2; }; mux_adapter "$2" machines "${@:3}" ;;
+            launch) mux_launch "$2" "${@:3}" ;;
+        esac
+        ;;
     refresh_env)
         source "$framework/core/zsh/lib/directives.zsh" || exit 1
         source "$mux_dir/lib/refresh.zsh" || exit 1
         mux_refresh "${2:-all}"
         ;;
-    *) print -ru2 -- 'Usage: marksharc-mux {detect|set_titles|refresh_env|sessions}'; exit 2 ;;
+    *) mux_usage ;;
 esac

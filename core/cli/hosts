@@ -18,6 +18,7 @@ EOF
 }
 
 source "$MARKSHARC_HOME/core/cli/hosts-lib.zsh"
+source "$MARKSHARC_HOME/core/zsh/lib/pick.zsh"
 
 typeset REPLY=
 _ms_hosts_file
@@ -134,7 +135,7 @@ case $cmd in
             exit 1
         fi
 
-        typeset -a candidates=() selected_lines=() selected_names=()
+        typeset -a candidates=() selected_names=()
         local h t s label
         for h in "${_ms_disc_names[@]}"; do
             t=${_ms_disc_targets[$h]}
@@ -145,37 +146,31 @@ case $cmd in
                 label="$h [$s]"
             fi
             [[ -n ${_ms_host_targets[$h]-} ]] && label+=" (configured)"
-            candidates+=( "$label" )
+            candidates+=( "$h"$'\t'"$label" )
         done
 
         if (( select_all )); then
             selected_names=( "${_ms_disc_names[@]}" )
-        elif whence -p -- gum >/dev/null 2>&1; then
-            local raw
-            raw=$(print -r -l -- "${candidates[@]}" | command gum choose --no-limit --header "Select hosts for $hosts_file") || {
-                print -r -- 'hosts populate: cancelled'
-                exit 0
-            }
-            [[ -n $raw ]] && selected_lines=( "${(@f)raw}" )
-        elif whence -p -- fzf >/dev/null 2>&1; then
-            local raw
-            raw=$(print -r -l -- "${candidates[@]}" | command fzf --multi --prompt='hosts> ' --header='Tab to toggle, Enter to confirm') || {
-                print -r -- 'hosts populate: cancelled'
-                exit 0
-            }
-            [[ -n $raw ]] && selected_lines=( "${(@f)raw}" )
         else
-            print -ru2 -- 'hosts populate: neither gum nor fzf was found on PATH (install gum/fzf or pass --all)'
-            print -r -l -- "${candidates[@]}"
-            exit 1
-        fi
-
-        if (( ! select_all )); then
-            local sel
-            for sel in "${selected_lines[@]}"; do
-                [[ -n $sel ]] || continue
-                selected_names+=( "${sel%% *}" )
-            done
+            if ! whence -p -- gum >/dev/null 2>&1 && ! whence -p -- fzf >/dev/null 2>&1; then
+                print -ru2 -- 'hosts populate: neither gum nor fzf was found on PATH (install gum/fzf or pass --all)'
+                for label in "${candidates[@]}"; do
+                    print -r -- "${label#*$'\t'}"
+                done
+                exit 1
+            fi
+            local raw terminal_fd pick_status
+            exec {terminal_fd}<&0
+            raw=$(print -r -l -- "${candidates[@]}" | _ms_pick --multi --header "Select hosts for $hosts_file" --flag --all --terminal-fd "$terminal_fd")
+            pick_status=$?
+            exec {terminal_fd}<&-
+            if (( pick_status == 1 )); then
+                print -r -- 'hosts populate: cancelled'
+                exit 0
+            elif (( pick_status != 0 )); then
+                exit $pick_status
+            fi
+            [[ -n $raw ]] && selected_names=( "${(@f)raw}" )
         fi
 
         if (( ! $#selected_names )); then

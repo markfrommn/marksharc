@@ -274,7 +274,7 @@ exit 1'
     # Prefer gum when both gum and fzf are available.
     stub_command gum 'printf "gum:%s\n" "$*" >> "$OPLOG"; grep -E "^(alpha|delta) "'
     stub_command fzf 'printf "fzf:%s\n" "$*" >> "$OPLOG"; cat'
-    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 1; }
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 1; }
     local hf=$XDG_CONFIG_HOME/marksharc/hosts.conf
     [[ $(<"$OPLOG") == gum:* && $(<"$OPLOG") != *fzf:* ]] || { cat "$OPLOG"; return 2; }
     [[ $(<"$hf") == *'host alpha alpha.example.net'* && $(<"$hf") == *'host delta ops@delta.example.net'* ]] || { cat "$hf"; return 3; }
@@ -284,7 +284,7 @@ exit 1'
     rm -f "$TEST_ROOT/bin/gum"
     : > "$OPLOG"
     stub_command fzf 'printf "fzf:%s\n" "$*" >> "$OPLOG"; grep -E "^(alpha|gamma) "'
-    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || { cat "$TEST_ROOT/err"; return 5; }
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" pty env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 5; }
     [[ $(<"$OPLOG") == fzf:* && $(<"$hf") == *'host gamma'* && $(grep -c 'host alpha' "$hf") == 1 ]] || { cat "$hf" "$OPLOG"; return 6; }
 
     # hosts list / add / remove and injection refusal.
@@ -298,6 +298,23 @@ exit 1'
   }
   It 'discovers hosts from ssh config and hc machine ls, prefers gum over fzf, and rejects option injection'
     When run populate_pickers_case
+    The status should be success
+  End
+
+  populate_no_picker_case() {
+    emulate -L zsh
+    hosts_setup
+    mkdir -p "$TEST_ROOT/no-tools"
+    env -i HOME="$HOME" PATH="$TEST_ROOT/no-tools" MARKSHARC_HOME="$MS_HOME" MARKSHARC_CONFIG="$XDG_CONFIG_HOME/marksharc" /bin/zsh "$MS_HOME/core/cli/hosts" populate --source ssh > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 1 && $(<"$TEST_ROOT/err") == *'neither gum nor fzf'* && $(<"$TEST_ROOT/out") == *'alpha [ssh]'* ]] || return 1
+    stub_command gum 'exit 99'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate --source ssh > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 3 && $(<"$TEST_ROOT/err") == *--all* && ! -s $TEST_ROOT/out ]] || return 2
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" hosts populate --source ssh --all > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 3
+    [[ $(<"$XDG_CONFIG_HOME/marksharc/hosts.conf") == *'host alpha'* ]]
+  }
+  It 'preserves the missing picker output and supports noninteractive selection with --all'
+    When run populate_no_picker_case
     The status should be success
   End
 End

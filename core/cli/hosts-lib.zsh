@@ -2,6 +2,7 @@
 # Sourced by core/cli/hosts and core/cli/push under `emulate -L zsh`.
 
 source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
+source "$MARKSHARC_HOME/core/zsh/lib/json.zsh"
 
 _ms_hosts_file() {
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
@@ -139,154 +140,24 @@ _ms_hosts_discover_ssh() {
     _ms_hosts_parse_ssh_file "$ssh_conf" "${ssh_conf:h}"
 }
 
-# Pure-zsh scanner for `hc machine ls --json` output: {"machines":[{...}, ...]}.
+# Import permanent hc machine entries into the discovery candidates.
 _ms_hosts_parse_hc_json() {
-    local json=$1
-    integer len=${#json} i=1 depth=0 in_machines=0 in_arr=0
-    local ch key val str m_name m_target m_via m_temp mkey bval REPLY=
-
-    _ms_json_skip_ws() {
-        while (( i <= len )); do
-            case $json[i] in
-                ' '|$'\t'|$'\n'|$'\r') (( i++ )) ;;
-                *) break ;;
-            esac
-        done
-    }
-
-    _ms_json_read_string() {
-        REPLY=
-        (( i <= len )) && [[ $json[i] == '"' ]] || return 1
-        (( i++ ))
-        local out= c
-        while (( i <= len )); do
-            c=$json[i]
-            if [[ $c == '"' ]]; then
-                (( i++ ))
-                REPLY=$out
-                return 0
-            fi
-            if [[ $c == '\' ]]; then
-                (( i++ ))
-                (( i <= len )) || return 1
-                case $json[i] in
-                    '"'|'\'|'/') out+=$json[i] ;;
-                    n) out+=$'\n' ;;
-                    t) out+=$'\t' ;;
-                    r) out+=$'\r' ;;
-                    *) out+=$json[i] ;;
-                esac
-                (( i++ ))
-                continue
-            fi
-            out+=$c
-            (( i++ ))
-        done
-        return 1
-    }
-
-    _ms_json_skip_value() {
-        _ms_json_skip_ws
-        (( i <= len )) || return 1
-        case $json[i] in
-            '"')
-                local REPLY=
-                _ms_json_read_string || return 1
-                ;;
-            '{'|'[')
-                local open=$json[i] close='}'
-                [[ $open == '[' ]] && close=']'
-                integer d=1
-                (( i++ ))
-                while (( i <= len && d > 0 )); do
-                    if [[ $json[i] == '"' ]]; then
-                        local REPLY=
-                        _ms_json_read_string || return 1
-                        continue
-                    fi
-                    if [[ $json[i] == $open ]]; then (( d++ ))
-                    elif [[ $json[i] == $close ]]; then (( d-- ))
-                    fi
-                    (( i++ ))
-                done
-                ;;
-            *)
-                while (( i <= len )); do
-                    case $json[i] in
-                        ','|'}'|']'|' '|$'\t'|$'\n'|$'\r') break ;;
-                        *) (( i++ )) ;;
-                    esac
-                done
-                ;;
-        esac
-        return 0
-    }
-
-    _ms_json_skip_ws
-    (( i <= len )) && [[ $json[i] == '{' ]] || return 0
-    (( i++ ))
-
-    while (( i <= len )); do
-        _ms_json_skip_ws
-        (( i <= len )) || break
-        [[ $json[i] == '}' ]] && break
-        [[ $json[i] == ',' ]] && { (( i++ )); continue; }
-        REPLY=
-        _ms_json_read_string || break
-        key=$REPLY
-        _ms_json_skip_ws
-        (( i <= len )) && [[ $json[i] == ':' ]] || break
-        (( i++ ))
-        _ms_json_skip_ws
-        if [[ $key == machines && $json[i] == '[' ]]; then
-            (( i++ ))
-            while (( i <= len )); do
-                _ms_json_skip_ws
-                (( i <= len )) || break
-                [[ $json[i] == ']' ]] && { (( i++ )); break; }
-                [[ $json[i] == ',' ]] && { (( i++ )); continue; }
-                if [[ $json[i] != '{' ]]; then
-                    _ms_json_skip_value || break
-                    continue
-                fi
-                (( i++ ))
-                m_name= m_target= m_via=false m_temp=false
-                while (( i <= len )); do
-                    _ms_json_skip_ws
-                    (( i <= len )) || break
-                    [[ $json[i] == '}' ]] && { (( i++ )); break; }
-                    [[ $json[i] == ',' ]] && { (( i++ )); continue; }
-                    _ms_json_read_string || break
-                    mkey=$REPLY
-                    _ms_json_skip_ws
-                    (( i <= len )) && [[ $json[i] == ':' ]] || break
-                    (( i++ ))
-                    _ms_json_skip_ws
-                    if [[ $mkey == (name|target) && $json[i] == '"' ]]; then
-                        _ms_json_read_string || break
-                        if [[ $mkey == name ]]; then m_name=$REPLY; else m_target=$REPLY; fi
-                    elif [[ $mkey == (via|temporary) ]]; then
-                        bval=
-                        while (( i <= len )); do
-                            case $json[i] in
-                                ','|'}'|' '|$'\t'|$'\n'|$'\r') break ;;
-                                *) bval+=$json[i]; (( i++ )) ;;
-                            esac
-                        done
-                        if [[ $mkey == via ]]; then m_via=$bval; else m_temp=$bval; fi
-                    else
-                        _ms_json_skip_value || break
-                    fi
-                done
-                if [[ -n $m_name && $m_via != true && $m_temp != true ]]; then
-                    [[ -n $m_target ]] || m_target=$m_name
-                    _ms_hosts_add_candidate "$m_name" "$m_target" hc
-                fi
-            done
-            break
-        else
-            _ms_json_skip_value || break
-        fi
+    local -A json_values=() json_types=()
+    local -i index
+    local prefix name target
+    _ms_json_parse "$1" || return 1
+    [[ ${json_types[/machines]-} == array ]] || return 1
+    for (( index = 0; index < ${json_values[/machines]}; ++index )); do
+        prefix=/machines/$index
+        [[ ${json_types[$prefix/name]-} == string ]] || continue
+        name=${json_values[$prefix/name]}
+        target=''
+        [[ ${json_types[$prefix/target]-} != string ]] || target=${json_values[$prefix/target]}
+        [[ -n $name ]] || continue
+        [[ ${json_types[$prefix/via]-} != boolean || ${json_values[$prefix/via]} != true ]] || continue
+        [[ ${json_types[$prefix/temporary]-} != boolean || ${json_values[$prefix/temporary]} != true ]] || continue
+        [[ -n $target ]] || target=$name
+        _ms_hosts_add_candidate "$name" "$target" hc
     done
 }
 
@@ -296,6 +167,105 @@ _ms_hosts_discover_hc() {
     json=$(command hc machine ls --json 2>/dev/null) || return 0
     [[ -n $json ]] || return 0
     _ms_hosts_parse_hc_json "$json"
+}
+
+# Launch helpers return their result in REPLY. The caller loads hosts.conf first.
+_ms_launch_host_kind() {
+    case ${1-} in
+        ''|local|localhost) REPLY=local ;;
+        remote) REPLY=prompt ;;
+        *) if [[ -n ${MARKSHARC_HOST-} && $1 == $MARKSHARC_HOST ]]; then
+               REPLY=local
+           else
+               REPLY=remote
+           fi ;;
+    esac
+}
+
+_ms_launch_host_target() {
+    REPLY=${_ms_host_targets[$1]-$1}
+}
+
+# The machine inventory is newline-delimited name, target, hostname TSV.
+_ms_launch_machine() {
+    local kind=$1 host=$2 rows=$3 target row name machine_target hostname rest
+    local -a matches=()
+    local -i tier
+    _ms_launch_host_target "$host"
+    target=$REPLY
+    for tier in 1 2 3; do
+        matches=()
+        for row in "${(@f)rows}"; do
+            [[ $row == *$'\t'* ]] || continue
+            name=${row%%$'\t'*}
+            rest=${row#*$'\t'}
+            machine_target=${rest%%$'\t'*}
+            hostname=${rest#*$'\t'}
+            [[ $rest == *$'\t'* ]] || hostname=''
+            case $tier in
+                1) [[ $name == $host ]] || continue ;;
+                2) [[ -n $hostname && $hostname == $host ]] || continue ;;
+                3) [[ $machine_target == $target || $machine_target == $host ]] || continue ;;
+            esac
+            matches+=( "$name" )
+        done
+        if (( $#matches == 1 )); then
+            REPLY=$matches[1]
+            return 0
+        elif (( $#matches > 1 )); then
+            print -ru2 -- "hosts: ambiguous machine for $host: ${(j:, :)matches}"
+            return 1
+        fi
+    done
+    case $kind in
+        herdr-core) print -ru2 -- "hosts: no machine for $host; add it with: hc machine add ${(q)target} --name ${(q)host}" ;;
+        herdr) print -ru2 -- "hosts: no machine for $host; add it with: herdr machine add ${(q)target} --label ${(q)host}" ;;
+        *) print -ru2 -- "hosts: $kind cannot reach $host" ;;
+    esac
+    return 1
+}
+
+# Read kind<TAB>name<TAB>target<TAB>hostname rows and print picker candidates.
+_ms_launch_host_candidates() {
+    local filter=${1-} row kind machine remainder target host kind_rows REPLY
+    local -a names=( "${_ms_host_names[@]}" ) kinds=() reachable=()
+    local -A inventories=() seen=() targets=()
+    for host in "${names[@]}"; do
+        seen[$host]=1
+        targets[$host]=${_ms_host_targets[$host]}
+    done
+    while IFS= read -r row || [[ -n $row ]]; do
+        [[ $row == *$'\t'* ]] || continue
+        kind=${row%%$'\t'*}
+        remainder=${row#*$'\t'}
+        [[ $remainder == *$'\t'* ]] || continue
+        machine=${remainder%%$'\t'*}
+        target=${remainder#*$'\t'}
+        target=${target%%$'\t'*}
+        [[ -n $kind && -n $machine ]] || continue
+        if [[ -z ${inventories[$kind]-} ]]; then
+            kinds+=( "$kind" )
+        fi
+        inventories[$kind]+="$remainder"$'\n'
+        if [[ -z ${seen[$machine]-} ]]; then
+            seen[$machine]=1
+            names+=( "$machine" )
+            targets[$machine]=${target:-$machine}
+        fi
+    done
+    for host in "${names[@]}"; do
+        _ms_launch_host_kind "$host"
+        [[ $REPLY == remote ]] || continue
+        reachable=()
+        for kind in "${kinds[@]}"; do
+            [[ -z $filter || $kind == $filter ]] || continue
+            kind_rows=${inventories[$kind]}
+            _ms_launch_machine "$kind" "$host" "$kind_rows" 2>/dev/null && reachable+=( "$kind" )
+        done
+        [[ -z $filter || $#reachable -gt 0 ]] || continue
+        print -r -- "$host"$'\t'"$host (${targets[$host]}) [${(j:, :)reachable}]"
+    done
+    return 0
 }
 
 _ms_hosts_format_line() {

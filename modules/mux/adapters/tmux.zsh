@@ -32,4 +32,85 @@ case $1 in
         return 0
         ;;
     sessions) command tmux list-sessions -F '#{session_name}' ;;
+    supports)
+        case ${2-} in
+            launch|autostart|argv|place-workspace|place-tab|place-hidden) return 0 ;;
+            *) return 1 ;;
+        esac
+        ;;
+    current|instances|machines|launch)
+        local operation=$1 socket=${TMUX%,*,*} result word
+        local -a tmux_cmd=( tmux ) args=() escaped=()
+        [[ -z $socket ]] || tmux_cmd+=( -S "$socket" )
+
+        case $operation in
+            current)
+                [[ -n $TMUX && $TMUX_PANE == %<-> ]] || return 1
+                command "${tmux_cmd[@]}" display-message -p -t "$TMUX_PANE" '#{session_id}' 2>/dev/null
+                return $?
+                ;;
+            instances)
+                command "${tmux_cmd[@]}" list-sessions -F $'#{session_id}\t#{session_name}' 2>/dev/null
+                return $?
+                ;;
+            machines) return 0 ;;
+        esac
+
+        if [[ -n ${launch_req[machine]} ]]; then
+            print -ru2 -- 'tmux: remote launch is not supported'
+            return 1
+        fi
+        if [[ -n ${launch_req[instance]} ]]; then
+            args=( new-window -t "${launch_req[instance]}:" )
+            [[ ${launch_req[focus]} != 0 && ${launch_req[place]} != hidden ]] || args+=( -d )
+            if [[ ${launch_req[place]} == workspace ]]; then
+                print -ru2 -- 'tmux: workspace placement uses a tab'
+            fi
+        else
+            args=( new-session -d -s marksharc )
+        fi
+        # tmux expands format expressions in directory and window-name options.
+        [[ -z ${launch_req[cwd]} ]] || args+=( -c "${launch_req[cwd]//\#/##}" )
+        [[ -z ${launch_req[name]} ]] || args+=( -n "${launch_req[name]//\#/##}" )
+        for word in "${launch_env[@]}"; do args+=( -e "$word" ); done
+        args+=( -P -F $'#{session_id}\t#{session_id}:#{window_id}.#{pane_id}' )
+        if (( $#launch_argv == 1 )); then
+            # A single tmux command argument is interpreted as a shell line.
+            args+=( -- /bin/sh -c 'exec "$@"' sh "${launch_argv[@]}" )
+        elif (( $#launch_argv )); then
+            args+=( -- "${launch_argv[@]}" )
+        fi
+        # The tmux client treats a trailing semicolon as a command separator.
+        # Escaping it in each argument preserves the literal byte at the server.
+        for word in "${args[@]}"; do
+            [[ $word != *';' ]] || word="${word%;}\\;"
+            escaped+=( "$word" )
+        done
+        if [[ ${launch_req[dry_run]} == 1 ]]; then
+            _ms_mux_preview "${tmux_cmd[@]}" "${escaped[@]}"
+            return 0
+        fi
+        if ! result=$(command "${tmux_cmd[@]}" "${escaped[@]}"); then
+            if [[ -z $launch_req[instance] ]] && (( $#launch_env )); then
+                local version
+                version=$(command "${tmux_cmd[@]}" -V 2>/dev/null)
+                if [[ $version =~ '^tmux ([0-9]+)\.([0-9]+)' ]] &&
+                    (( match[1] < 3 || (match[1] == 3 && match[2] < 2) )); then
+                    print -ru2 -- "tmux: new-session environment options need tmux 3.2 or later (found $version)"
+                fi
+            fi
+            return 1
+        fi
+        [[ $result == \$<->$'\t'\$<->:@<->.%<-> ]] || {
+            print -ru2 -- 'tmux: launch returned an invalid address'
+            return 1
+        }
+        if [[ -z ${launch_req[instance]} ]]; then
+            print -ru2 -- 'tmux: attach with tmux attach -t marksharc'
+        elif [[ ${launch_req[place]} == hidden ]]; then
+            local window=${${result#*$'\t'}%.%*}
+            print -ru2 -- "tmux: hidden window. Select with $(_ms_mux_preview "${tmux_cmd[@]}" select-window -t "$window")"
+        fi
+        print -r -- "$result"
+        ;;
 esac

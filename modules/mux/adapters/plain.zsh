@@ -23,6 +23,7 @@ mux_terminal_title() {
 }
 
 case $1 in
+    supports) return 1 ;;
     detect) [[ -n $TERM && $TERM != dumb || $TERM_PROGRAM == (iTerm.app|Apple_Terminal) ]] ;;
     set_titles) mux_terminal_title "$3" ;;
     terminal_title) mux_terminal_title "${@:2}" ;;
