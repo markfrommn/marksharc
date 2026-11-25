@@ -1,3 +1,32 @@
+_ms_hc_focus_app() {
+    local space=$1 address=$2 output key candidate space_id terminal
+    local -i attempt
+    local -A json_values=() json_types=()
+    for (( attempt = 1; attempt <= 8; ++attempt )); do
+        output=$(command herdr-app ls 2>/dev/null) || return 0
+        _ms_json_parse "$output" || return 0
+        terminal=''
+        # The app and Core can use different names for the same machine.
+        # Match the space label as well as the terminal ID to avoid focusing a different Core's pane.
+        for key in "${(@k)json_types}"; do
+            [[ $key == /spaces/<->/tabs/<->/terminals/<->/terminal && $json_types[$key] == string ]] || continue
+            candidate=${json_values[$key]}
+            space_id=${json_values[${key%%/tabs/*}/id]}
+            [[ ${space_id:t} == "$space" && ${candidate:t} == ${address:t} ]] || continue
+            [[ -z $terminal || $terminal == "$candidate" ]] || return 0
+            terminal=$candidate
+        done
+        if [[ -n $terminal ]]; then
+            if ! command herdr-app do agent.focus --terminal "$terminal" >/dev/null 2>&1; then
+                print -ru2 -- "hc launch: the Herdr app could not focus $terminal"
+            fi
+            return 0
+        fi
+        # Label placement reaches the app asynchronously after hc run returns.
+        (( attempt == 8 )) || command sleep 0.15
+    done
+}
+
 case $1 in
     detect) [[ -n $HC_TERMINAL_ID ]] ;;
     set_titles)
@@ -76,6 +105,10 @@ case $1 in
         [[ -z $launch_req[name] ]] || args+=( --label "marksharc.name=$launch_req[name]" )
 
         local space='' part address
+        local -i focus_app=0
+        if [[ $place != hidden && ${launch_req[focus]} == 1 ]] && (( $+commands[herdr-app] )); then
+            focus_app=1
+        fi
         if [[ $place == tab && -z $machine && $instance == "$current_instance" ]]; then
             if [[ $launch_req[dry_run] == 1 ]]; then
                 _ms_mux_preview "${cli[@]}" get "$HC_TERMINAL_ID" --json
@@ -119,6 +152,10 @@ case $1 in
 
         if [[ $launch_req[dry_run] == 1 ]]; then
             _ms_mux_preview "${cli[@]}" "${args[@]}"
+            if (( focus_app )); then
+                _ms_mux_preview herdr-app ls
+                _ms_mux_preview herdr-app do agent.focus --terminal '<app-terminal-address>'
+            fi
             return
         fi
         output=$(command "${cli[@]}" "${args[@]}") || return 1
@@ -133,6 +170,8 @@ case $1 in
         fi
         if [[ $place == hidden ]]; then
             print -ru2 -- "hc launch: hidden terminal. Attach with $(_ms_mux_preview "${cli[@]}" attach "$address")"
+        elif (( focus_app )); then
+            _ms_hc_focus_app "$space" "$address"
         fi
         printf '%s\t%s\n' "$instance" "$address"
         ;;

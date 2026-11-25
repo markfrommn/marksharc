@@ -143,7 +143,7 @@ DEV-78 ran these on 2026-11-25 with the operator at the app window. The terminal
 | V8 | A shell's `exit` closes its terminal's view. | Pass in the app and in Herdr TUI 0.9.5. On sol, `marksharc-mux launch herdr` created a pane in a disposable server, which returned an empty pane list after the shell exited. tmux closes the window by its manual. |
 | V9 | `tmux new-session -e` on the macOS Homebrew tmux. | Pass with tmux 3.8, including an empty value. |
 | V10 | A `--no-parent` terminal outlives the terminal that started it. | Pass. A child started without it was killed with its parent. |
-| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Pending operator presence at the macOS app window. The adapter currently relies on label placement, which preserves the existing focus. |
+| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Pass with Herdr app 0.1.12 and Core 0.1.22 on macOS. The app kept the original focus on label placement and switched to the new terminal's space after `agent.focus`. The operator confirmed the switch. The original view was restored and the probe terminal removed. |
 
 ## 5. Architecture
 
@@ -229,7 +229,7 @@ Running Herdr Core instances are found without waking one: the adapter lists the
 
 When a placement falls back, the command prints one line on standard error naming the placement used. For a hidden terminal the line includes how to reach it, such as `hc attach t21`. A labelled Herdr Core terminal is shown by whichever app windows watch that core. With none watching it stays reachable by its address, which the result line carries.
 
-`--no-focus` maps to `--no-focus` on the Herdr TUI and `-d` on tmux. A terminal placed by label on Herdr Core appears without taking the focus. When focus is wanted and an app window answers on the calling host, the adapter then runs `herdr-app do agent.focus --terminal <address>`, once check V11 confirms it. From any other host the focus stays where it was.
+`--no-focus` maps to `--no-focus` on the Herdr TUI and `-d` on tmux. A terminal placed by label on Herdr Core appears without taking the focus. When focus is wanted, the adapter looks for the new terminal in its labelled space in the calling host's app window, then runs `herdr-app do agent.focus --terminal <address>` with the app's address. The focus stays where it was when the app has no window on the calling host or cannot resolve the terminal.
 
 Starting a kind with no running instance: tmux creates a detached session with `new-session -d -s <name>` and prints `tmux attach -t <name>` on standard error. Herdr Core starts its core on the first `hc` command. The Herdr TUI is never started.
 

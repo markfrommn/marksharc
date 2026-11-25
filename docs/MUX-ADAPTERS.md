@@ -44,7 +44,7 @@ marksharc-mux launch herdr-core --instance default --machine build --cwd '~/src'
 
 The launch flags are `--instance`, `--machine`, `--cwd`, `--name`, `--place workspace|tab|hidden`, `--focus`, `--no-focus`, `--dry-run`, and repeatable `--env NAME=VALUE`. Pass program arguments after `--`. The Herdr TUI accepts command delivery through `LAUNCH_RUN` in the environment and requires an absolute cwd for a remote workspace. Herdr Core changes into a remote-home path inside its terminal wrapper. An empty tmux instance requests a detached session.
 
-A dry run prints the provider commands with each argument quoted. A preview of Core tab placement from a caller terminal includes the label lookup and a placeholder for the space ID. Placement fallbacks and attach hints go to stderr. See [the launch specification](../specs/LAUNCH-SPEC.md#54-launch-adapters) for each provider's placement and startup rules.
+A dry run prints the provider commands with each argument quoted. A preview of Core tab placement from a caller terminal includes the label lookup and a placeholder for the space ID. If the Herdr app is installed and focus is requested for a visible placement, the preview includes the app lookup and focus command with a placeholder for the app's terminal address. Placement fallbacks and attach hints go to stderr. See [the launch specification](../specs/LAUNCH-SPEC.md#54-launch-adapters) for each provider's placement and startup rules.
 
 Extend the contract spec in `modules/mux/tests/adapters_spec.sh` with stubbed CLIs. Exercise nesting, missing tools, stable targeting, literal title text, and client fields the provider can actually retrieve.
 

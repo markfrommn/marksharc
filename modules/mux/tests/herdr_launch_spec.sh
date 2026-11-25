@@ -175,10 +175,10 @@ esac'
   hc_workspace_case() {
     hc_stub
     local preview space
-    preview=$(mux launch herdr-core --dry-run --machine mac --place tab --cwd /remote/absolute 2> "$TEST_ROOT/err") || return 1
+    preview=$(mux launch herdr-core --dry-run --machine mac --place tab --cwd /remote/absolute --no-focus 2> "$TEST_ROOT/err") || return 1
     [[ $(<"$TEST_ROOT/err") == *'uses a new workspace'* && ! -s $OPLOG ]] || return 2
     [[ $preview =~ "^'env' 'HC_SOCKET=' 'HC_SESSION=default' 'hc' 'run' '--bg' '--no-parent' '--no-notify' '--on' 'mac' '--label' 'herdr.space=sp[0-9a-f]{32}' '--cwd' '/remote/absolute'$" ]] || return 3
-    [[ $(mux launch herdr-core --place workspace --env EMPTY=) == $'default\tt5' ]] || return 4
+    [[ $(mux launch herdr-core --place workspace --env EMPTY= --no-focus) == $'default\tt5' ]] || return 4
     local -a args=()
     # Read the NUL-delimited argument stream without collapsing empty arguments.
     while IFS='' read -r -d '' space; do args+=( "$space" ); done < "$OPLOG"
@@ -187,6 +187,51 @@ esac'
 
   It 'creates a fresh Core space and supplies a login shell when only environment is set'
     When run hc_workspace_case
+    The status should be success
+  End
+
+  hc_focus_case() {
+    hc_stub
+    hc_lock_setup || return 1
+    export APP_LOG="$TEST_ROOT/app.log" APP_SEEN="$TEST_ROOT/app.seen"
+    stub_command herdr-app 'printf "%s\0" "$@" >> "$APP_LOG"
+case "$1" in
+  ls)
+    if [ ! -e "$APP_SEEN" ]; then
+      : > "$APP_SEEN"
+      echo '\''{"spaces":[{"id":"other","tabs":[{"terminals":[{"terminal":"t5"}]}]}]}'\''
+    else
+      echo '\''{"spaces":[{"id":"other","tabs":[{"terminals":[{"terminal":"t5"}]}]},{"id":"viewer/sp1234567890abcdef1234567890abcdef","tabs":[{"terminals":[{"terminal":"viewer/t5"}]}]}]}'\''
+    fi ;;
+  do) echo "{\"ok\":true}" ;;
+esac'
+    local preview
+    preview=$(mux launch herdr-core --place tab --dry-run) || return 2
+    [[ $preview == *$'\n'"'herdr-app' 'ls'"$'\n'"'herdr-app' 'do' 'agent.focus' '--terminal' '<app-terminal-address>'" ]] || return 3
+    [[ ! -s $OPLOG && ! -e $APP_LOG ]] || return 4
+    [[ $(mux launch herdr-core --place tab) == $'work\tt5' ]] || return 5
+    printf '%s\0' ls ls do agent.focus --terminal viewer/t5 > "$TEST_ROOT/expected"
+    cmp "$TEST_ROOT/expected" "$APP_LOG" || return 6
+    : > "$APP_LOG"
+    mux launch herdr-core --place tab --no-focus >/dev/null || return 7
+    mux launch herdr-core --place hidden >/dev/null 2>&1 || return 8
+    [[ ! -s $APP_LOG ]]
+  }
+
+  It 'focuses the terminal in the app by its visible space and app address'
+    When run hc_focus_case
+    The status should be success
+  End
+
+  hc_no_app_case() {
+    hc_stub
+    hc_lock_setup || return 1
+    stub_command herdr-app 'if [ "$1" = ls ]; then exit 1; fi; echo unexpected-focus >&2; exit 2'
+    [[ $(mux launch herdr-core --place tab) == $'work\tt5' ]]
+  }
+
+  It 'returns the terminal address when there is no app window'
+    When run hc_no_app_case
     The status should be success
   End
 
