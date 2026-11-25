@@ -9,12 +9,13 @@ on:
       # This comes first - last match wins
       # So to include things like package.json this
       # has to come first
+      - "**"
       - "!**.md"
       - "!**.json"
+      - "!**.toml"
       - "!**.xml"
-      - "**"
-      - ".gitignore"
-      - ".cwf**"
+      - "!.gitignore"
+      - "!.cwf**"
 
   push:
     branches: [main]
@@ -23,12 +24,13 @@ on:
       # This comes first - last match wins
       # So to include things like package.json this
       # has to come first
+      - "**"
       - "!**.md"
       - "!**.json"
       - "!**.xml"
-      - "**"
-      - ".gitignore"
-      - ".cwf**"
+      - "!**.toml"
+      - "!.gitignore"
+      - "!.cwf**"
 
   workflow_dispatch:
     inputs:
