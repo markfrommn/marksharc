@@ -445,6 +445,37 @@ Describe 'marksharc doctor'
     The status should be success
   End
 
+  carapace_doctor_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module completion-carapace completion-fzf-tab
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    ms_env
+    # Default off: missing carapace is quiet.
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out != *'missing command: carapace'* && $out == *'missing plugin'*fzf-tab* ]] || { print -r -- "$out"; return 1; }
+    # Opted in without carapace: reports missing command once and still checks fzf-tab fallback plugin.
+    print -r -- 'set completion-carapace.enable on' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    out=$(<"$TEST_ROOT/out")
+    [[ $(grep -c 'missing command: carapace (completion-carapace)' "$TEST_ROOT/out") == 1 && $out == *'missing plugin'*fzf-tab* ]] || { print -r -- "$out"; return 2; }
+    # Opted in with carapace present: no missing command and suppressed fzf-tab clone is not demanded.
+    stub_command carapace 'exit 0'
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    out=$(<"$TEST_ROOT/out")
+    [[ $out != *'missing command: carapace'* && $out != *'missing plugin'*fzf-tab* ]] || { print -r -- "$out"; return 3; }
+    # Forcing both restores the fzf-tab plugin check.
+    printf 'set completion-carapace.enable on\nset completion-carapace.allow_fzf_tab on\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    out=$(<"$TEST_ROOT/out")
+    [[ $out == *'missing plugin'*fzf-tab* ]] || { print -r -- "$out"; return 4; }
+  }
+  It 'diagnoses missing carapace only when enabled and skips suppressed fzf-tab plugin checks'
+    When run carapace_doctor_case
+    The status should be success
+  End
+
   host_override_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"

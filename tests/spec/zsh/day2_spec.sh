@@ -163,6 +163,21 @@ Describe 'bootstrap, update and installers'
     The status should be success
   End
 
+  carapace_day2_case() {
+    ms_fixture_full
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    print -r -- 'module completion-carapace' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    stub_command brew 'cat "$3" > "$TEST_ROOT/brewfile"'
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" bootstrap > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    [[ $(<"$TEST_ROOT/brewfile") == *'brew "carapace"'* ]] || { cat "$TEST_ROOT/brewfile"; return 2; }
+  }
+  It 'registers the public carapace Homebrew package'
+    When run carapace_day2_case
+    The status should be success
+  End
+
   mise_installer_case() {
     ms_fixture_full
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"

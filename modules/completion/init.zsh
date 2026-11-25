@@ -118,4 +118,10 @@ zstyle '*' single-ignored show
 
 # Ensure zsh does not fall back to showing ignored patterns
 zstyle ':completion:*' completer _complete
+
+# Clear inherited module-owned Carapace exports when a fresh shell switches away
+# from completion-carapace (including when the module itself is turned off).
+if (( ! ${_ms_reloading:-0} )) && [[ -n ${MARKSHARC_CARAPACE_ACTIVE-} ]] && (( $+functions[_ms_completion_carapace_active] )) && ! _ms_completion_carapace_active; then
+    unset CARAPACE_BRIDGES CARAPACE_EXCLUDES MARKSHARC_CARAPACE_ACTIVE
+fi
 true
