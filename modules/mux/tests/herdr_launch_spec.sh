@@ -189,4 +189,32 @@ esac'
     When run hc_workspace_case
     The status should be success
   End
+
+  failed_creation_case() {
+    local outcome=$1 tool kind
+    for tool in herdr hc; do
+      kind=$tool
+      [[ $tool != hc ]] || kind=herdr-core
+      case $outcome in
+        cli) stub_command "$tool" 'echo provider-error >&2; exit 7' ;;
+        malformed) stub_command "$tool" 'echo "[not JSON]"' ;;
+        missing) stub_command "$tool" 'echo "{}"' ;;
+      esac
+      mux launch "$kind" --instance work --place workspace > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+      [[ $? == 1 && ! -s $TEST_ROOT/out ]] || return 1
+      case $outcome in
+        cli) [[ $(<"$TEST_ROOT/err") == provider-error ]] || return 2 ;;
+        malformed) [[ $(<"$TEST_ROOT/err") == *'invalid JSON' ]] || return 3 ;;
+        missing) [[ $(<"$TEST_ROOT/err") == *'did not return'* ]] || return 4 ;;
+      esac
+    done
+  }
+
+  Context 'failed creation replies'
+    Parameters:value cli malformed missing
+    It 'reports provider errors and invalid results without printing a success address'
+      When run failed_creation_case "$1"
+      The status should be success
+    End
+  End
 End

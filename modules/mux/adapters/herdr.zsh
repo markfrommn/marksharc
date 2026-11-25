@@ -92,7 +92,10 @@ case $1 in
                     return
                 fi
                 output=$(command "${cli[@]}" "${args[@]}") || return 1
-                _ms_json_parse "$output" || return 1
+                _ms_json_parse "$output" || {
+                    print -ru2 -- 'herdr launch: creation returned invalid JSON'
+                    return 1
+                }
                 pane=${json_values[/result/root_pane/pane_id]}
                 [[ $json_types[/result/root_pane/pane_id] == string && -n $pane && $pane != *[[:cntrl:]]* ]] || {
                     print -ru2 -- 'herdr launch: creation did not return a root pane id'

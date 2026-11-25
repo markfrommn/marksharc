@@ -122,7 +122,10 @@ case $1 in
             return
         fi
         output=$(command "${cli[@]}" "${args[@]}") || return 1
-        _ms_json_parse "$output" || return 1
+        _ms_json_parse "$output" || {
+            print -ru2 -- 'hc launch: creation returned invalid JSON'
+            return 1
+        }
         address=${json_values[/address]}
         if [[ $json_types[/address] != string || -z $address || $address == *[[:cntrl:]]* ]]; then
             print -ru2 -- 'hc launch: creation did not return a terminal address'

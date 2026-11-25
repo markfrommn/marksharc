@@ -1,5 +1,6 @@
 Describe 'tmux launch adapter'
   tmux_adapter() { source "$MARKSHARC_ROOT/modules/mux/adapters/tmux.zsh" "$@"; }
+  mux_cli() { "$MARKSHARC_ROOT/modules/mux/bin/marksharc-mux" "$@"; }
   _ms_mux_preview() { printf "'%s' " "$@"; print; }
 
   tmux_stub() {
@@ -67,6 +68,36 @@ esac'
   }
   It 'autostarts detached, treats a single program as data, and previews without execution'
     When run launch_modes_case
+    The status should be success
+  End
+
+  preview_case() {
+    tmux_stub
+    local place=$1 detached=''
+    [[ $place != hidden ]] || detached=" '-d'"
+    local expected="'tmux' 'new-window' '-t' '\$3:'$detached '-c' '/work dir' '-e' 'EMPTY=' '-P' "
+    expected+="'-F' \$'#{session_id}\\t#{session_id}:#{window_id}.#{pane_id}' '--' '/bin/echo' 'space; \$ \"quote\"'"
+    [[ $(mux_cli launch tmux --instance '$3' --place "$place" --cwd '/work dir' --env EMPTY= --dry-run -- /bin/echo 'space; $ "quote"' 2> "$TEST_ROOT/err") == "$expected" ]] || return 1
+    [[ ! -s $OPLOG ]]
+  }
+  Context 'tmux placements'
+    Parameters:value workspace tab hidden
+    It 'prints the complete command without running tmux'
+      When run preview_case "$1"
+      The status should be success
+    End
+  End
+
+  failure_case() {
+    stub_command tmux 'echo provider-error >&2; exit 7'
+    mux_cli launch tmux --instance '$3' --place tab > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 1 && ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/err") == provider-error ]] || return 1
+    stub_command tmux 'printf "%s\n" "no address"'
+    mux_cli launch tmux --instance '$3' --place tab > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    [[ $? == 1 && ! -s $TEST_ROOT/out && $(<"$TEST_ROOT/err") == *'invalid address'* ]]
+  }
+  It 'reports tmux errors and invalid results without printing a success address'
+    When run failure_case
     The status should be success
   End
 End
