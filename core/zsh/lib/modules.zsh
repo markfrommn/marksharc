@@ -218,6 +218,66 @@ _ms_mise_drop_shims() {
     unset MARKSHARC_MISE_SHIMS
 }
 
+# Completion UI mutual exclusion helpers (spec 6.9): completion-carapace and
+# completion-fzf-tab are alternative interactive zsh completion UIs.
+_ms_completion_carapace_wanted() {
+    emulate -L zsh
+    local ui=${(L)MARKSHARC_COMPLETION_UI-}
+    case $ui in
+        carapace|both) return 0 ;;
+        fzf-tab|native) return 1 ;;
+    esac
+    local cfg_set=0 cfg_enable=off cfg_explicit_on=0
+    if [[ ${(t)_ms_cfg_set} == *association* ]]; then
+        if [[ -n ${_ms_cfg_set[completion-carapace.enable]+x} ]]; then
+            cfg_set=1
+            cfg_enable=${_ms_cfg_set[completion-carapace.enable]}
+        fi
+    fi
+    if [[ ${(t)_ms_cfg_enabled} == *association* && ${_ms_cfg_enabled[completion-carapace]-0} == 1 ]]; then
+        cfg_explicit_on=1
+    fi
+    local enable=${_ms_opt_completion_carapace_enable-$cfg_enable}
+    [[ $enable == (on|1|yes|true) ]] && return 0
+    (( cfg_explicit_on && ! cfg_set )) && return 0
+    return 1
+}
+
+_ms_completion_carapace_active() {
+    emulate -L zsh
+    if (( $#_ms_plan )) && (( ! ${_ms_plan[(Ie)completion-carapace]} )); then
+        return 1
+    fi
+    _ms_completion_carapace_wanted || return 1
+    _ms_command_available carapace
+}
+
+_ms_completion_fzf_tab_active() {
+    emulate -L zsh
+    if (( $#_ms_plan )) && (( ! ${_ms_plan[(Ie)completion-fzf-tab]} )); then
+        return 1
+    fi
+    local ui=${(L)MARKSHARC_COMPLETION_UI-}
+    case $ui in
+        native) return 1 ;;
+        fzf-tab|both) return 0 ;;
+        carapace)
+            _ms_completion_carapace_active && return 1
+            return 0
+            ;;
+    esac
+    if _ms_completion_carapace_active; then
+        local cfg_allow=off
+        if [[ ${(t)_ms_cfg_set} == *association* ]]; then
+            cfg_allow=${_ms_cfg_set[completion-carapace.allow_fzf_tab]-off}
+        fi
+        local allow=${_ms_opt_completion_carapace_allow_fzf_tab-$cfg_allow}
+        [[ $allow == (on|1|yes|true) ]] && return 0
+        return 1
+    fi
+    return 0
+}
+
 # Load the pinned plugins named by a module's zsh.plugins registry (spec 6.8), in
 # registry order, from the XDG cache. Startup never touches the network: a missing
 # clone is skipped silently (doctor reports it) and zsh-plugin-update clones. The

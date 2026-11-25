@@ -146,10 +146,15 @@ The interactive layer is on by default and degrades to native behaviour for each
 | `theme` | vivid `LS_COLORS`, bat as man pager, fzf defaults and bat/eza previews; delta for git when enabled | `ls_colors`, `man_pager`, `bat_theme`, `delta`, `fzf` |
 | `ps` | The ps helpers drawn by procs | `procs` |
 | `prompt-starship` | A starship config file or the bundled `rich` preset | `config` |
+| `completion-carapace` | Opt-in Carapace completion for zsh; disables `completion-fzf-tab` unless forced | `enable`, `bridges`, `excludes`, `allow_fzf_tab` |
+
+Switch between `fzf-tab` and `carapace` persistently via `set completion-carapace.enable on|off`
+or for a single session with `completion-ui carapace|fzf-tab|both|native|reset` (followed by
+`exec zsh -l`).
 
 The two plugins are pinned clones: `marksharc update` (or `zsh-plugin-update`) fetches them,
 and startup only loads clones that exist. `marksharc bootstrap` installs the tools the modules
-declare (eza, procs, vivid, bat, git-delta, fzf, fd, starship).
+declare (eza, procs, vivid, bat, git-delta, fzf, fd, starship, carapace).
 
 ```text
 set theme.delta on

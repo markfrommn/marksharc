@@ -27,6 +27,22 @@ if (( mise_owns_python )) && [[ $mise_version_files == (on|1|yes|true) && -r $HO
         (( ++issues ))
     fi
 fi
+carapace_enable=${_ms_cfg_set[completion-carapace.enable]-${_ms_mod_optdef[completion-carapace.enable]-off}}
+integer carapace_wanted=0 carapace_available=0 carapace_active=0 carapace_allow_fzf_tab=0
+if [[ ${_ms_mod_enabled[completion-carapace]-0} == 1 ]]; then
+    if [[ $carapace_enable == (on|1|yes|true) ]] || [[ ${_ms_cfg_enabled[completion-carapace]-0} == 1 && -z ${_ms_cfg_set[completion-carapace.enable]+x} ]]; then
+        carapace_wanted=1
+    fi
+fi
+whence -p -- carapace >/dev/null 2>&1 && carapace_available=1
+if (( carapace_wanted && carapace_available )); then
+    carapace_active=1
+    [[ ${_ms_cfg_set[completion-carapace.allow_fzf_tab]-${_ms_mod_optdef[completion-carapace.allow_fzf_tab]-off}} == (on|1|yes|true) ]] && carapace_allow_fzf_tab=1
+fi
+if (( carapace_wanted && ! carapace_available )) && [[ ${_ms_cfg_enabled[completion-carapace]-0} != 1 ]]; then
+    print -r -- 'doctor: missing command: carapace (completion-carapace)'
+    (( ++issues ))
+fi
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 if [[ ! -r $HOME/.zshenv ]]; then
     print -r -- "doctor: missing stub: $HOME/.zshenv"
@@ -230,6 +246,9 @@ for name in "${_ms_mod_names[@]}"; do
         _ms_words "$line" || continue
         [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
         if [[ $name == node-nvm && $registry == */fish.plugins && ${reply[2]} == nvm.fish ]] && (( mise_owns_node )); then
+            continue
+        fi
+        if [[ $name == completion-fzf-tab && $registry == */zsh.plugins && ${reply[2]} == fzf-tab ]] && (( carapace_active && ! carapace_allow_fzf_tab )); then
             continue
         fi
         plugin_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/${reply[2]}@${reply[4]}
