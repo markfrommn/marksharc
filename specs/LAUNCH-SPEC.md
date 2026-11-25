@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Design approved 2026-11-25; implementation not started |
+| Status | Design approved 2026-11-25. DEV-79 implements the launch foundation. |
 | Source issues | DEV-78 (this design), DEV-79, DEV-74, DEV-75, DEV-76 (Linear, project MarkSharc) |
 | Extends | [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md) sections 6.11, 6.13, and 7.1. That document wins where the two disagree. |
 | Companion | [LAUNCH-PLAN.md](LAUNCH-PLAN.md) |
@@ -99,7 +99,7 @@ Herdr Core runs terminals and keeps them alive. The Herdr app shows them and arr
 - **New terminal.** `herdr workspace create [--cwd D] [--label T] [--env K=V]… [--focus|--no-focus]` returns JSON with `.result.workspace.workspace_id`, `.result.tab.tab_id`, and `.result.root_pane.pane_id`. `herdr tab create --workspace <id>` takes the same options and returns `.result.tab` and `.result.root_pane`. Verified.
 - **Program.** Creation takes no program. A new pane runs the configured shell (`terminal.default_shell`, else `$SHELL`) in the mode set by `terminal.shell_mode` (`auto`, `login`, or `non_login`). `herdr pane run <pane> <command>` types the command into that shell; it does not replace the shell. Verified.
 - **Environment.** A new pane gets the server's environment plus each `--env`. A server started inside another multiplexer passes that multiplexer's markers to every pane: a Herdr pane under a server started in an `hc` terminal sees `HC_TERMINAL_ID` too. Verified.
-- **Machines.** `herdr machine list --json` prints `[{"id":…,"label":…,"target":…,"session":…,"enabled":…}]`. `herdr --machine <label-or-id> <command>` forwards an API command to that machine's server, which must already be running. It does not combine with `--session`. Remote paths must be absolute, `~`, or start with `~/`.
+- **Machines.** `herdr machine list --json` prints `[{"id":…,"label":…,"target":…,"session":…,"enabled":…}]`. `herdr --machine <label-or-id> <command>` forwards an API command to that machine's server, which must already be running. It does not combine with `--session`. Use an absolute path for a remote workspace. In V7, a `~/work` request opened in the remote home instead of the existing `work` subdirectory.
 - **Starting.** `herdr server` runs a headless server and bare `herdr` opens the TUI. Automation starts neither.
 
 ### 4.4 tmux
@@ -139,11 +139,11 @@ DEV-78 ran these on 2026-11-25 with the operator at the app window. The terminal
 | V4 | `herdr-app do space.new` with a wrapped argv. | Not run. Placement no longer needs it. |
 | V5 | `hc run` with no core running starts one. | Pass. Every `hc` command does, including `hc server status`. |
 | V6 | `HC_SESSION=<name>` reaches a separate core. | Pass. The probe core had its own identity and terminal list, and stopping it left the default core untouched. Socket paths are in 4.2. |
-| V7 | `herdr --machine <label> workspace create --cwd --env` against a running remote server, including an empty `--env` value. | Open. No saved machine had a ready Herdr TUI server. |
-| V8 | A shell's `exit` closes its terminal's view. | Pass in the app: the terminal finished with status 0 and its tab went. tmux closes the window by its manual. The Herdr TUI pane is open. |
+| V7 | `herdr --machine <label> workspace create --cwd --env` against a running remote server, including an empty `--env` value. | Pass through SSH to a disposable Herdr TUI 0.9.5 server on sol. An absolute cwd, an empty value, and a value containing spaces, a semicolon, a dollar sign, and quotes reached the pane. `~/work` fell back to the remote home. The adapter requires an absolute remote cwd. |
+| V8 | A shell's `exit` closes its terminal's view. | Pass in the app and in Herdr TUI 0.9.5. On sol, `marksharc-mux launch herdr` created a pane in a disposable server, which returned an empty pane list after the shell exited. tmux closes the window by its manual. |
 | V9 | `tmux new-session -e` on the macOS Homebrew tmux. | Pass with tmux 3.8, including an empty value. |
 | V10 | A `--no-parent` terminal outlives the terminal that started it. | Pass. A child started without it was killed with its parent. |
-| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Open. |
+| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Pending operator presence at the macOS app window. The adapter currently relies on label placement, which preserves the existing focus. |
 
 ## 5. Architecture
 
@@ -210,9 +210,9 @@ How each kind carries the request:
 |---|---|---|---|
 | Instance | `HC_SOCKET` from `HC_TERMINAL_SOCKET` inside a terminal; `HC_SESSION=<id>` otherwise | The inherited context inside a pane; `--session <id>` otherwise | `-S <socket>` from `TMUX` inside a pane, else the default socket; `-t <id>:` |
 | Machine | `--on <machine>` | `--machine <label>` | Not supported |
-| Directory | `--cwd` for an absolute path. A path under the remote home gets no `--cwd`; the wrapper changes into it | `--cwd` | `-c` |
+| Directory | `--cwd` for an absolute path. A path under the remote home gets no `--cwd`; the wrapper changes into it. | `--cwd`, with an absolute path when a machine is selected. | `-c` |
 | Variables | `env NAME=VALUE …` in front of the program | `--env NAME=VALUE` | `-e NAME=VALUE` |
-| Program | The argv. With none: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`, because the `env` wrapper needs a program. For a path under the remote home: `sh -c 'cd -- "$1" && shift && exec "$@"' sh <dir> <argv…>`, the directory being an argument | None; a command travels in `LAUNCH_RUN` (6.4) | The argv. With none: the default shell |
+| Program | The argv. With environment and no argv: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`. For a path under the remote home: `sh -c 'CDPATH= cd -- "$HOME/$1" && shift && exec "$@"' sh <home-relative-dir> <argv…>`. | None; a command travels in `LAUNCH_RUN` (6.4) | The argv. With none: the default shell |
 | Name | The label `marksharc.name`. The app names a space after its first terminal's directory | `--label` | `-n` |
 | Always | `--bg --no-parent --no-notify` | | `-P -F` to read the address |
 | Address | `address` in the JSON reply, as `machine/address` when remote | `pane_id` | `<session>:<window id>.<pane id>` |

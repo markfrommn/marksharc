@@ -28,6 +28,23 @@ Add a `.zsh` file to `modules/mux/adapters/`. The dispatcher discovers filenames
 | `set_titles WORKSPACE TAB PANE [SUBNAME SOURCE]` | Use a stable target from the calling shell. Pass titles as data and escape any format syntax the provider interprets. Optional metadata uses the directory subtitle and hook source. |
 | `refresh_env NAME...` | Write known values into the caller's `client_env` associative array. An empty value records an explicit removal. Leave a key absent when the provider has no client value. The dispatcher handles probes, environment directives and shell state. |
 | `sessions` | Print the provider's session inventory as data. The Herdr TUI adapter returns `name<TAB>socket` for the shim generator. |
+| `supports FEATURE` | Return success for a supported launch feature. Features are `launch`, `remote`, `autostart`, `argv`, `place-workspace`, `place-tab`, and `place-hidden`. |
+| `current` | Print the caller's live instance ID. |
+| `instances` | Print running local instances as `id<TAB>description` without starting a server. Herdr Core reads the sockets named by each session's `core.lock`. |
+| `machines [INSTANCE]` | Print `name<TAB>target<TAB>hostname` for the selected instance. The hostname field is empty when the provider has none. |
+| `launch` | Open one terminal from the caller's `launch_req` map and `launch_env` and `launch_argv` arrays. Print `instance<TAB>address`. |
+
+`marksharc-mux OP KIND [ARG ...]` exposes the launch adapter operations. The adapter kinds are `tmux`, `herdr`, and `herdr-core`.
+
+```sh
+marksharc-mux instances tmux
+marksharc-mux launch tmux --instance '$1' --cwd "$PWD" --place tab --dry-run -- /usr/bin/env
+marksharc-mux launch herdr-core --instance default --machine build --cwd '~/src' --place hidden
+```
+
+The launch flags are `--instance`, `--machine`, `--cwd`, `--name`, `--place workspace|tab|hidden`, `--focus`, `--no-focus`, `--dry-run`, and repeatable `--env NAME=VALUE`. Pass program arguments after `--`. The Herdr TUI accepts command delivery through `LAUNCH_RUN` in the environment and requires an absolute cwd for a remote workspace. Herdr Core changes into a remote-home path inside its terminal wrapper. An empty tmux instance requests a detached session.
+
+A dry run prints the provider commands with each argument quoted. A preview of Core tab placement from a caller terminal includes the label lookup and a placeholder for the space ID. Placement fallbacks and attach hints go to stderr. See [the launch specification](../specs/LAUNCH-SPEC.md#54-launch-adapters) for each provider's placement and startup rules.
 
 Extend the contract spec in `modules/mux/tests/adapters_spec.sh` with stubbed CLIs. Exercise nesting, missing tools, stable targeting, literal title text, and client fields the provider can actually retrieve.
 
