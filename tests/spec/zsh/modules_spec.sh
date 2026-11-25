@@ -18,7 +18,7 @@ Describe 'module tree: bands, idempotency, tree layout and loading'
       case $name in
         path) lo=0 hi=9 ;;
         brew) lo=10 hi=19 ;;
-        completion|completion-fzf-tab|fzf-fish|herdr|cwf) lo=70 hi=79 ;;
+        completion|completion-fzf-tab|completion-carapace|fzf-fish|herdr|cwf) lo=70 hi=79 ;;
         nav|zoxide|prompt-starship|history-atuin|history-native) lo=80 hi=89 ;;
         titles|x11|ssh-agent|greeting) lo=90 hi=94 ;;
         # Line-editor plugins that wrap widgets load last of all.

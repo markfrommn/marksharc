@@ -8,7 +8,11 @@ Fill in additional details on more major changes includeing in the additional (o
 Leave implementation details and file inventories to git and GitHub. Move pending entries into a real version at release.
 The 0.<PR>.0 versions below are historical backfills, not a versioning rule for future releases. -->
 
-## [Unreleased]
+## [0.23.0]
+
+Added an opt-in Carapace completion module for zsh with bridges and excludes options, mutual exclusion with fzf-tab unless forced, and `completion-ui` switching across fresh shells. (DEV-55)
+
+## [0.22.0]
 
 Added push sync over parallel SSH with regex host filtering, a `hosts.conf` inventory with `gum`/`fzf` discovery from `.ssh/config` and `hc machine ls`, poll-pull `sync --auto` and launchd/systemd timers, `sync --update`, and `update -y` / `--system` native OS package updates. (DEV-56)
 

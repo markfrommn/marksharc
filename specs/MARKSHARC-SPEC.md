@@ -515,7 +515,7 @@ changes fetched by sync apply to the next invocation.
 | `lmstudio`, `cuda` | MVP | App-tier paths and env | `build_path` fragments |
 | `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins at 95 and 99, after fzf-tab and atuin; an atuin suggestion strategy when atuin is installed; syntax highlighting loads last of all | |
 | `theme` | Modernization | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include through `GIT_CONFIG_COUNT`, fzf defaults and previews (fzf-tab included); order 21, before completion reads `LS_COLORS` | |
-| `completion-carapace` | Modernization | Opt-in | |
+| `completion-carapace` | Modernization | Opt-in zsh completion via cached `carapace _carapace zsh` at order 72 with `enable`, `bridges`, `excludes`, and `allow_fzf_tab` options; disables `completion-fzf-tab` unless forced; `completion-ui` / `MARKSHARC_COMPLETION_UI` switches between UIs for a fresh shell (`exec zsh -l`) | |
 | `cloud` | Later | kubectl, krew, kubectx, gcloud, aws, helm | k8s and gcloud blocks |
 
 ### 7.2 Private modules (author's overlay)

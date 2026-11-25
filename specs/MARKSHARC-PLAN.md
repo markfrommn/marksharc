@@ -842,7 +842,10 @@ Task plan and provider research are in [DEV-53-PLAN.md](DEV-53-PLAN.md) and [Mux
 
 **Done when**
 
-- The evaluation document exists and states a decision.
+- The module is created and in use.
+- `DEV-73` records the Carapace evaluation focus areas and user choices (retrospective evaluation moved from DEV-55 to DEV-73).
+
+**Outcome:** Added `modules/completion-carapace` (order 72, zsh-only, opt-in via `completion-carapace.enable` or explicit `module completion-carapace`) with `bridges` (default `zsh,fish,bash`), `excludes`, and `allow_fzf_tab` options, cached `carapace _carapace zsh` initialization, mutual exclusion with `completion-fzf-tab` (falling back silently to fzf-tab when `carapace` is missing), session switching via `completion-ui` / `MARKSHARC_COMPLETION_UI` suggesting `exec zsh -l`, `doctor` diagnostics, and `package brew carapace`. Evaluation focus areas were added to `DEV-73`. See [DEV-55-PLAN.md](DEV-55-PLAN.md).
 
 #### P3.8 — Push sync: poll-pull timer and ssh fan-out (DEV-56)
 

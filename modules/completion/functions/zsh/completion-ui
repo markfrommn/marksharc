@@ -1,0 +1,47 @@
+# Inspect or switch the interactive zsh completion UI for the next shell (spec 6.9).
+# Usage: completion-ui [status | carapace | fzf-tab | both | native | reset]
+emulate -L zsh
+local cmd=${1-status} active=native pending=${MARKSHARC_COMPLETION_UI-}
+
+if (( $# > 1 )); then
+    print -ru2 -- "Usage: completion-ui [status | carapace | fzf-tab | both | native | reset]"
+    return 2
+fi
+
+if (( ${_ms_completion_ui_carapace:-0} && ${_ms_completion_ui_fzf_tab:-0} )); then
+    active=both
+elif (( ${_ms_completion_ui_carapace:-0} )); then
+    active=carapace
+elif (( ${_ms_completion_ui_fzf_tab:-0} )); then
+    active=fzf-tab
+fi
+
+case $cmd in
+    status)
+        print -r -- "completion-ui: active=$active${pending:+ override=$pending}"
+        return 0
+        ;;
+    carapace|both)
+        if ! command -v carapace >/dev/null 2>&1; then
+            print -ru2 -- "completion-ui: carapace is not installed (install with 'brew install carapace' or 'marksharc bootstrap')"
+            return 1
+        fi
+        export MARKSHARC_COMPLETION_UI=$cmd
+        print -r -- "completion-ui: next shell will use $cmd; run 'exec zsh -l' to apply"
+        return 0
+        ;;
+    fzf-tab|native)
+        export MARKSHARC_COMPLETION_UI=$cmd
+        print -r -- "completion-ui: next shell will use $cmd; run 'exec zsh -l' to apply"
+        return 0
+        ;;
+    reset|default)
+        unset MARKSHARC_COMPLETION_UI
+        print -r -- "completion-ui: cleared session override; run 'exec zsh -l' to apply overlay defaults"
+        return 0
+        ;;
+    *)
+        print -ru2 -- "Usage: completion-ui [status | carapace | fzf-tab | both | native | reset]"
+        return 2
+        ;;
+esac
