@@ -1,5 +1,32 @@
 # Launch a terminal session
 
+`cwf-new` creates a worktree in a new terminal when given a launch option:
+
+```sh
+cwf-new --repo project --host build feature/branch
+cwf-new --launch feature/branch
+cwf-new --pick --mux herdr feature/branch
+```
+
+The options are `--repo`, `--host`, `--mux`, `--mux-id`, `--place`, `--launch`
+and `--pick`. Without `--repo`, the current base repository supplies a local
+path or, for another host, its name. Outside a repository, or with `--pick`,
+the repository picker asks. Creation always starts in a base repository.
+Plain `cwf-new <branch>` still creates and enters a worktree in the caller.
+
+The new terminal runs its own host's `cwf-new` after interactive shell init,
+so the overlay's post-create hooks run there. Both hosts need current MarkSharc
+with the `launch`, `cwf` and `git-worktree` modules enabled and `cwf` available.
+The caller stays in its original directory. A creation failure leaves the new
+terminal open with the error visible.
+
+Successful launched creation sets `LAUNCH_WORKTREE` in that shell. After its
+normal checks and confirmation, `gwt-clean` removes the merged worktree and
+branch and closes the terminal only when that marker names the removed
+worktree and every cleanup step succeeded. A cleanup failure keeps the shell
+open. Plain creation in a terminal launched into a base repository also keeps
+the terminal open after cleanup, because it does not set that marker.
+
 `launch-repo` opens an existing repository or worktree by name. Configure
 `git-worktree.roots` with whitespace-separated directories containing base repositories:
 

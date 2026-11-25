@@ -49,10 +49,12 @@ os.execv(sys.argv[1], sys.argv[1:])
   }
 
   launch_env() {
+    # Fish can generate completions in a detached process at first interactive
+    # startup. Its test flag prevents writes racing with fixture teardown.
     env -i HOME="$HOME" PATH="$PATH" TERM=dumb \
       XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
       XDG_DATA_HOME="$XDG_DATA_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
-      MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 \
+      MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_NOTIFY=0 FISH_UNIT_TESTS_RUNNING=1 \
       FIXTURE_LOG="$TEST_ROOT/run" FIXTURE_PROMPT="$TEST_ROOT/prompt" "$@"
   }
 

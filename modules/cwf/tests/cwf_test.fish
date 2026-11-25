@@ -80,6 +80,12 @@ set -l offered (complete -C 'cwf-new ' | string split -f1 \t)
 @test "completion offers only branches, not files" (count $offered) -eq 3
 @test "completion filters by the typed prefix" "$(complete -C 'cwf-new fe' | string split -f1 \t)" = feature/one
 @test "completion offers nothing for a second argument" -z "$(complete -C 'cwf-new main ')"
+@test "completion offers mux kinds" "$(complete -C 'cwf-new --mux he' | string split -f1 \t | string join ' ')" = 'herdr herdr-core'
+@test "completion offers placement after launch options" "$(complete -C 'cwf-new --place hi' | string split -f1 \t)" = hidden
+@test "completion still offers a branch after options" "$(complete -C 'cwf-new --mux hc fe' | string split -f1 \t)" = feature/one
+command mkdir -p "$XDG_CACHE_HOME/marksharc/$MARKSHARC_HOST/repos"
+printf 'alpha\t/tmp/alpha\tbase\t/tmp/alpha\tmain\nlinked\t/tmp/linked\tworktree\t/tmp/alpha\tfeature\n' >"$XDG_CACHE_HOME/marksharc/$MARKSHARC_HOST/repos/local.tsv"
+@test "repository completion offers only bases" "$(complete -C 'cwf-new --repo al' | string split -f1 \t)" = alpha
 builtin cd "$TEST_ROOT"
 @test "completion outside a repository offers nothing" -z "$(complete -C 'cwf-new ')"
 

@@ -34,6 +34,42 @@ DATA
     When run late_failure_case
     The status should be success
   End
+  launch_marker_case() {
+    emulate -L zsh
+    git_fixture || return 1
+    local mode=$1 marker=$TEST_ROOT/worktree
+    case $mode in
+      empty) marker='' ;;
+      different) marker=$TEST_ROOT/base ;;
+      alias) ln -s "$TEST_ROOT/worktree" "$TEST_ROOT/worktree-link"; marker=$TEST_ROOT/worktree-link ;;
+    esac
+    cat > "$TEST_ROOT/bin/cwf" <<'DATA'
+#!/bin/sh
+if [ "$FIXTURE_MODE" = status-fail ]; then exit 8; fi
+printf '%s\n' 'no cwf environment'
+DATA
+    cat > "$TEST_ROOT/bin/git" <<'DATA'
+#!/bin/sh
+case "$FIXTURE_MODE:$1 $2" in branch-fail:'branch -d') exit 8 ;; esac
+exec "$REAL_GIT" "$@"
+DATA
+    chmod +x "$TEST_ROOT/bin/cwf" "$TEST_ROOT/bin/git"
+    : > "$TEST_ROOT/directives"
+    print y | LAUNCH_WORKTREE="$marker" FIXTURE_MODE="$mode" MARKSHARC_DIRECTIVES="$TEST_ROOT/directives" \
+      /bin/zsh -f "$MARKSHARC_ROOT/modules/git-worktree/bin/gwt-clean" > "$TEST_ROOT/output" 2>&1
+    local rc=$? contents=$(<"$TEST_ROOT/directives")
+    case $mode in
+      match|alias) [[ $rc == 0 && $contents == $'cd\t'*$'\nexit\t0' ]] ;;
+      empty|different) [[ $rc == 0 && $contents == $'cd\t'* && $contents != *exit* ]] ;;
+      status-fail) [[ $rc != 0 && -d "$TEST_ROOT/worktree" && -z $contents ]] ;;
+      branch-fail) [[ $rc != 0 && $contents == $'cd\t'* && $contents != *exit* ]] ;;
+    esac
+  }
+  Parameters:value match alias empty different status-fail branch-fail
+  It 'only exits for successful cleanup of the marked worktree: $1'
+    When run launch_marker_case "$1"
+    The status should be success
+  End
   cleanup_case() {
     emulate -L zsh
     git_fixture "${2:-main}" || return
