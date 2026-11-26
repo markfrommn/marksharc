@@ -80,6 +80,8 @@ this table to cover every module.
 | Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
 | Bash environment | Rendered Bash syntax, PATH and export parity, late guards, manager paths, agent markers, inheritance and cache recovery | `spec/contract/bash_spec.sh` |
 | Bash tool integrations | Cached prompt, navigation and environment hooks, Atuin recording and bindings, native history fallback and lazy version-manager selection | `spec/contract/bash_tools_spec.sh`, `spec/contract/bash_hooks_spec.sh` |
+| Bash native modules | Directory history, Readline keys and prompt refresh, native stack, tools and platform fallbacks, workflow hooks, and cleanup with user replacements | `spec/contract/bash_nav_spec.sh`, `spec/contract/bash_utilities_spec.sh`, `spec/contract/bash_workflow_spec.sh` |
+| Bash startup | Sync notice generation and throttle, detached checks, and opt-in fortune in eligible sessions | `spec/contract/bash_startup_spec.sh` |
 | Core | Modern host facts, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
 | Core | Agent/batch quiet on the full tree; gvm selection without forks | `spec/zsh/core_agent_spec.sh` |
 | Startup | Mode matrix quiet/reload; greeting opt-in; offline pinned plugin and cached completion; cached init reuse; installer failure propagation | `spec/zsh/startup_spec.sh` |
@@ -105,7 +107,7 @@ this table to cover every module.
 | docker | claude-yolo only in docker with SANDCAT; cleanup-docker kills and removes through docker only | `spec/zsh/modules/docker/docker_spec.sh` |
 | mux | Adapter contracts, nested title updates, tmux reattach and bounded forwarding recovery | `spec/zsh/modules/mux/`, `modules/mux/tests/mux_test.fish` |
 | launch | Positional and flag syntax, validation and results, mux and machine selection, dry-run argv, session metadata and forwarding; repository and worktree resolution | `spec/zsh/modules/launch/launch_session_spec.sh`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
-| Run after init | One-shot zsh and fish startup hooks, encoded and empty argv words, exec mode, and interactive class only | `spec/contract/launch_run_spec.sh` |
+| Run after init | One-shot zsh, Fish and Bash startup hooks, encoded and empty argv words, exec mode, and interactive class only | `spec/contract/launch_run_spec.sh` |
 | Launch completions | Host and mux candidates, positional host syntax, options, and offline cached repository names | `spec/zsh/launch_completions_spec.sh`, `fish/completions_test.fish`, `spec/zsh/modules/launch/launch_repo_spec.sh` |
 | titles | set-title/chdir-set-title escape and skip behavior | `spec/zsh/modules/titles/titles_spec.sh` |
 | herdr | Session shims from herdr session list, collie detection, render-time completion generation and generator-failure atomicity | `spec/zsh/modules/herdr/herdr_spec.sh`, `spec/zsh/modules/cc-providers/shims_spec.sh` |

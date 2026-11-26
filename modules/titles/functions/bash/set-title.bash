@@ -1,0 +1,4 @@
+function set-title {
+    TERM=${TERM-} TERM_PROGRAM=${TERM_PROGRAM-} INSIDE_EMACS=${INSIDE_EMACS-} \
+        "$MARKSHARC_HOME/modules/mux/bin/marksharc-mux" terminal_title "$@"
+}

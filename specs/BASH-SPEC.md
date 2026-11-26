@@ -2,7 +2,8 @@
 
 The design was approved on 2026-11-25. DEV-80 delivers the runtime and caller-state
 wrappers. [DEV-81](DEV-81-PLAN.md) covers tool integrations and version managers.
-Native module parity and final acceptance are tracked in DEV-82 and DEV-83.
+[DEV-82](DEV-82-PLAN.md) covers native module and workflow parity. DEV-83 tracks
+completion, line-editor integration and final acceptance.
 Issue: [DEV-61](https://linear.app/psols/issue/DEV-61/marksharc-l2-full-interactive-bash).
 Evidence date: 2026-11-25, checkout `624d27d`.
 Authority: [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md), especially sections 6, 6.16 and 10.

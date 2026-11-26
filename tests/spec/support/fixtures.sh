@@ -13,6 +13,7 @@ fixture_setup() {
   export TEST_ROOT HOME="$TEST_ROOT/home" ZDOTDIR="$TEST_ROOT/home/zsh" OPLOG="$TEST_ROOT/operations"
   export XDG_CONFIG_HOME="$HOME/config" XDG_CACHE_HOME="$HOME/cache" XDG_DATA_HOME="$HOME/data" XDG_STATE_HOME="$HOME/state"
   export XDG_RUNTIME_DIR="$HOME/run"
+  export MARKSHARC_NOTIFY=0
   mkdir -p "$HOME" "$ZDOTDIR" "$TEST_ROOT/bin"
   : > "$OPLOG"
   if [ -n "${REAL_FISH:-}" ]; then

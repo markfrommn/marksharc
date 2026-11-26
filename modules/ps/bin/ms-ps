@@ -1,0 +1,7 @@
+#!/usr/bin/env zsh
+# Reuse the zsh selection and drawing implementation in an isolated child.
+_ms_opt_ps_procs=$1
+shift
+_ms_ps_source=${0:A:h:h}/functions/zsh/_ms_ps
+function _ms_ps { source "$_ms_ps_source"; }
+_ms_ps "$@"

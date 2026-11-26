@@ -75,7 +75,7 @@ The flag form starts when you give `--host`, `--pwd`, or `--command`. Use `--` b
 
 `--place workspace|tab|hidden` controls placement. With Herdr Core, workspace creates a new app space and tab uses the caller's space when available. In Herdr TUI, a tab uses the caller's workspace when available. If the caller has no space or workspace suitable for a tab, the mux creates one. In tmux, a workspace opens as a window in the selected session. A hidden session prints how to reach it on standard error. Pass `--name` to set the display name and `--no-focus` to keep the current view where supported.
 
-With no command, the session opens at the shell prompt. A command normally takes the place of the shell and the terminal ends when the command exits. `--in-shell` runs the command after interactive startup and leaves the shell at its prompt. For `--in-shell` and commands on the Herdr TUI, the target shell must be MarkSharc zsh or fish with `launch` enabled.
+With no command, the session opens at the shell prompt. A command normally takes the place of the shell and the terminal ends when the command exits. `--in-shell` runs the command after interactive startup and leaves the shell at its prompt. For `--in-shell` and commands on the Herdr TUI, the target requires interactive MarkSharc in zsh, Fish, or Bash 4.4+, with `launch` enabled.
 
 Repeat `--env NAME=VALUE` to set variables in the new session. `NAME` must be a shell identifier. Names beginning with `LAUNCH_` are reserved. The launcher sets `LAUNCH_PARENT_HOST`, `LAUNCH_PARENT_PID`, `LAUNCH_PARENT_SSH_AUTH_SOCK`, and `LAUNCH_PARENT_DISPLAY`. A local launch carries `SSH_AUTH_SOCK`, `DISPLAY`, and `XAUTHORITY` when present. The startup helpers can reuse same-host parent values.
 

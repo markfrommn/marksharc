@@ -1086,11 +1086,11 @@ three. Runtime behavior remains pending until the owning issue supplies evidence
 | --- | --- | --- | --- | --- |
 | L2.1 | [DEV-80](https://linear.app/psols/issue/DEV-80), [implementation plan](DEV-80-PLAN.md) | Runtime, rendered init/aliases/options, cache, hooks, reload, directive applier and six caller-state wrappers | 5 | DEV-61, DEV-50, DEV-68, DEV-51 |
 | L2.2 | [DEV-81](https://linear.app/psols/issue/DEV-81), [implementation plan](DEV-81-PLAN.md) | Starship, Atuin/native history, zoxide, direnv, mise and legacy manager adapters | 5 | DEV-80, DEV-72 |
-| L2.3 | [DEV-82](https://linear.app/psols/issue/DEV-82) | Navigation and native public modules; titles/mux/ssh/X11; workflow/launch; notification and greeting | 5 | DEV-80, DEV-76 |
+| L2.3 | [DEV-82](https://linear.app/psols/issue/DEV-82), [implementation plan](DEV-82-PLAN.md) | Navigation and native public modules; titles/mux/ssh/X11; workflow/launch; notification and greeting | 5 | DEV-80, DEV-76 |
 | L2.4 | [DEV-83](https://linear.app/psols/issue/DEV-83) | Completion, ble.sh/fzf integration, explicit interpreter CI matrix, doctor/user docs and final real-tool acceptance | 5 | DEV-80, DEV-81, DEV-82, DEV-55 |
 
-L2.1 owns core interfaces and wrappers; L2.2/L2.3 consume them. L2.3 owns native module
-initialization rather than rewriting shared executables. L2.4 selects and verifies the
+L2.1 owns core interfaces and wrappers; L2.2/L2.3 consume them. L2.3 provides native module
+initialization and shares command logic where effects stay in a child. L2.4 selects and verifies the
 immutable ble.sh pin before integration. Actual Bash 4.4, current 5.x on macOS/Linux
 and macOS 3.2 env-only regression coverage are required; newer-shell compatibility flags
 are insufficient. A real-tool PTY pass and warm startup within 500 ms complete acceptance.

@@ -299,9 +299,9 @@ On the Herdr TUI a pane always starts its shell, so a plain command also travels
 
 `LAUNCH_RUN` carries an argv to the new session's shell: the words tab-separated, with tab, newline, and `%` percent-encoded as in the directive protocol (MARKSHARC-SPEC 6.11). `LAUNCH_RUN_EXEC=1` asks the shell to replace itself with the command.
 
-The `launch` module's init registers a one-shot hook when `LAUNCH_RUN` is not empty and the session class is `interactive`. The hook fires before the first prompt, after every module's init. It decodes the argv, unsets both variables, and then runs the argv as one simple command, so shell functions such as the `cwf-new` wrapper apply. With `LAUNCH_RUN_EXEC` it uses `exec`. zsh uses a self-removing `precmd` hook and fish a self-erasing `fish_prompt` handler. The text is never evaluated as shell code.
+The `launch` module's init registers a one-shot hook when `LAUNCH_RUN` is not empty and the session class is `interactive`. The hook fires before the first prompt, after every module's init. It decodes the argv, unsets both variables, and then runs the argv as one simple command, so shell functions such as the `cwf-new` wrapper apply. With `LAUNCH_RUN_EXEC=1` it uses `exec`. zsh uses a self-removing `precmd` hook, Fish a self-erasing `fish_prompt` handler, and Bash the framework's first-prompt hook registry. The text is never evaluated as shell code.
 
-The target shell must be a marksharc zsh or fish with the `launch` module enabled. Any other shell ignores the variable and opens at its prompt; the launcher cannot detect that.
+The target shell requires MarkSharc interactive init and the `launch` module enabled in zsh, Fish, or Bash 4.4+. Other shells ignore the variable and open at their prompt. The launcher cannot detect that.
 
 ## 7. Launch metadata
 
@@ -429,7 +429,7 @@ The rules of MARKSHARC-SPEC section 8 apply: a temporary HOME, command stubs, an
 | Hosts | Reserved names, both matching rules, the ambiguous and missing cases, and the picker's union. |
 | Picker | `gum`, `fzf`, neither, no terminal, cancel. `marksharc hosts populate` behaves as before. |
 | `launch-session` | Both syntax forms and their conflicts, every status in 6.2, `--dry-run` goldens, the metadata in 7.1, and no agent marker in the new session. |
-| Run after init | zsh and fish: the command runs once after init, the variables are gone before it runs, `exec` mode, an encoded argv with tab and newline, and no action in batch and agent sessions. |
+| Run after init | zsh, Fish and Bash: the command runs once after init, the variables are gone before it runs, `exec` mode, an encoded argv with tab and newline, and no action in batch and agent sessions. |
 | Startup | `setup-ssh-agent` and `setup-x11-display` with a usable, a dead, and an other-host parent value. |
 | Inventory | Disposable repositories: scan, worktree chain, cache header, every freshness rule, and a stub `ssh` for the remote case. |
 | `launch-repo` | Each rule in 8.3, the path form, the reserved creation form, and the `launch-session` argv it produces. |

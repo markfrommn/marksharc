@@ -85,6 +85,26 @@ _ms_bash_run_cleanups() {
     _ms_bash_cleanup_order=() _ms_bash_cleanup_definitions=()
 }
 
+_ms_bash_notify() {
+    [[ ${MARKSHARC_NOTIFY:-1} != 0 && ${_ms_bash_reloading-} != 1 ]] || return 0
+    local sync_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/$MARKSHARC_HOST/sync
+    local notice='' generation='' last=0 hours=$1 now
+    [[ ! -r $sync_dir/status ]] || notice=$(<"$sync_dir/status")
+    [[ ! -r $sync_dir/generation ]] || generation=$(<"$sync_dir/generation")
+    if [[ $notice == "behind${generation:+|$generation}" ]]; then
+        printf '%s\n' 'marksharc: updates available (run marksharc sync)'
+    fi
+    [[ ! -r $sync_dir/checked ]] || IFS= read -r last < "$sync_dir/checked"
+    [[ $last =~ ^[0-9]{1,12}$ ]] || last=0
+    [[ $hours =~ ^[0-9]{1,9}$ ]] || hours=12
+    printf -v now '%(%s)T' -1
+    if [[ -x $MARKSHARC_HOME/core/cli/notify ]] &&
+        (( now < 10#$last || now - 10#$last >= 10#$hours * 3600 )); then
+        # Launch from a subshell so Bash does not create an interactive job.
+        ( command nohup zsh -f "$MARKSHARC_HOME/core/cli/notify" --check </dev/null >/dev/null 2>&1 & )
+    fi
+}
+
 _ms_bash_activate() {
     local _ms_bash_loading_init=1
     local -a _ms_bash_completion_files=()
