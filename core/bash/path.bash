@@ -1,4 +1,16 @@
 # Native Bash PATH construction for generated environment directives.
+_ms_mise_owns() {
+    [[ ${_ms_bash_mise_module_enabled-0} == 1 ]] || return 1
+    case ${1-} in node|go|python|ruby) ;; *) return 1 ;; esac
+    local tool
+    local -a configured
+    read -r -a configured <<< "${_ms_opt_mise_tools-}"
+    for tool in "${configured[@]}"; do
+        if [[ $tool == "$1" ]]; then _ms_command_available mise; return; fi
+    done
+    return 1
+}
+
 _ms_bash_mise_drop_activation_paths() {
     local entry candidate oldifs=$IFS skip
     local -a active=() inherited=() kept=()
@@ -148,6 +160,21 @@ _ms_bash_gvm() {
         _ms_bash_add manager "$root/gos/$name/bin"
     fi
 }
+_ms_bash_gvm_sync_goroot() {
+    local entry
+    local -a paths
+    IFS=: read -r -a paths <<< "$PATH"
+    for entry in "${paths[@]}"; do
+        [[ -x $entry/go && ! -d $entry/go ]] || continue
+        if [[ ${entry%/*/*} == "${GVM_ROOT:-$HOME/.gvm}/gos" ]]; then
+            export GOROOT=${entry%/bin}
+        elif [[ -n ${GOROOT-} && ! $entry/go -ef $GOROOT/bin/go ]]; then
+            unset GOROOT
+        fi
+        break
+    done
+    return 0
+}
 _ms_bash_start() {
     local marker value
     local -a markers
@@ -286,18 +313,7 @@ _ms_bash_finish() {
     PATH="${result[*]}"
     IFS=$oldifs
     export PATH
-    if [[ ${_ms_bash_has_gvm-0} == 1 ]]; then
-        IFS=: read -r -a inherited <<< "$PATH"
-        for entry in "${inherited[@]}"; do
-            [[ -x $entry/go && ! -d $entry/go ]] || continue
-            if [[ ${entry%/*/*} == "${GVM_ROOT:-$HOME/.gvm}/gos" ]]; then
-                export GOROOT=${entry%/bin}
-            elif [[ -n ${GOROOT-} && $entry/go != "$GOROOT/bin/go" ]]; then
-                unset GOROOT
-            fi
-            break
-        done
-    fi
+    if [[ ${_ms_bash_has_gvm-0} == 1 ]]; then _ms_bash_gvm_sync_goroot; fi
     case ${_ms_bash_agent_env-} in
         on|1|yes|true) _ms_bash_env_export BASH_ENV "$MARKSHARC_HOME/core/bash/env.bash" ;;
         *) [[ ${BASH_ENV-} != "$MARKSHARC_HOME/core/bash/env.bash" ]] || unset BASH_ENV ;;

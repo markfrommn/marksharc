@@ -37,11 +37,13 @@ tier, ahead of Homebrew. Agent and batch shells use those shims without shell ac
 so a script or agent running in a worktree gets the version requested by that directory.
 Inherited nvm and gvm PATH entries are removed only for tools mise owns.
 
-Interactive zsh and fish shells also source cached `mise activate` output. With the default
-`chpwd` mode, mise's prompt hook is removed: prompts do not run mise, while changing
-directories costs one hook-env refresh. `mise shell`, `mise use`, and the compatibility
-functions refresh immediately. After editing `.nvmrc`, `mise.toml`, or another version file
-by hand, run `cd .` to refresh the current shell.
+Interactive zsh, fish and Bash 4.4+ source cached `mise activate` output. With the default
+`chpwd` mode, one environment refresh runs per directory change. Bash observes the
+change at the next prompt, so `cd project; node ...` on a single line may run before
+activation. Mise shims and explicit manager commands can select the version on the same
+line. `mise shell`, `mise use`, and the compatibility functions refresh immediately.
+After editing a version file in place, run `marksharc reload` in Bash or `cd .` in zsh
+and fish to refresh.
 
 The compatibility functions translate `use`, `install`, `ls`, `current`, and
 `alias default`. For example, `nvm use 22` becomes `mise shell node@22`, and

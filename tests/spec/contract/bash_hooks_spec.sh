@@ -68,6 +68,33 @@ exit
     The status should be success
   End
 
+  preexec_prompt_case() {
+    MARKSHARC_ROOT="$MARKSHARC_ROOT" "${MARKSHARC_TEST_BASH:-bash}" -c '
+      source "$MARKSHARC_ROOT/core/bash/hooks.bash"
+      bash_preexec_imported=defined
+      __bp_precmd_invoke_cmd() { :; }
+      precmd_functions=()
+      foreign() { printf "%s:%s\n" "$1" "$2"; }
+      PROMPT_COMMAND=$(printf "%s\n" '"'"'__bp_precmd_invoke_cmd "$_"'"'"' \
+        '"'"'foreign "$?" "${PIPESTATUS[*]}"'"'"' __bp_interactive_mode)
+      original=$PROMPT_COMMAND
+      owned() { :; }
+      _ms_bash_register_prompt owned
+      _ms_bash_hooks_install
+      BP_PIPESTATUS=(1 0)
+      _ms_bash_prompt_return 1
+      "${precmd_functions[0]}"
+      eval "${PROMPT_COMMAND#*$'"'"'\n'"'"'}" 2>/dev/null
+      _ms_bash_hooks_reset
+      [[ $PROMPT_COMMAND == "$original" ]]
+    '
+  }
+  It 'restores the pipeline snapshot for a foreign command on the bash-preexec transport'
+    When run preexec_prompt_case
+    The status should be success
+    The output should equal '1:1 0'
+  End
+
   backend_case() {
     MARKSHARC_ROOT="$MARKSHARC_ROOT" "${MARKSHARC_TEST_BASH:-bash}" -c '
       source "$MARKSHARC_ROOT/core/bash/hooks.bash"

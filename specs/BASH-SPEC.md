@@ -1,8 +1,8 @@
 # MarkSharc Interactive Bash Specification
 
-Status: design approved 2026-11-25; Bash runtime and caller-state wrappers delivered
-in DEV-80. Tool integrations, native module parity and final acceptance remain
-in DEV-81–DEV-83.
+The design was approved on 2026-11-25. DEV-80 delivers the runtime and caller-state
+wrappers. [DEV-81](DEV-81-PLAN.md) covers tool integrations and version managers.
+Native module parity and final acceptance are tracked in DEV-82 and DEV-83.
 Issue: [DEV-61](https://linear.app/psols/issue/DEV-61/marksharc-l2-full-interactive-bash).
 Evidence date: 2026-11-25, checkout `624d27d`.
 Authority: [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md), especially sections 6, 6.16 and 10.
@@ -109,6 +109,11 @@ Directory-key commands also refresh the visible prompt immediately. This means a
 compound `cd project; node ...` on one line may run before prompt-based manager selection;
 an explicit manager command or mise shims handles that case. Document this difference.
 
+The Bash adapters select installed nvm and gvm versions from the nearest `.nvmrc` and
+`go.mod`. Install missing versions with an explicit manager command. Direnv evaluates
+its environment hook at each prompt so an approval or edit can take effect in the
+current directory.
+
 Provide one owned hook registry for framework prompt/directory callbacks. Preserve
 foreign scalar `PROMPT_COMMAND` on 4.4/5.0 and array form on 5.1+, the incoming status,
 pipeline status and existing DEBUG traps. Use documented tool/backend hook interfaces
@@ -139,6 +144,11 @@ introduce automatic installation where the declared policy forbids it.
 | Completion menu | ble.sh menu selection and filtering | Readline completion/listing; Carapace alone supplies candidates, not zsh's fzf-tab UI |
 | Suggestions and highlighting | ble.sh | Unavailable in plain Readline; Bash 5.x alone does not supply them |
 | fzf | File/directory selection, shared previews and theme settings | Atuin retains Ctrl-R ownership; do not stack a second history binding or promise identical fzf-tab widgets |
+
+The native history file is `${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/history.bash`.
+Readline loads Atuin's bundled backend once per shell. Reload changes the recording
+callbacks and key bindings in place while retaining the loaded backend. A fresh shell
+selects a new history session and backend.
 
 Load bash-completion once when available, then Carapace when selected, then the
 framework/tool-specific registrations. Preserve zoxide's specialized completion. Keep

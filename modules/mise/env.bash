@@ -1,15 +1,4 @@
 # Native Bash mise ownership, safe exports and legacy PATH filtering.
-_ms_mise_owns() {
-    [[ ${_ms_bash_mise_module_enabled-0} == 1 ]] || return 1
-    case ${1-} in node|go|python|ruby) ;; *) return 1 ;; esac
-    _ms_command_available mise || return 1
-    local tool
-    for tool in ${_ms_opt_mise_tools-}; do
-        [[ $tool == "$1" ]] && return 0
-    done
-    return 1
-}
-
 _ms_bash_mise_filter_path() {
     local entry oldifs=$IFS
     local nvm_root=${NVM_DIR:-$HOME/.nvm} gvm_root=${GVM_ROOT:-$HOME/.gvm}

@@ -79,6 +79,7 @@ this table to cover every module.
 | Core | `cs`/`li` reload: rebuild, trace, session kept, edit pickup | `spec/zsh/core_reload_spec.sh` |
 | Renderer | Golden conf-to-env rendering; shell-word/hostile tokenizer cases; all guards; overlay directives and tiers; completion artifacts, render ids, stale refresh and public module conversion | `spec/zsh/render_spec.sh` |
 | Bash environment | Rendered Bash syntax, PATH and export parity, late guards, manager paths, agent markers, inheritance and cache recovery | `spec/contract/bash_spec.sh` |
+| Bash tool integrations | Cached prompt, navigation and environment hooks, Atuin recording and bindings, native history fallback and lazy version-manager selection | `spec/contract/bash_tools_spec.sh`, `spec/contract/bash_hooks_spec.sh` |
 | Core | Modern host facts, exports, ZDOTDIR generation and read-only fallback, no repo writes, umask cache | `spec/zsh/core_env_spec.sh` |
 | Core | Agent/batch quiet on the full tree; gvm selection without forks | `spec/zsh/core_agent_spec.sh` |
 | Startup | Mode matrix quiet/reload; greeting opt-in; offline pinned plugin and cached completion; cached init reuse; installer failure propagation | `spec/zsh/startup_spec.sh` |
