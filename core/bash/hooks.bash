@@ -1,10 +1,12 @@
 # Framework hook registries. Callbacks are shell function names, not shell code.
 _ms_bash_prompt_hooks=()
+_ms_bash_first_prompt_hooks=()
 _ms_bash_chpwd_hooks=()
 _ms_bash_preexec_hooks=()
 _ms_bash_prompt_replay=:
 
 _ms_bash_register_prompt() { _ms_bash_hook_add _ms_bash_prompt_hooks "$1"; }
+_ms_bash_register_first_prompt() { _ms_bash_hook_add _ms_bash_first_prompt_hooks "$1"; }
 _ms_bash_register_chpwd() { _ms_bash_hook_add _ms_bash_chpwd_hooks "$1"; }
 _ms_bash_register_preexec() { _ms_bash_hook_add _ms_bash_preexec_hooks "$1"; }
 
@@ -27,6 +29,13 @@ _ms_bash_preexec_dispatch() {
 
 _ms_bash_prompt_dispatch() {
     local callback
+    if (( ${#_ms_bash_first_prompt_hooks[@]} )); then
+        local -a first_prompt=("${_ms_bash_first_prompt_hooks[@]}")
+        _ms_bash_first_prompt_hooks=()
+        for callback in "${first_prompt[@]}"; do
+            if declare -F "$callback" >/dev/null; then "$callback" || :; fi
+        done
+    fi
     if [[ ! ${_ms_bash_hook_pwd_set-} || $_ms_bash_hook_pwd != "$PWD" ]]; then
         _ms_bash_hook_pwd=$PWD
         _ms_bash_hook_pwd_set=1
@@ -170,7 +179,7 @@ _ms_bash_hooks_install() {
     [[ ${_ms_bash_hooks_installed-} != 1 ]] || return 0
     _ms_bash_hooks_installed=1
     _ms_bash_hook_pwd_set=
-    if (( ${#_ms_bash_prompt_hooks[@]} || ${#_ms_bash_chpwd_hooks[@]} )); then
+    if (( ${#_ms_bash_first_prompt_hooks[@]} || ${#_ms_bash_prompt_hooks[@]} || ${#_ms_bash_chpwd_hooks[@]} )); then
         if declare -F blehook >/dev/null; then
             blehook 'PRECMD!=_ms_bash_ble_prompt'
             _ms_bash_prompt_backend=ble
@@ -233,6 +242,7 @@ _ms_bash_hooks_reset() {
         bash_preexec) _ms_bash_hook_remove preexec_functions _ms_bash_preexec_dispatch ;;
     esac
     _ms_bash_prompt_hooks=()
+    _ms_bash_first_prompt_hooks=()
     _ms_bash_chpwd_hooks=()
     _ms_bash_preexec_hooks=()
     unset _ms_bash_hooks_installed _ms_bash_hook_pwd_set _ms_bash_preexec_backend \

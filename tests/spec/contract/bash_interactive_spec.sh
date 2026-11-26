@@ -127,7 +127,7 @@ EOF
       [[ $(probe_fn) == owned && ! -e $TEST_ROOT/cleanups ]] || exit 14
       marksharc reload >/dev/null || exit 15
       [[ $MARKSHARC_SESSION == interactive && $(kept_fn) == user && ${BASH_ALIASES[kept_alias]} == "printf user" && $PROBE_REPLACED == user ]] || exit 16
-      printf "%s\n" "module probe off" "module prompt-starship off" "module history-atuin off" "module zoxide off" > "$MARKSHARC_CONFIG/config.conf"
+      printf "%s\n" "module probe off" "module prompt-starship off" "module history-atuin off" "module zoxide off" "module nav off" "module titles off" > "$MARKSHARC_CONFIG/config.conf"
       marksharc reload || exit 17
       if [[ -n $(type -t probe_fn) || -n $(type -t probe_alias) || -n ${PROBE_ENV+x} || -n ${PROBE_INIT+x} ]]; then
         type -t probe_fn probe_alias
