@@ -7,7 +7,7 @@
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
 | Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
-| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md): approved design, pending DEV-80–DEV-83 |
+| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md): Bash runtime and caller-state wrappers in DEV-80, full acceptance pending DEV-81–DEV-83 |
 | Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
@@ -345,7 +345,7 @@ Wiring per shell:
 |---|---|---|
 | zsh | `~/.zshenv`: set `MARKSHARC_HOME`, source `core/zsh/zshenv.zsh` | `zshenv.zsh` sets `ZDOTDIR` to `~/.local/state/marksharc/zdot` (four one-line stubs) and runs the env phase. `.zprofile` re-asserts PATH after macOS `path_helper`. `.zshrc` runs the init phase. |
 | fish | `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. Existing Fish configuration is preserved by default. |
-| bash | `~/.bashrc` and `~/.bash_profile` | Currently source the rendered `env.bash`, silently, in every mode. The approved interactive extension for Bash 4.4+ is specified in 6.16 and pending DEV-80–DEV-83. `BASH_ENV` remains env-only and is set only when `agent.bash_env` is on. |
+| bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash` in every mode and native interactive init when eligible (6.16). `BASH_ENV` loads the environment and is set only when `agent.bash_env` is on. |
 
 The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
 
@@ -486,8 +486,8 @@ changes fetched by sync apply to the next invocation.
 The approved target is substantially equivalent public interactive behavior in Bash
 4.4+ on macOS and Linux, delivered by DEV-80–DEV-83. Bash 3.2 retains environment
 support. Older versions never automatically exec a newer shell, and startup stays
-quiet; `doctor` reports the interactive version requirement. The current Bash
-implementation remains environment-only until those issues deliver the extension.
+quiet; `doctor` reports the interactive version requirement as part of DEV-83.
+DEV-80 provides native interactive startup, reload, hooks and caller-state wrappers.
 
 The complete behavior contract, module coverage, accepted gaps and acceptance matrix
 are in [BASH-SPEC.md](BASH-SPEC.md). Its requirements include:

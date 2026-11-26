@@ -162,7 +162,8 @@ _ms_render() {
     emulate -L zsh
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
-    local tmp=$cache/env.zsh.tmp.$$ bash_tmp=$cache/env.bash.tmp.$$ fish_tmp=$cache/env.fish.tmp.$$ name old key file
+    local tmp=$cache/env.zsh.tmp.$$ bash_tmp=$cache/env.bash.tmp.$$ bash_init_tmp=$cache/init.bash.tmp.$$
+    local fish_tmp=$cache/env.fish.tmp.$$ name old key file
     local -a entries=() envplan=() dirs=() reqcmds=() reqos=() options=() optdefs=() _ms_render_pending_paths=() _ms_render_completion_files=() _ms_render_shim_files=()
     local _ms_render_generate=${1:-1} _ms_render_stage=$cache/completions.tmp.$$ _ms_shims_stage=$cache/bin.tmp.$$
     integer _ms_render_failed=0
@@ -220,18 +221,23 @@ _ms_render() {
         print -r -- '    esac'
         print -r -- '}'
     } > "$tmp" || { command rm -rf -- "$tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
-    source "$MARKSHARC_HOME/core/zsh/lib/render-bash.zsh"
-    _ms_render_bash > "$bash_tmp" || { command rm -rf -- "$tmp" "$bash_tmp" "$_ms_render_stage" "$_ms_shims_stage"; return 1; }
+    if ! source "$MARKSHARC_HOME/core/zsh/lib/render-bash.zsh" ||
+       ! _ms_render_bash > "$bash_tmp" || ! _ms_render_bash_init > "$bash_init_tmp"; then
+        command rm -rf -- "$tmp" "$bash_tmp" "$bash_init_tmp" "$_ms_render_stage" "$_ms_shims_stage"
+        return 1
+    fi
     if (( _ms_render_failed )); then
-        command rm -rf -- "$tmp" "$bash_tmp" "$_ms_render_stage" "$_ms_shims_stage"
+        command rm -rf -- "$tmp" "$bash_tmp" "$bash_init_tmp" "$_ms_render_stage" "$_ms_shims_stage"
         return 1
     fi
     if ! source "$MARKSHARC_HOME/core/zsh/lib/render-fish.zsh" || ! _ms_render_fish > "$fish_tmp"; then
-        command rm -rf -- "$tmp" "$bash_tmp" "$fish_tmp" "$_ms_render_stage" "$_ms_shims_stage"
+        command rm -rf -- "$tmp" "$bash_tmp" "$bash_init_tmp" "$fish_tmp" "$_ms_render_stage" "$_ms_shims_stage"
         return 1
     fi
-    if ! command mv -f -- "$bash_tmp" "$cache/env.bash" || ! command mv -f -- "$fish_tmp" "$cache/env.fish"; then
-        command rm -rf -- "$tmp" "$bash_tmp" "$fish_tmp" "$_ms_render_stage" "$_ms_shims_stage"
+    if ! command mv -f -- "$bash_tmp" "$cache/env.bash" ||
+       ! command mv -f -- "$bash_init_tmp" "$cache/init.bash" ||
+       ! command mv -f -- "$fish_tmp" "$cache/env.fish"; then
+        command rm -rf -- "$tmp" "$bash_tmp" "$bash_init_tmp" "$fish_tmp" "$_ms_render_stage" "$_ms_shims_stage"
         return 1
     fi
     { printf '%s\n' "$HOME" "$MARKSHARC_HOME" "$config" "$_ms_env_id_value"; } > "$cache/bash-context.tmp.$$" && \

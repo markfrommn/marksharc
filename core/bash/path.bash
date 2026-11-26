@@ -68,6 +68,20 @@ _ms_command_available() {
 }
 _ms_render_dir() { [[ -d $1 ]]; }
 _ms_render_file() { [[ -e $1 ]]; }
+_ms_bash_env_export() {
+    if [[ ${_ms_bash_tracking_env-} == 1 ]]; then
+        _ms_bash_set_env "$@"
+    else
+        export "$1=$2"
+    fi
+}
+_ms_bash_option() {
+    if [[ ${_ms_bash_tracking_env-} == 1 || ${_ms_bash_loading_init-} == 1 ]]; then
+        _ms_bash_set_option "$@"
+    else
+        printf -v "$1" '%s' "$2"
+    fi
+}
 _ms_bash_version_newer() {
     local left=${1#v} right=${2#v} a b
     local -a left_parts right_parts
@@ -145,6 +159,15 @@ _ms_bash_start() {
         if [[ -n $value && $value != 0 ]]; then MARKSHARC_SESSION=agent; break; fi
     done
     if [[ $MARKSHARC_SESSION == batch && $- == *i* && -t 0 && -t 1 ]]; then MARKSHARC_SESSION=interactive; fi
+    if [[ $MARKSHARC_SESSION == interactive && ${_ms_bash_rc_loading-} == 1 ]]; then
+        # shellcheck source=core/bash/ownership.bash
+        source "$MARKSHARC_HOME/core/bash/ownership.bash"
+        _ms_bash_tracking_env=1
+    elif [[ ${_ms_bash_reloading-} == 1 ]]; then
+        _ms_bash_tracking_env=1
+        # Reload keeps the class even when its output is redirected.
+        MARKSHARC_SESSION=interactive
+    fi
     export -n MARKSHARC_SESSION
     _ms_first=() _ms_manager=() _ms_brew=() _ms_system=() _ms_user=() _ms_app=() _ms_local=() _ms_last=() _ms_module_bins=() _ms_extra_tiers=() _ms_extra_dirs=()
     _ms_bash_has_gvm=0
@@ -276,7 +299,12 @@ _ms_bash_finish() {
         done
     fi
     case ${_ms_bash_agent_env-} in
-        on|1|yes|true) export BASH_ENV=$MARKSHARC_HOME/core/bash/env.bash ;;
+        on|1|yes|true) _ms_bash_env_export BASH_ENV "$MARKSHARC_HOME/core/bash/env.bash" ;;
         *) [[ ${BASH_ENV-} != "$MARKSHARC_HOME/core/bash/env.bash" ]] || unset BASH_ENV ;;
     esac
+    if [[ ${_ms_bash_tracking_env-} == 1 ]]; then
+        # _ms_bash_apply_env supplies the pre-render value.
+        # shellcheck disable=SC2154
+        _ms_bash_record_path "$_ms_bash_path_before"
+    fi
 }

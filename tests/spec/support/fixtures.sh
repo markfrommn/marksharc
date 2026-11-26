@@ -34,6 +34,14 @@ fixture_teardown() { cd /; rm -rf -- "$TEST_ROOT"; }
 iecho() { :; }
 ierr() { printf '%s\n' "$*" >&2; }
 have_command() { command -v "$1" >/dev/null 2>&1; }
+bash_interactive_unavailable() {
+  ! "${MARKSHARC_TEST_BASH:-bash}" --noprofile --norc -c \
+    '(( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) ))' 2>/dev/null
+}
+bash_prompt_array_unavailable() {
+  ! "${MARKSHARC_TEST_BASH:-bash}" --noprofile --norc -c \
+    '(( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) ))' 2>/dev/null
+}
 # Real Git only operates on disposable fixtures; no real remote URLs are configured.
 git_fixture() {
   "$REAL_GIT" init -q -b "${1:-main}" "$TEST_ROOT/base"

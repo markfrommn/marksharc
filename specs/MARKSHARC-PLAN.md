@@ -1084,7 +1084,7 @@ three. Runtime behavior remains pending until the owning issue supplies evidence
 
 | Entry | Issue | Scope | Estimate | Depends on |
 | --- | --- | --- | --- | --- |
-| L2.1 | [DEV-80](https://linear.app/psols/issue/DEV-80) | Runtime, rendered init/aliases/options, cache, hooks, reload, directive applier and six caller-state wrappers | 5 | DEV-61, DEV-50, DEV-68, DEV-51 |
+| L2.1 | [DEV-80](https://linear.app/psols/issue/DEV-80), [implementation plan](DEV-80-PLAN.md) | Runtime, rendered init/aliases/options, cache, hooks, reload, directive applier and six caller-state wrappers | 5 | DEV-61, DEV-50, DEV-68, DEV-51 |
 | L2.2 | [DEV-81](https://linear.app/psols/issue/DEV-81) | starship/Atuin/native history/zoxide/direnv; mise and legacy manager adapters | 5 | DEV-80, DEV-72 |
 | L2.3 | [DEV-82](https://linear.app/psols/issue/DEV-82) | Navigation and native public modules; titles/mux/ssh/X11; workflow/launch; notification and greeting | 5 | DEV-80, DEV-76 |
 | L2.4 | [DEV-83](https://linear.app/psols/issue/DEV-83) | Completion, ble.sh/fzf integration, explicit interpreter CI matrix, doctor/user docs and final real-tool acceptance | 5 | DEV-80, DEV-81, DEV-82, DEV-55 |
