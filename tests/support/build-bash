@@ -1,0 +1,47 @@
+#!/bin/sh
+# Provision an isolated interpreter for CI and local contract tests.
+# Usage: tests/support/build-bash <4.4|5.3> <output-file>
+set -eu
+
+if [ "$#" -ne 2 ] || [ -z "$2" ] || [ -d "$2" ]; then
+  printf 'usage: %s <4.4|5.3> <output-file>\n' "$0" >&2
+  exit 2
+fi
+version=$1
+case $2 in
+  /*) destination=$2 ;;
+  *) destination=$PWD/$2 ;;
+esac
+case $version in
+  4.4) sha256=d86b3392c1202e8ff5a423b302e6284db7f8f435ea9f39b5b1b20fd3ac36dfcb ;;
+  5.3) sha256=0d5cd86965f869a26cf64f4b71be7b96f90a3ba8b3d74e27e8e9d9d5550f31ba ;;
+  *) printf 'build-bash: unsupported test release %s\n' "$version" >&2; exit 2 ;;
+esac
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-bash.XXXXXX")
+trap 'rm -rf -- "$work"' EXIT
+trap 'exit 130' HUP INT TERM
+archive=$work/bash-$version.tar.gz
+curl --fail --silent --show-error --location --retry 3 --max-time 120 \
+  "https://ftp.gnu.org/gnu/bash/bash-$version.tar.gz" --output "$archive"
+printf '%s  %s\n' "$sha256" "$archive" | shasum -a 256 -c -
+tar -xzf "$archive" -C "$work"
+source=$work/bash-$version
+
+set -- --without-bash-malloc
+if [ "$version" = 4.4 ]; then
+  # Bash 4.4 predates modern compilers' defaults for implicit declarations.
+  set -- "$@" 'CFLAGS=-O2 -std=gnu11 -Wno-error=implicit-function-declaration -Wno-error=implicit-int'
+  # Its config.guess predates the Apple Silicon host name.
+  if [ "$(uname -sm)" = 'Darwin arm64' ]; then
+    set -- "$@" --build=aarch64-apple-darwin
+  fi
+fi
+if ! (cd "$source" && ./configure "$@" && make -j 4 bash) > "$work/build.log" 2>&1; then
+  cat "$work/build.log" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname -- "$destination")"
+cp -- "$source/bash" "$destination"
+"$destination" --version

@@ -14,4 +14,4 @@ unset _l
 _ms_verbose=0
 _ms_facts
 _ms_env_id
-_ms_render "$generate"
+_ms_render "$generate" "$generate"

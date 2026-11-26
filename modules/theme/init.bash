@@ -73,6 +73,9 @@ case ${_ms_opt_theme_fzf-on} in
         if type -P eza >/dev/null; then _ms_theme_dir_preview='eza --tree --level=2 --color=always {} | head -n 200'; fi
         _ms_bash_set_env FZF_CTRL_T_OPTS "--preview '$_ms_theme_file_preview'"
         _ms_bash_set_env FZF_ALT_C_OPTS "--preview '$_ms_theme_dir_preview'"
+        if type -P fzf >/dev/null; then
+            _ms_bash_load_file "${BASH_SOURCE[0]%/*}/lib/fzf.bash"
+        fi
         unset _ms_theme_command _ms_theme_file_preview _ms_theme_dir_preview ;;
 esac
 unset _ms_theme_bat

@@ -241,7 +241,7 @@ EOF
       *) exit 96 ;;
     esac'
     terminal -ic '
-      [[ -z ${HISTFILE-} ]] || exit 41
+      [[ $HISTFILE == /dev/null ]] || exit 41
       _ms_bash_preexec_dispatch ble-command
       BLE_PIPESTATUS=(2 0)
       _ms_bash_prompt_return 2

@@ -7,7 +7,7 @@
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
 | Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
-| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, caller-state wrappers, tool integrations and version managers. Native module parity and final acceptance are tracked in DEV-82 and DEV-83. |
+| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, public modules, line editor and completion. [DEV-83](DEV-83-PLAN.md) records final acceptance evidence. |
 | Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
@@ -149,7 +149,7 @@ Counts are Mac / sol.
 - Fish, brought forward onto the same structure.
 - Full interactive Bash 4.4+, with environment-only fallback on older Bash and no
   automatic shell replacement. The approved design and delivery boundaries are in
-  [BASH-SPEC.md](BASH-SPEC.md); runtime delivery is pending DEV-80–DEV-83.
+  [BASH-SPEC.md](BASH-SPEC.md).
 
 ### 4.3 Maybe later
 
@@ -294,6 +294,7 @@ Module and overlay files (`module.conf`, `config.conf`, `hosts/*.conf`):
 | `alias <name> <value> [when …]` | Define an interactive alias. |
 | `plugin <name> <git-url> <sha> [shell <s>] [kind source\|fpath]` | Pin a third-party plugin (6.8). |
 | `completion <cmd> <generator…>` | Generate a completion file into the cache at render time. |
+| `completion-bash <cmd> <generator…>` | Generate a Bash completion file into its own cache on explicit renders. |
 | `package <manager> <name>` | Declare a package for `bootstrap` (`brew`, `cask`, `apt`, `dnf`). |
 | `update <label> <command…>` | Register an argv-based step for `marksharc update`. A command path beginning with `./` resolves relative to its module directory or the overlay root. |
 | `installer <name> <script>` | Register an executable for `marksharc install`. Relative paths resolve from the module directory or the overlay root. |
@@ -484,12 +485,9 @@ changes fetched by sync apply to the next invocation.
 ### 6.16 Interactive Bash
 
 The approved target is substantially equivalent public interactive behavior in Bash
-4.4+ on macOS and Linux, delivered by DEV-80–DEV-83. Bash 3.2 retains environment
-support. Older versions never automatically exec a newer shell, and startup stays
-quiet; `doctor` reports the interactive version requirement as part of DEV-83.
-DEV-80 provides native interactive startup, reload, hooks and caller-state wrappers.
-DEV-81 provides the Starship, Atuin, native history, zoxide, direnv and version-manager
-adapters.
+4.4+ on macOS and Linux. Bash 3.2 retains environment support. Older versions never
+automatically exec a newer shell, and `doctor` reports the interactive version
+requirement. [DEV-83](DEV-83-PLAN.md) records the platform and startup measurements.
 
 The complete behavior contract, module coverage, accepted gaps and acceptance matrix
 are in [BASH-SPEC.md](BASH-SPEC.md). Its requirements include:
@@ -669,7 +667,7 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Notify exception | Detached interactive fetch, throttled to 12 hours by default; cached behind notice on a subsequent eligible shell | Operator, DEV-45 |
 | Overlay location | `mark-desktop-files/marksharc/` linked to `~/.config/marksharc` | Interview |
 | Write-once language | zsh executables | Interview |
-| Bash | Env-only in Modernization; approved full interaction on 4.4+, older versions env-only, no automatic exec; optional recommended ble.sh; delivery pending DEV-80–DEV-83 | Interview; operator, DEV-61 |
+| Bash | Interactive on 4.4+, older versions env-only, no automatic exec, optional recommended ble.sh | Interview; operator, DEV-61 |
 | Config format | Line directives, no parser dependency | Interview |
 | `.` on PATH | Off by default; on in the author's overlay | Interview |
 | Pre-migration depth | Full mirror of the target layout, in place | Interview |

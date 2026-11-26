@@ -65,16 +65,7 @@ insert-cycleddown() { local REPLY; _dirhistory_first_child && switch-to-dir -- "
 
 _ms_nav_widget() {
     "$1" || return
-    if [[ ${_ms_bash_prompt_owned-} ]]; then
-        _ms_bash_prompt_capture 0 0
-        # The core prompt capture constructs the replay command.
-        # shellcheck disable=SC2154
-        eval "$_ms_bash_prompt_replay"
-    else
-        _ms_bash_prompt_dispatch 0 0
-    fi
-    # bind -x returns to Readline, which redraws the current edit buffer.
-    printf '\r\033[2K%s' "${PS1@P}"
+    _ms_bash_widget_redraw
 }
 _ms_nav_keymap() {
     local -n result=$1
@@ -91,7 +82,7 @@ _ms_nav_keymap() {
                 key=$map:${BASH_REMATCH[1]}
                 # shellcheck disable=SC2004,SC2034 # Writes to the caller's map.
                 result[$key]=$kind:$line
-            done < <(bind -m "$map" "-$kind" 2>/dev/null)
+            done < <(_ms_bash_binding_dump -m "$map" "-$kind" 2>/dev/null)
         done
     done
 }

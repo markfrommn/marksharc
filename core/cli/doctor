@@ -7,6 +7,42 @@ source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 _ms_verbose=0
 _ms_modules_discover
 integer issues=0
+bash_version=${MARKSHARC_BASH_VERSION-}
+if [[ -z $bash_version ]]; then
+    bash_path=${SHELL-}
+    [[ $bash_path == */bash && -x $bash_path ]] || bash_path=$(whence -p -- bash)
+    if [[ -n $bash_path ]]; then
+        bash_version=$(BASH_ENV='' "$bash_path" --noprofile --norc -c 'printf %s "$BASH_VERSION"')
+    fi
+fi
+if [[ $bash_version == <->.<->* ]]; then
+    bash_major=${bash_version%%.*}
+    bash_minor=${${bash_version#*.}%%.*}
+    if (( bash_major < 4 || (bash_major == 4 && bash_minor < 4) )); then
+        print -r -- "doctor: Bash $bash_version is environment-only; interactive MarkSharc requires Bash 4.4 or newer"
+    elif [[ -n ${MARKSHARC_BASH_BACKENDS-} ]]; then
+        print -r -- "doctor: Bash $bash_version active=${MARKSHARC_BASH_BACKENDS} pending=${MARKSHARC_BASH_PENDING}"
+        if [[ $MARKSHARC_BASH_BACKENDS == readline/* ]]; then
+            print -r -- 'doctor: Readline provides native completion and listing; ble.sh adds suggestions, highlighting and a completion menu'
+        fi
+        if [[ $MARKSHARC_BASH_BACKENDS == */native && ${_ms_mod_enabled[completion]-0} == 1 ]]; then
+            print -r -- 'doctor: Bash uses built-in completion; install bash-completion for additional commands'
+        fi
+    fi
+fi
+if [[ ${_ms_mod_enabled[line-editor-ble]-0} == 1 ]]; then
+    ble_dir=${_ms_mod_dir[line-editor-ble]}
+    if [[ -r $ble_dir/ble.pin ]]; then
+        IFS= read -r ble_pin < "$ble_dir/ble.pin"
+        ble_file=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins/ble.sh@$ble_pin/out/ble.sh
+        if [[ ! -r $ble_file ]]; then
+            print -r -- 'doctor: optional Bash editor ble.sh is missing (run marksharc install ble.sh)'
+            "$ble_dir/support/acquire-ble" --check-prerequisites 2>&1 || :
+        elif [[ ${MARKSHARC_BASH_BACKENDS-} == readline/* && ${MARKSHARC_BASH_PENDING-} == ble/* ]]; then
+            print -r -- "doctor: ble.sh is available; run 'exec bash -l' to select it in a fresh shell"
+        fi
+    fi
+fi
 case ${MARKSHARC_BASH_HISTORY-} in
     atuin-bash-preexec)
         print -r -- 'doctor: Bash history uses Atuin with bash-preexec; duration and exit status can be incomplete for some commands' ;;

@@ -1,5 +1,5 @@
 # Reload tracks the declarations it installed and retires only matching effects.
-declare -gA _ms_bash_previous=() _ms_bash_installed=() _ms_bash_replaced=()
+declare -gA _ms_bash_previous=() _ms_bash_installed=() _ms_bash_replaced=() _ms_bash_process_functions=()
 declare -ga _ms_bash_owned_path=()
 
 _ms_bash_effect() {
@@ -82,6 +82,11 @@ _ms_bash_snapshot_definitions() {
         _ms_snapshot[$_ms_key]=${_ms_definition%$'\n'}
     done < <(
         while IFS= read -r _ms_function; do
+            if [[ ${_ms_bash_process_functions[$_ms_function]+yes} ]]; then continue; fi
+            # The editor loads more libraries lazily after the initial snapshot.
+            if [[ ${_ms_bash_active_editor-} == ble ]]; then
+                case $_ms_function in ble/*|ble-*|_ble_*) continue ;; esac
+            fi
             printf 'function:%s\0' "$_ms_function"
             builtin declare -f -- "$_ms_function"
             printf '\0'

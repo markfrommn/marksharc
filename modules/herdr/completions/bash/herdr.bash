@@ -1,0 +1,1 @@
+_ms_bash_load_generated_completion herdr

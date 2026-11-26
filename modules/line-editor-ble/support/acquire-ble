@@ -1,0 +1,115 @@
+#!/bin/sh
+# Build the pinned editor only through an explicit install or update operation.
+set -eu
+
+check_prerequisites() {
+    missing=0
+    for tool in git bash; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            printf 'ble.sh: missing build prerequisite: %s\n' "$tool" >&2
+            missing=1
+        fi
+    done
+    case $(LC_ALL=C command gawk --version 2>/dev/null) in
+        'GNU Awk'*) ;;
+        *) printf '%s\n' 'ble.sh: missing build prerequisite: gawk (GNU Awk)' >&2; missing=1 ;;
+    esac
+
+    builder=
+    for tool in gmake make; do
+        case $(LC_ALL=C command "$tool" --version 2>/dev/null) in
+            'GNU Make'*) builder=$tool; break ;;
+        esac
+    done
+    if [ -z "$builder" ]; then
+        printf '%s\n' 'ble.sh: missing build prerequisite: GNU Make (gmake or make)' >&2
+        missing=1
+    fi
+    [ "$missing" -eq 0 ]
+}
+
+case $#:${1-} in
+    0:) ;;
+    1:--update) ;;
+    1:--check-prerequisites) check_prerequisites; exit $? ;;
+    *) exit 2 ;;
+esac
+
+module=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+if ! IFS= read -r pin < "$module/ble.pin"; then
+    printf '%s\n' 'ble.sh: unable to read the pinned commit' >&2
+    exit 1
+fi
+case $pin in
+    *[!0123456789abcdef]*) pin= ;;
+esac
+if [ "${#pin}" -ne 40 ]; then
+    printf '%s\n' 'ble.sh: invalid pinned commit' >&2
+    exit 1
+fi
+
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/plugins"
+target=$cache/ble.sh@$pin
+
+# Git hooks can export these for the caller's repository. Every operation
+# below targets the cache, including Git commands run by the upstream build.
+unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE
+unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
+ready() {
+    [ ! -L "$1" ] && [ -d "$1/.git" ] &&
+        [ -s "$1/out/ble.sh" ] && [ -r "$1/out/ble.sh" ] &&
+        [ -d "$1/out/lib" ]
+}
+
+installed_pin() {
+    ready "$1" && [ "$(command git -C "$1" rev-parse HEAD 2>/dev/null)" = "$pin" ]
+}
+
+if [ -e "$target" ] || [ -L "$target" ]; then
+    if installed_pin "$target"; then
+        printf 'ble.sh: already installed at %s\n' "$target"
+        exit 0
+    fi
+    printf 'ble.sh: existing path is not a completed build of this pin: %s\n' "$target" >&2
+    exit 1
+fi
+
+if [ "${1-}" = --update ]; then
+    opted_in=0
+    for previous in "$cache"/ble.sh@*; do
+        if ready "$previous"; then
+            opted_in=1
+            break
+        fi
+    done
+    if [ "$opted_in" -eq 0 ]; then
+        printf '%s\n' 'ble.sh: skipped (first install: marksharc install ble.sh)'
+        exit 0
+    fi
+fi
+
+check_prerequisites
+umask 077
+mkdir -p -- "$cache"
+staging=$(mktemp -d "$cache/.ble.XXXXXXXX")
+trap 'rm -rf -- "$staging"' EXIT
+trap 'exit 1' HUP INT TERM
+checkout=$staging/${target##*/}
+upstream=https://github.com/akinomyoga/ble.sh.git
+
+command git init -q "$checkout"
+# The pinned .gitmodules uses a URL relative to the upstream repository.
+command git -C "$checkout" remote add origin "$upstream"
+command git -C "$checkout" fetch -q --depth 1 origin "$pin"
+command git -C "$checkout" checkout -q --detach FETCH_HEAD
+[ "$(command git -C "$checkout" rev-parse HEAD)" = "$pin" ]
+command git -C "$checkout" submodule update --init --recursive --depth 1
+command "$builder" --silent -C "$checkout"
+installed_pin "$checkout"
+
+# The stage is on the same filesystem, with the final basename. A concurrent
+# publisher can win the rename without exposing a partial or nested checkout.
+mv -n -- "$checkout" "$cache/" || installed_pin "$target"
+installed_pin "$target"
+printf 'ble.sh: installed at %s\n' "$target"
