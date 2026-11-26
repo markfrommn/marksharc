@@ -61,4 +61,32 @@ DATA
     When run socket_case
     The status should be success
   End
+  socket_platform_case() {
+    emulate -L zsh
+    local os=$1 expected_flag=$2 group=$3 script=$TEST_ROOT/fix-docker-socket
+    sed "s|/var/run/docker.sock|$HOME/docker.sock|" "$MARKSHARC_ROOT/modules/docker/bin/fix-docker-socket" > "$script" || return 1
+    chmod +x "$script"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$HOME/docker.sock" || return 2
+    stub_command uname "printf '%s\n' '$os'"
+    stub_command stat "printf 'stat %s\n' \"\$*\" >> \"\$OPLOG\"; printf '%s\n' '$group'"
+    stub_command sudo 'printf "sudo %s\n" "$*" >> "$OPLOG"'
+    bash -c '"$1"' _ "$script" > "$TEST_ROOT/out" 2>&1 || return 3
+    if [[ $group == docker ]]; then
+      [[ $(<"$OPLOG") == "stat $expected_flag $HOME/docker.sock" ]] || { cat "$OPLOG"; return 4; }
+    else
+      [[ $(<"$OPLOG") == "stat $expected_flag $HOME/docker.sock"$'\n'"sudo chgrp docker $HOME/docker.sock" ]] || { cat "$OPLOG"; return 5; }
+    fi
+  }
+  Describe 'fix-docker-socket platform stat flags and group check'
+    Parameters
+      Darwin '-f %Sg' docker
+      Darwin '-f %Sg' wheel
+      Linux  '-c %G'  docker
+      Linux  '-c %G'  root
+    End
+    It "uses $2 on $1 and skips sudo only when group is docker (group=$3)"
+      When run socket_platform_case "$1" "$2" "$3"
+      The status should be success
+    End
+  End
 End

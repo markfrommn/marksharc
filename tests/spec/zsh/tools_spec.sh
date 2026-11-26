@@ -66,9 +66,15 @@ DATA
     # bun's completion file reaches compinit through fpath.
     ms_unit "BUN_INSTALL=$HOME/.bun; source \"\$MARKSHARC_HOME/modules/bun/init.zsh\"; print -r -- \"\$fpath[1]\"" || return 6
     [[ $(<"$TEST_ROOT/out") == "$HOME/.bun" ]] || return 7
+    # Linux pnpm layout: ~/.local/share/pnpm alone when ~/Library/pnpm is absent.
+    rm -rf "$HOME/Library/pnpm"
+    tool_run Linux 'source "$MARKSHARC_HOME/modules/pnpm/env.zsh"; print -r -- "PNPM=$PNPM_HOME" >&2' || return 8
+    got=( "${(@f)$(<"$TEST_ROOT/out")}" )
+    [[ $(<"$TEST_ROOT/err") == "PNPM=$HOME/.local/share/pnpm" ]] || { cat "$TEST_ROOT/err"; return 9; }
+    (( ${got[(Ie)$HOME/.local/share/pnpm]} > 0 )) || { show $got; return 10; }
     # No bun, no pnpm: nothing exported, nothing added.
     rm -rf "$HOME/.bun" "$HOME/Library/pnpm" "$HOME/.local/share/pnpm"
-    tool_run Darwin '_ms_test_render_module bun; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"' || return 8
+    tool_run Darwin '_ms_test_render_module bun; source "$MARKSHARC_HOME/modules/pnpm/env.zsh"' || return 11
     [[ $(<"$TEST_ROOT/out") != *bun* && $(<"$TEST_ROOT/out") != *pnpm* ]]
   }
   It 'exports BUN_INSTALL and PNPM_HOME and adds their directories only when installed'
@@ -129,6 +135,8 @@ Describe 'interactive tool modules (init phase)'
     [[ $(<"$TEST_ROOT/out") == "$expected_ls|ls -lA|ls -a|ls -l|ls -FA|ls -F" ]] || { cat "$TEST_ROOT/out"; return 4; }
     ms_unit 'MARKSHARC_OS=darwin; source "$MARKSHARC_HOME/modules/ls/init.zsh"; print -r -- "${aliases[ls]}"' || return 5
     [[ $(<"$TEST_ROOT/out") == 'ls -G' ]] || return 6
+    ms_unit 'MARKSHARC_OS=linux; source "$MARKSHARC_HOME/modules/ls/init.zsh"; print -r -- "${aliases[ls]}"' || return 7
+    [[ $(<"$TEST_ROOT/out") == 'ls --color=auto' ]] || return 8
     # No other module defines the family again (the old file defined ll twice).
     ! grep -rE "alias +(ll|la|dir|lf|lsf)=" "$MARKSHARC_ROOT/modules" --include='*.zsh' --exclude-dir=ls
   }
@@ -139,11 +147,19 @@ Describe 'interactive tool modules (init phase)'
   pager_options_case() {
     emulate -L zsh
     have_command() { [[ $1 == less ]]; }
+    stub_command diff 'printf "diff %s\n" "$*" >> "$OPLOG"'
+    stub_command less 'printf "less %s\n" "$*" >> "$OPLOG"; cat >/dev/null'
+    hash -r
     unset PAGER LESS MANPATH
     source "$MARKSHARC_ROOT/modules/pager/init.zsh" || return 1
     [[ $PAGER == 'less -R' && $LESS == -FRX && $MANPATH == /usr/share/man* ]] || return 2
     (( ${+functions[diff]} + ${+functions[diffcp]} == 2 )) || return 3
-    [[ ${(t)MANPATH} == *export* && ${(t)PAGER} == *export* ]]
+    [[ ${(t)MANPATH} == *export* && ${(t)PAGER} == *export* ]] || return 4
+    : > "$OPLOG"
+    diff a b || return 5
+    diffcp a b || return 6
+    [[ $(<"$OPLOG") == $'diff --color=auto a b\ndiff --color=always a b\nless -R' ||
+       $(<"$OPLOG") == $'diff --color=auto a b\nless -R\ndiff --color=always a b' ]] || { cat "$OPLOG"; return 7; }
   }
   It 'sets PAGER, LESS and MANPATH and defines the coloured diff wrappers'
     When run pager_options_case
