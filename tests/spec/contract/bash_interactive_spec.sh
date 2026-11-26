@@ -53,9 +53,9 @@ EOF
       complete -p probe >/dev/null || exit 13
       source "$HOME/.bash_profile"
       source "$HOME/.bashrc"
-      [[ $(wc -l < "$TEST_ROOT/starts") == 1 ]] || exit 14
+      [[ $(wc -l < "$TEST_ROOT/starts") -eq 1 ]] || exit 14
       "$BASH" -ic '"'"'[[ $(type -t post_fn) == function && $_ms_opt_probe_choice == "chosen value" ]]'"'"' || exit 15
-      [[ $(sort -u "$TEST_ROOT/starts" | wc -l) == 2 ]] || exit 16
+      [[ $(sort -u "$TEST_ROOT/starts" | wc -l) -eq 2 ]] || exit 16
     ' > "$TEST_ROOT/out" 2>&1 || { status=$?; cat "$TEST_ROOT/out"; return "$status"; }
     ! grep -E 'marksharc:|command not found|unbound variable' "$TEST_ROOT/out"
   }
@@ -137,9 +137,9 @@ EOF
       [[ :$PATH: != *":$HOME/probe bin:"* && :$PATH: == *":$HOME/user bin:"* ]] || exit 19
       [[ $(kept_fn) == user && ${BASH_ALIASES[kept_alias]} == "printf user" && $PROBE_REPLACED == user ]] || exit 20
       [[ $(complete -p probe) == *user* ]] || exit 21
-      [[ $PROMPT_COMMAND == ": foreign" && $(wc -l < "$TEST_ROOT/cleanups") == 2 ]] || exit 22
+      [[ $PROMPT_COMMAND == ": foreign" && $(wc -l < "$TEST_ROOT/cleanups") -eq 2 ]] || exit 22
       cs >/dev/null 2>&1 && li >/dev/null 2>&1 || exit 23
-      [[ $(wc -l < "$TEST_ROOT/cleanups") == 2 ]] || exit 24
+      [[ $(wc -l < "$TEST_ROOT/cleanups") -eq 2 ]] || exit 24
       [[ ${BASH_ALIASES[restored_alias]} == "printf user" && $(declare -p PROBE_BASELINE) == "declare -- PROBE_BASELINE=\"before\"" ]] || exit 25
     ' > "$TEST_ROOT/out" 2>&1 || { status=$?; cat "$TEST_ROOT/out"; return "$status"; }
   }
@@ -147,6 +147,20 @@ EOF
     Skip if 'selected Bash is older than 4.4' bash_interactive_unavailable
     Skip if 'Python is unavailable for the PTY fixture' test -z "$PYTHON"
     When run reload_case
+    The status should be success
+  End
+
+  linked_framework_case() {
+    prepare_bash_runtime
+    ln -s "$MARKSHARC_ROOT" "$TEST_ROOT/framework link"
+    export MARKSHARC_HOME="$TEST_ROOT/framework link"
+    bash_terminal -ic 'marksharc reload && [[ $(probe_fn) == owned ]]' \
+      > "$TEST_ROOT/out" 2>&1 || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'reloads when the framework path contains a directory symlink'
+    Skip if 'selected Bash is older than 4.4' bash_interactive_unavailable
+    Skip if 'Python is unavailable for the PTY fixture' test -z "$PYTHON"
+    When run linked_framework_case
     The status should be success
   End
 

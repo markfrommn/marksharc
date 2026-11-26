@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 with tempfile.TemporaryDirectory() as temp:
+    temp = str(Path(temp).resolve())
     base = Path(temp)
     (base / 'first child').mkdir()
     (base / 'second').mkdir()

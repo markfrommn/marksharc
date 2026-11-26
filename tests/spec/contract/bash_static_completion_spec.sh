@@ -47,6 +47,7 @@ Describe 'Bash workflow completions'
     printf '%s\t%s\t%s\t%s\t\n' "api team's" "/repos/api team's" base "/repos/api team's" > "$inventory/builder.tsv"
     cd "$TEST_ROOT" || return
     cat > "$HOME/.bashrc" <<'EOF'
+PS1='' PS2=''
 source "$MARKSHARC_HOME/modules/launch/completions/bash/launch-session.bash"
 source "$MARKSHARC_HOME/modules/launch/completions/bash/launch-repo.bash"
 launch-session() { printf 'ARG:<%s>\n' "$@"; }

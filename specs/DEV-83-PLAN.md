@@ -61,7 +61,8 @@ Explicitly rendered completions completed `herdr workspace` and `cwf status`
 with Herdr 0.9.5 and CWF 0.21.1. The installer E2E covers checkout, clone, and
 legacy installations and both Bash startup files.
 
-The CI matrix builds actual GNU Bash 4.4.0 and 5.3.0 on Linux and macOS.
+The CI matrix builds GNU Bash 4.4.0 on Linux and macOS and 5.3.0 on Linux.
+The macOS 5.3 checks use Homebrew Bash, matching the user installation path.
 The macOS job also uses `/bin/bash` 3.2 for the environment-only regression.
 The real-tool PTY check prints platform-specific cold and five-sample warm
 times to the first visible prompt.
@@ -69,9 +70,10 @@ times to the first visible prompt.
 | Platform | Profile | Cold tool cache | Warm median | Warm max |
 | --- | --- | ---: | ---: | ---: |
 | Linux | Bash 5.3.0, ble.sh, Starship, Atuin, bash-completion, Carapace, zoxide, fzf | 5,109 ms | 3,034 ms | 3,127 ms |
+| macOS (local) | Homebrew Bash 5.3.20, same full profile | 2,965 ms | 1,415 ms | 1,582 ms |
 | macOS | Same profile on hosted CI | Pending | Pending | Pending |
 
-The Linux warm result exceeds the 500 ms budget. Startup profiling found
+The Linux and local macOS warm results exceed the 500 ms budget. Startup profiling found
 editor initialization and editor-compatible Atuin, directory and fzf binding
 setup to be material costs. Full acceptance remains open while the warm
 budget and macOS results are outstanding.
