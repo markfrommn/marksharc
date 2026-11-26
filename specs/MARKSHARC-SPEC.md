@@ -7,6 +7,7 @@
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
 | Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
+| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md): approved design, pending DEV-80–DEV-83 |
 | Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
@@ -146,11 +147,13 @@ Counts are Mac / sol.
 - Push sync: a poll-pull timer and an ssh fan-out.
 - Launch commands: `launch-session`, `launch-repo`, and `cwf-new` in a launched terminal, over the multiplexer adapters ([LAUNCH-SPEC.md](LAUNCH-SPEC.md)).
 - Fish, brought forward onto the same structure.
+- Full interactive Bash 4.4+, with environment-only fallback on older Bash and no
+  automatic shell replacement. The approved design and delivery boundaries are in
+  [BASH-SPEC.md](BASH-SPEC.md); runtime delivery is pending DEV-80–DEV-83.
 
 ### 4.3 Maybe later
 
 - A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm).
-- Full interactive bash.
 - A coexist install mode that does not take over `ZDOTDIR`.
 - A generic `AGENTS.md` / `CLAUDE.md` for the public repo.
 - A Go helper binary for hot-path work.
@@ -251,6 +254,10 @@ modules/<name>/
   tests/               # specs for this module
 ```
 
+The approved Bash extension (6.16) uses `init.bash`, `functions/bash/<fn>.bash`
+and `completions/bash/<cmd>.bash`. Bash loads function definitions explicitly;
+zsh autoload files and Fish functions are not sourced into Bash.
+
 How a module covers the four impact areas:
 
 | Area | Mechanism |
@@ -338,7 +345,7 @@ Wiring per shell:
 |---|---|---|
 | zsh | `~/.zshenv`: set `MARKSHARC_HOME`, source `core/zsh/zshenv.zsh` | `zshenv.zsh` sets `ZDOTDIR` to `~/.local/state/marksharc/zdot` (four one-line stubs) and runs the env phase. `.zprofile` re-asserts PATH after macOS `path_helper`. `.zshrc` runs the init phase. |
 | fish | `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. Existing Fish configuration is preserved by default. |
-| bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash`, silently, in every mode. No interactive phase until full bash is in scope. `BASH_ENV` is set only when the `agent.bash_env` option is on. |
+| bash | `~/.bashrc` and `~/.bash_profile` | Currently source the rendered `env.bash`, silently, in every mode. The approved interactive extension for Bash 4.4+ is specified in 6.16 and pending DEV-80–DEV-83. `BASH_ENV` remains env-only and is set only when `agent.bash_env` is on. |
 
 The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
 
@@ -473,6 +480,41 @@ explicitly configured. An unused default provider directory stays optional.
 
 The update runner validates its step labels and arguments once before execution. Configuration
 changes fetched by sync apply to the next invocation.
+
+### 6.16 Interactive Bash
+
+The approved target is substantially equivalent public interactive behavior in Bash
+4.4+ on macOS and Linux, delivered by DEV-80–DEV-83. Bash 3.2 retains environment
+support. Older versions never automatically exec a newer shell, and startup stays
+quiet; `doctor` reports the interactive version requirement. The current Bash
+implementation remains environment-only until those issues deliver the extension.
+
+The complete behavior contract, module coverage, accepted gaps and acceptance matrix
+are in [BASH-SPEC.md](BASH-SPEC.md). Its requirements include:
+
+- Init requires an interactive Bash with stdin/stdout TTYs and no active agent marker.
+  `BASH_ENV`, batch, agent and no-TTY invocations remain env-only. Render shared data
+  into native Bash init, aliases and options; use `init.bash`, Bash function files and
+  `local/post.bash` for native interactive behavior. Keep the env artifact 3.2-compatible.
+- Reuse write-once executables and shims. Native wrappers apply the existing literal
+  caller-state protocol, including deferred `exit`. Reload tracks owned state and
+  preserves foreign hooks and later user replacements; render failure retains live init.
+- Compose prompt/directory callbacks with existing scalar or array `PROMPT_COMMAND`
+  and preexec backends, preserving status and pipeline results. Directory callbacks
+  observe `$PWD` changes before the next prompt; same-line `cd; command` can precede
+  automatic manager selection. Keep native Bash directory-stack semantics.
+- Use starship, Atuin, zoxide, fzf and optional Carapace/bash-completion. Optional,
+  recommended ble.sh >= 0.4 supplies suggestions, highlighting and menu selection;
+  Readline is the fallback. Acquire/build immutable pins only through explicit
+  install/update tooling. Missing or failed Atuin integration retains native Bash
+  history persistence; working Atuin integration disables that persistent native store.
+- Port public functional modules, manager ownership/fallback and launch handoff; do
+  not load zsh/Fish plugins in Bash. Private shell-specific hooks require an adoption
+  inventory. Backend switches require an explicit fresh shell; ordinary reload stays
+  in place. Missing optional tools never break startup.
+- Verify actual Bash 4.4 and current 5.x, macOS 3.2 env compatibility, real-tool PTY
+  behavior on macOS/Linux and warm startup against 500 ms. Intermediate issues do
+  not certify the full feature; final acceptance belongs to DEV-83.
 
 ## 7. Module catalog
 
@@ -625,7 +667,7 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Notify exception | Detached interactive fetch, throttled to 12 hours by default; cached behind notice on a subsequent eligible shell | Operator, DEV-45 |
 | Overlay location | `mark-desktop-files/marksharc/` linked to `~/.config/marksharc` | Interview |
 | Write-once language | zsh executables | Interview |
-| Bash | Env-only, early in Modernization | Interview |
+| Bash | Env-only in Modernization; approved full interaction on 4.4+, older versions env-only, no automatic exec; optional recommended ble.sh; delivery pending DEV-80–DEV-83 | Interview; operator, DEV-61 |
 | Config format | Line directives, no parser dependency | Interview |
 | `.` on PATH | Off by default; on in the author's overlay | Interview |
 | Pre-migration depth | Full mirror of the target layout, in place | Interview |

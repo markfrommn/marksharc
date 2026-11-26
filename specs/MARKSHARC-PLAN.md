@@ -6,9 +6,11 @@
 
 **Architecture:** A read-only framework repo, a user-owned overlay in `~/.config/marksharc`, and per-host cache and state. Functional areas are modules. Env is declared once and rendered per shell; interactive behaviour is native; complex commands are zsh executables with a small directive protocol.
 
-**Tech stack:** zsh 5.9+, fish 4.x, bash 5.x (env only); ShellSpec 0.28.1; GitHub Actions on macOS and Ubuntu; atuin, starship, fzf, zoxide; git for distribution and sync.
+**Tech stack:** zsh 5.9+, fish 4.x, Bash environment support including macOS 3.2; approved interactive Bash 4.4+ delivery pending L2.1–L2.4; ShellSpec 0.28.1; GitHub Actions on macOS and Ubuntu; atuin, starship, fzf, zoxide; git for distribution and sync.
 
 **Spec:** [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md). The plan argues from the spec; read both. The launch commands (P3.9) have their own [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
+Interactive Bash (L2) has its own approved [BASH-SPEC.md](BASH-SPEC.md); DEV-61 is the
+design/docs PR, and DEV-80–DEV-83 deliver the runtime.
 
 **Tracking:** Linear project MarkSharc, team Development. Planning issue DEV-33. Milestones match the phases below.
 
@@ -34,9 +36,11 @@
 | 3. Modernization | marksharc | Rendered env, bash env, write-once commands, Day 0 / Day 2 commands, multiplexers, upgrades, push sync, launch commands | DEV-49, DEV-50, DEV-51, DEV-52, DEV-53, DEV-54, DEV-55, DEV-56, DEV-78, DEV-79, DEV-74, DEV-75, DEV-76 |
 | 4. Fish | marksharc | Fish on the same structure | DEV-57, DEV-58 |
 | 6. Cleanup | mark-desktop-files | No shell code left outside the overlay | DEV-59 |
-| 5. Later | marksharc | Unscheduled candidates | DEV-60, DEV-61, DEV-62, DEV-63, DEV-64, DEV-72 (L6) |
+| 5. Later | marksharc | Advanced features and remaining candidates; L2 design approved, runtime pending | DEV-60, DEV-61 (L2 design), DEV-80, DEV-81, DEV-82, DEV-83 (L2 implementation), DEV-62, DEV-63, DEV-64, DEV-72 (L6) |
 
 Rough size: 110 estimate points across 31 scheduled PRs, plus 6 unscheduled candidates.
+L2's approved decomposition separately scopes four implementation PRs at 5 points
+each; the DEV-61 estimate covers the design/docs issue rather than the full runtime.
 
 ## Dependencies
 
@@ -74,7 +78,11 @@ flowchart LR
   P4_2["P4.2 DEV-58"]
   P6_1["P6.1 DEV-59"]
   L1["L1 DEV-60"]
-  L2["L2 DEV-61"]
+  L2["L2 design DEV-61"]
+  L2_1["L2.1 DEV-80"]
+  L2_2["L2.2 DEV-81"]
+  L2_3["L2.3 DEV-82"]
+  L2_4["L2.4 DEV-83"]
   L3["L3 DEV-62"]
   L4["L4 DEV-63"]
   L5["L5 DEV-64"]
@@ -121,6 +129,16 @@ flowchart LR
   P4_2 --> P6_1
   P3_1 --> L1
   P3_2 --> L2
+  L2 --> L2_1
+  P3_3 --> L2_1
+  L2_1 --> L2_2
+  L6 --> L2_2
+  L2_1 --> L2_3
+  P3_9_4 --> L2_3
+  L2_1 --> L2_4
+  L2_2 --> L2_4
+  L2_3 --> L2_4
+  P3_7 --> L2_4
   P2_6 --> L3
   P2_4 --> L4
   P2_7 --> L5
@@ -1023,25 +1041,57 @@ on the Mac and sol is a manual acceptance step after merge.
 
 - Decided when cloud CLI use returns; history shows near zero today.
 
-#### L2 — Full interactive bash (DEV-61)
+#### L2 — Interactive Bash design and decomposition (DEV-61)
 
 - **Repo:** marksharc
 - **Estimate:** 5
-- **Depends on:** P3.2 (DEV-50)
+- **Depends on:** P3.2 (DEV-50), DEV-68
 
-**Goal:** Bash as a third interactive shell: prompt, completion, functions, and wrappers.
+**Goal:** Specify substantially equivalent public interactive Bash behavior and scope
+reviewable implementation PRs. Design approved 2026-11-25; runtime delivery is pending.
 
 **Scope**
 
-- Interactive phase for bash; starship, atuin, and zoxide init; completion via Carapace or bash-completion; applier and wrappers.
+- [BASH-SPEC.md](BASH-SPEC.md) defines Bash 4.4+ interaction, environment-only support
+  on older versions and no automatic shell replacement.
+- Reuse shared executables and starship/Atuin/zoxide/fzf/Carapace integrations; native
+  wrappers and hooks supply caller/editor behavior. Optional recommended ble.sh >= 0.4
+  supplies suggestions, highlighting and completion menus; Readline gaps are explicit.
+- Reconcile the main spec and plan and create L2.1–L2.4 with dependencies. This issue
+  contains documentation only. [DEV-61-PLAN.md](DEV-61-PLAN.md) is its task plan.
 
 **Tests**
 
-- Contract suite interactive cases for bash.
+- Research baseline: 29 Bash contract examples pass; local tool init generation/syntax
+  probes cover system Bash 3.2 and Homebrew Bash 5.3. Carapace 1.8.5 refuses Bash 3.2.
+- Validate document links, consistency, issue dependencies and diff whitespace. These
+  checks do not certify the planned interactive behavior.
 
 **Done when**
 
-- Only if a host or user needs interactive bash.
+- The approved feature contract and delivery boundaries are published through the
+  docs-only PR. Completing DEV-61 means design delivery; full parity is accepted in
+  DEV-83. The conditional single-PR phase-lite path does not apply to this decomposition.
+
+##### L2 implementation boundaries
+
+Every issue writes its own `specs/DEV-<id>-PLAN.md` before implementation, implements
+the linked feature contract, and runs `tests/check` plus install E2E. No workflow or
+review exception is preselected. B and C share A as a prerequisite; D integrates all
+three. Runtime behavior remains pending until the owning issue supplies evidence.
+
+| Entry | Issue | Scope | Estimate | Depends on |
+| --- | --- | --- | --- | --- |
+| L2.1 | [DEV-80](https://linear.app/psols/issue/DEV-80) | Runtime, rendered init/aliases/options, cache, hooks, reload, directive applier and six caller-state wrappers | 5 | DEV-61, DEV-50, DEV-68, DEV-51 |
+| L2.2 | [DEV-81](https://linear.app/psols/issue/DEV-81) | starship/Atuin/native history/zoxide/direnv; mise and legacy manager adapters | 5 | DEV-80, DEV-72 |
+| L2.3 | [DEV-82](https://linear.app/psols/issue/DEV-82) | Navigation and native public modules; titles/mux/ssh/X11; workflow/launch; notification and greeting | 5 | DEV-80, DEV-76 |
+| L2.4 | [DEV-83](https://linear.app/psols/issue/DEV-83) | Completion, ble.sh/fzf integration, explicit interpreter CI matrix, doctor/user docs and final real-tool acceptance | 5 | DEV-80, DEV-81, DEV-82, DEV-55 |
+
+L2.1 owns core interfaces and wrappers; L2.2/L2.3 consume them. L2.3 owns native module
+initialization rather than rewriting shared executables. L2.4 selects and verifies the
+immutable ble.sh pin before integration. Actual Bash 4.4, current 5.x on macOS/Linux
+and macOS 3.2 env-only regression coverage are required; newer-shell compatibility flags
+are insufficient. A real-tool PTY pass and warm startup within 500 ms complete acceptance.
 
 #### L3 — Trial mise for version management (DEV-62)
 
@@ -1154,9 +1204,11 @@ on the Mac and sol is a manual acceptance step after merge.
 | 6.13 Multiplexers | DEV-39 (lift), DEV-53 (adapters) |
 | 6.14 Sync | DEV-45, DEV-56 |
 | 6.15 Day 0 and Day 2 | DEV-44, DEV-45, DEV-52 |
+| 6.16 Interactive Bash; [BASH-SPEC.md](BASH-SPEC.md) | DEV-61 (approved design/docs), DEV-80–DEV-83 (runtime pending) |
 | 7 Module catalog | DEV-38, DEV-39, DEV-40, DEV-54, DEV-55, DEV-60, L6 (DEV-72) |
 | 8 Testing and quality | Every PR; DEV-41 (CI), DEV-48 (inventory) |
 | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) | DEV-78 (design), DEV-79, DEV-74, DEV-75, DEV-76; per section in [LAUNCH-PLAN.md](LAUNCH-PLAN.md) |
 | 9 Migration map | DEV-42, DEV-43, DEV-46, DEV-59 |
 | 10 Design rules | DEV-47 |
-| 4.3 Maybe later | DEV-60, DEV-61, DEV-62 (decision) and L6 (mise module), DEV-63, DEV-64; the Go helper has no issue yet |
+| 4.2 Interactive Bash extension | DEV-61 (design/docs), DEV-80, DEV-81, DEV-82, DEV-83; full runtime acceptance pending |
+| 4.3 Maybe later | DEV-60, DEV-62 (decision) and L6 (mise module), DEV-63, DEV-64; the Go helper has no issue yet |
