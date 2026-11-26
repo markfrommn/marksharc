@@ -3,7 +3,11 @@ Describe 'Bash utility modules'
     config="$HOME/utility config"
     mkdir -p "$config" "$TEST_ROOT/bin"
     export MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_CONFIG="$config" MARKSHARC_NOTIFY=0
-    printf '%s\n' 'source "$MARKSHARC_HOME/core/bash/bashrc.bash"' > "$HOME/.bashrc"
+    cat > "$HOME/.bashrc" <<'EOF'
+# Some platforms install a command-not-found handler before MarkSharc starts.
+command_not_found_handle() { printf 'foreign handler: %s\n' "$1"; }
+source "$MARKSHARC_HOME/core/bash/bashrc.bash"
+EOF
     printf '%s\n' 'module prompt-starship off' 'module history-atuin off' 'module zoxide off' \
       'set theme.delta on' 'set editor.command "custom editor"' > "$config/config.conf"
     stub_command eza ':'
@@ -21,6 +25,8 @@ Describe 'Bash utility modules'
       [[ $EDITOR == "custom editor" && $LESS == -FRX && $LS_COLORS == di=blue ]] || { declare -p EDITOR LESS LS_COLORS; exit 10; }
       [[ $MANPAGER == "sh -c '\''col -bx | bat -l man -p'\''" && $GIT_CONFIG_KEY_0 == include.path ]] || exit 11
       [[ ${BASH_ALIASES[ll]} == "eza -lA" && -z ${BASH_ALIASES[ls]+x} ]] || exit 12
+      declare -F command_not_found_handle >/dev/null &&
+        [[ $(declare -f command_not_found_handle) != *"foreign handler:"* ]] || exit 26
       [[ $(pss sshd) == "--or 42" && $(pssuj sshd) == "--insert Ppid --insert Pgid --insert State --or 42" ]] || exit 13
       _ms_opt_ps_procs=off
       [[ $(pss sshd) == *sshd* ]] || exit 14
@@ -30,7 +36,8 @@ Describe 'Bash utility modules'
       marksharc reload || exit 15
       [[ $EDITOR == user-editor && ${BASH_ALIASES[ll]} == "printf user" ]] || exit 16
       [[ -z ${LS_COLORS+x} && -z ${GIT_CONFIG_COUNT+x} && -z ${LESS+x} ]] || exit 17
-      [[ -z $(type -t pss) && -z $(type -t diffcp) && -z $(type -t command_not_found_handle) ]] || exit 18
+      if declare -F pss >/dev/null || declare -F diffcp >/dev/null; then exit 18; fi
+      [[ $(command_not_found_handle fixture-command) == "foreign handler: fixture-command" ]] || exit 27
       printf "%s\n" "module theme on" "set theme.delta on" "module prompt-starship off" "module history-atuin off" "module zoxide off" > "$MARKSHARC_CONFIG/config.conf"
       marksharc reload || exit 19
       export GIT_CONFIG_KEY_1=user.key GIT_CONFIG_VALUE_1=user-value GIT_CONFIG_COUNT=2
