@@ -1,7 +1,8 @@
 # DEV-61 task plan
 
-Status: design and four-PR decomposition approved 2026-11-25. This is the docs-only
-task plan; runtime work belongs to DEV-80–DEV-83 and their per-issue task plans.
+Status: design and four-PR decomposition approved 2026-11-25. The operator also
+authorized the Fish test-runner isolation fix found during verification. Interactive
+runtime work belongs to DEV-80–DEV-83 and their per-issue task plans.
 
 1. Read the live Linear issue, comments and prerequisites, then the authoritative spec,
    current L2 plan entry and repository memory index. **Done.** DEV-50 and DEV-68 are
@@ -21,10 +22,16 @@ task plan; runtime work belongs to DEV-80–DEV-83 and their per-issue task plan
    plan, and create scoped Linear issues/dependencies: DEV-80 (runtime/wrappers),
    DEV-81 (tool integrations/managers), DEV-82 (native modules/workflow), DEV-83
    (completion/editor/acceptance). Verify doc links, consistency and dependency edges;
-   commit/publish a docs-only PR. Keep design delivery distinct from runtime acceptance.
-   Merge remains a human decision; phase-lite is not used for this design/docs unit.
+   commit/publish the design PR. Keep design delivery distinct from runtime acceptance.
+   Merge remains a human decision; phase-lite is not used for this unit.
+7. Isolate the Fish unit runner from Homebrew's global mise activation. **Authorized.**
+   Set `MISE_FISH_AUTO_ACTIVATE=0` inside the runner's `env -i` boundary and retain
+   configuration loading for fishtape's universal counters. Own `tests/run-fish-units`,
+   `tests/spec/repo/fish_runner_spec.sh` and the runner documentation in `tests/README.md`.
+   Add a parent/child regression, reproduce its failure, then verify the runner specs,
+   full Fish suite, lint and hosted macOS/Linux CI. This fixes the test harness only.
 
-Verification for this documentation change: `git diff --check`, local Markdown link
+Verification for the documentation: `git diff --check`, local Markdown link
 checks, source/reference inspection and a self-review for unresolved design ambiguity.
 `tests/run-tests --shell sh spec/contract/bash_spec.sh` is baseline evidence, not a
 claim that the proposed interactive functionality is implemented.

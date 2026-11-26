@@ -1058,7 +1058,9 @@ reviewable implementation PRs. Design approved 2026-11-25; runtime delivery is p
   wrappers and hooks supply caller/editor behavior. Optional recommended ble.sh >= 0.4
   supplies suggestions, highlighting and completion menus; Readline gaps are explicit.
 - Reconcile the main spec and plan and create L2.1–L2.4 with dependencies. This issue
-  contains documentation only. [DEV-61-PLAN.md](DEV-61-PLAN.md) is its task plan.
+  delivers design/docs plus the authorized Fish test-runner isolation fix found during
+  verification. [DEV-61-PLAN.md](DEV-61-PLAN.md) is its task plan; interactive runtime
+  implementation remains in DEV-80–DEV-83.
 
 **Tests**
 
@@ -1070,7 +1072,7 @@ reviewable implementation PRs. Design approved 2026-11-25; runtime delivery is p
 **Done when**
 
 - The approved feature contract and delivery boundaries are published through the
-  docs-only PR. Completing DEV-61 means design delivery; full parity is accepted in
+  design PR. Completing DEV-61 means design delivery; full parity is accepted in
   DEV-83. The conditional single-PR phase-lite path does not apply to this decomposition.
 
 ##### L2 implementation boundaries

@@ -42,12 +42,15 @@ trap 'exit 130' HUP INT TERM
 mkdir -p "$workspace/home" "$workspace/config" "$workspace/cache" "$workspace/data" "$workspace/state"
 # fishtape keeps its counts in universal variables that each per-file child fish updates, so
 # the parent fish reads its (throwaway) configuration: no --no-config here.
+# Homebrew's global mise hook also runs in these children. Disable its activation in
+# the scrubbed environment so it cannot replace fixture PATHs or make missing tools visible.
 status=0
 # shellcheck disable=SC2016 # $argv belongs to fish
 env -i PATH="$PATH" HOME="$workspace/home" \
   XDG_CONFIG_HOME="$workspace/config" XDG_CACHE_HOME="$workspace/cache" \
   XDG_DATA_HOME="$workspace/data" XDG_STATE_HOME="$workspace/state" \
   MARKSHARC_ROOT="$root" REAL_GIT="$(command -v git)" TMPDIR="$workspace" TERM=dumb \
+  MISE_FISH_AUTO_ACTIVATE=0 \
   fish -c 'source $argv[1]; and fishtape $argv[2..]' "$func" "$@" > "$workspace/tap" 2>&1 || status=$?
 cat "$workspace/tap"
 if [ "$status" -eq 0 ] && grep -q '^not ok' "$workspace/tap"; then

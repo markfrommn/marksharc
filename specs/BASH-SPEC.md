@@ -246,7 +246,8 @@ generation/syntax/registration probes, not interactive integration certification
 
 The operator approved Bash 4.4+ full interaction, older-version environment-only
 fallback, no automatic shell replacement, optional recommended ble.sh and the four-PR
-decomposition on 2026-11-25. DEV-61 contains specifications and planning only.
+decomposition on 2026-11-25. DEV-61 delivers specifications/planning plus the authorized
+Fish test-runner isolation fix; it does not implement interactive Bash.
 DEV-80 is blocked on DEV-61; DEV-81 and DEV-82 depend on DEV-80; DEV-83 depends on all
 three. Completed implementation prerequisites are recorded in the program plan and
 Linear. Each runtime issue requires its own task-level plan and verification evidence.
