@@ -81,6 +81,30 @@ DATA
     When run domain_case
     The status should be success
   End
+  brew_linuxbrew_reload_case() {
+    emulate -L zsh
+    source "$MARKSHARC_ROOT/core/zsh/lib/util.zsh"
+    source "$MARKSHARC_ROOT/core/zsh/lib/cache.zsh"
+    load_mfn brew
+    local lb="$HOME/home/linuxbrew/.linuxbrew/bin"
+    mkdir -p "$lb"
+    cat > "$lb/brew" <<'DATA'
+#!/bin/sh
+printf 'RUN %s\n' "$*" >> "$OPLOG"
+printf 'export HOMEBREW_PREFIX="%s"\n' "$(dirname "$(dirname "$0")")"
+DATA
+    chmod +x "$lb/brew"
+    _ms_reloading=1
+    setup-homebrew "$lb/brew" || return 1
+    [[ ! -s $OPLOG && -z ${HOMEBREW_PREFIX-} ]] || return 2
+    _ms_reloading=0
+    setup-homebrew "$lb/brew" || return 3
+    [[ $HOMEBREW_PREFIX == "$HOME/home/linuxbrew/.linuxbrew" && $(<"$OPLOG") == 'RUN shellenv zsh' ]]
+  }
+  It 'supports Linuxbrew shellenv and skips re-running on reload'
+    When run brew_linuxbrew_reload_case
+    The status should be success
+  End
   It 'keeps generic modern host facts without legacy normalization'
     When run host_fact_case
     The status should be success

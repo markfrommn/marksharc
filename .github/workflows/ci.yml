@@ -11,6 +11,7 @@ on:
       # has to come first
       - "**"
       - "!**.md"
+      - "tests/README.md"
       - "!**.json"
       - "!**.toml"
       - "!**.xml"
@@ -26,6 +27,7 @@ on:
       # has to come first
       - "**"
       - "!**.md"
+      - "tests/README.md"
       - "!**.json"
       - "!**.xml"
       - "!**.toml"
@@ -71,10 +73,13 @@ jobs:
           sudo add-apt-repository -y ppa:fish-shell/release-4
           sudo apt-get update -q
           sudo apt-get install -y -q zsh fish shellcheck
+          sudo apt-get install -y -q hyperfine || true
 
       - name: Install shells and linters (macOS)
         if: runner.os == 'macOS'
-        run: brew install bash fish shellcheck
+        run: |
+          brew install bash fish shellcheck
+          brew install hyperfine || true
 
       - name: Install pinned ShellSpec
         run: |
@@ -153,6 +158,10 @@ jobs:
 
       - name: Fish unit suite
         run: tests/run-fish-units
+
+      - name: Advisory startup-time check
+        continue-on-error: true
+        run: tests/bench-startup --runs 5 --warmup 1
 
   # Exercise Day 0 startup and uninstall in fresh and preconfigured homes.
   install-e2e:

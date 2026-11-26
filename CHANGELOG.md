@@ -10,6 +10,8 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Completed the contract inventory covering all public modules with an automated CI check enforcing 90%+ coverage, added Linux-specific and PTY interactive test cases, and added an advisory startup-time benchmark check. (DEV-48)
+
 Added launched `cwf-new` sessions on local or remote hosts, with post-create hooks after interactive startup and terminal closure after successful `gwt-clean` cleanup. (DEV-76)
 
 Added `launch-repo` and `repo-list` to discover configured repositories and open existing local or remote worktrees. (DEV-75)

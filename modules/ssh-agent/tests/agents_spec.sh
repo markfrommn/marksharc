@@ -303,4 +303,56 @@ DATA
     The status should be success
   End
   End
+  discover_linux_case() {
+    emulate -L zsh
+    fpath=( "$MARKSHARC_ROOT/modules/ssh-agent/lib" $fpath )
+    autoload -Uz _ms_agent_discover _ms_agent_probe
+    mkdir -p "$XDG_RUNTIME_DIR"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$XDG_RUNTIME_DIR/openssh_agent" || return 1
+    stub_command uname 'printf "Linux\n"'
+    stub_command ssh-add '[ "$1" = -l ] && [ "$SSH_AUTH_SOCK" = "$XDG_RUNTIME_DIR/openssh_agent" ] && exit 0; exit 2'
+    local REPLY=''
+    _ms_agent_discover || return 2
+    [[ $REPLY == "$XDG_RUNTIME_DIR/openssh_agent" ]] || return 3
+    stub_command ssh-add 'exit 2'
+    if _ms_agent_discover; then return 4; fi
+    [[ -z $REPLY ]]
+  }
+  It 'discovers the Linux XDG_RUNTIME_DIR openssh_agent socket when live'
+    When run discover_linux_case
+    The status should be success
+  End
+  discover_forwarded_case() {
+    emulate -L zsh
+    fpath=( "$MARKSHARC_ROOT/modules/ssh-agent/lib" $fpath )
+    autoload -Uz _ms_agent_discover _ms_agent_probe
+    local tmp="$TEST_ROOT/tmp-fwd"
+    mkdir -p "$tmp/ssh-one" "$tmp/ssh-two"
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$tmp/ssh-one/agent.100" || return 1
+    "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$tmp/ssh-two/agent.200" || return 2
+    stub_command uname 'printf "Linux\n"'
+    stub_command timeout 'while [ "$1" = -k ]; do shift 2; done; shift; exec "$@"'
+    stub_command ssh-add '[ "$1" = -l ] && [ "$SSH_AUTH_SOCK" = "'"$tmp"'/ssh-one/agent.100" ] && exit 0; exit 2'
+    hash -r
+    local TMPDIR=$tmp REPLY=''
+    _ms_agent_discover --forwarded || return 3
+    [[ $REPLY == "$tmp/ssh-one/agent.100" ]] || return 4
+    # Two live forwarded sockets are ambiguous and must not be guessed.
+    stub_command ssh-add '[ "$1" = -l ] && exit 0; exit 2'
+    if _ms_agent_discover --forwarded; then return 5; fi
+    [[ -z $REPLY ]] || return 6
+    # More than 8 owned candidates exceed the bounded scan limit.
+    local i
+    for i in 3 4 5 6 7 8 9; do
+      mkdir -p "$tmp/ssh-$i"
+      "$PYTHON" "$MARKSHARC_ROOT/tests/support/pty_socket.py" socket "$tmp/ssh-$i/agent.$i" || return 7
+    done
+    stub_command ssh-add '[ "$1" = -l ] && [ "$SSH_AUTH_SOCK" = "'"$tmp"'/ssh-one/agent.100" ] && exit 0; exit 2'
+    if _ms_agent_discover --forwarded; then return 8; fi
+    [[ -z $REPLY ]]
+  }
+  It 'discovers a single live forwarded socket and refuses ambiguous or oversized candidate sets'
+    When run discover_forwarded_case
+    The status should be success
+  End
 End

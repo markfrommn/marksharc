@@ -1,0 +1,246 @@
+#!/bin/sh
+# Advisory startup-time check (spec 8, DEV-48): install this checkout into a
+# temporary HOME and measure warm zsh batch and interactive (PTY) startup with
+# hyperfine (or a Python timing fallback when hyperfine is absent).
+#
+# Usage:
+#   tests/bench-startup [--runs N] [--warmup N] [--batch-budget-ms MS]
+#                       [--interactive-budget-ms MS] [--strict] [--json PATH]
+#                       [checkout]
+set -eu
+
+suite=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+checkout=$(CDPATH='' cd -- "$suite/.." && pwd)
+runs=${MARKSHARC_BENCH_RUNS:-5}
+warmup=${MARKSHARC_BENCH_WARMUP:-1}
+batch_budget_ms=${MARKSHARC_BENCH_BATCH_MS:-200}
+interactive_budget_ms=${MARKSHARC_BENCH_INTERACTIVE_MS:-500}
+strict=0
+json_out=
+
+usage() {
+  cat <<'EOF' >&2
+usage: tests/bench-startup [--runs N] [--warmup N] [--batch-budget-ms MS]
+                           [--interactive-budget-ms MS] [--strict] [--json PATH]
+                           [checkout]
+EOF
+  exit 2
+}
+
+is_uint() {
+  case $1 in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    --runs) [ $# -ge 2 ] || usage; runs=$2; shift 2 ;;
+    --warmup) [ $# -ge 2 ] || usage; warmup=$2; shift 2 ;;
+    --batch-budget-ms) [ $# -ge 2 ] || usage; batch_budget_ms=$2; shift 2 ;;
+    --interactive-budget-ms) [ $# -ge 2 ] || usage; interactive_budget_ms=$2; shift 2 ;;
+    --strict) strict=1; shift ;;
+    --json) [ $# -ge 2 ] || usage; json_out=$2; shift 2 ;;
+    -h|--help) usage ;;
+    --) shift; break ;;
+    -*) usage ;;
+    *) checkout=$1; shift ;;
+  esac
+done
+[ $# -le 1 ] || usage
+if [ $# -eq 1 ]; then checkout=$1; fi
+
+is_uint "$runs" && [ "$runs" -ge 1 ] || { echo "bench-startup: --runs must be >= 1" >&2; exit 2; }
+is_uint "$warmup" || { echo "bench-startup: --warmup must be >= 0" >&2; exit 2; }
+is_uint "$batch_budget_ms" || { echo "bench-startup: --batch-budget-ms must be >= 0" >&2; exit 2; }
+is_uint "$interactive_budget_ms" || { echo "bench-startup: --interactive-budget-ms must be >= 0" >&2; exit 2; }
+
+checkout=$(CDPATH='' cd -- "$checkout" && pwd)
+[ -r "$checkout/install.sh" ] && [ -r "$checkout/core/zsh/zshenv.zsh" ] || {
+  echo "bench-startup: $checkout is not a marksharc checkout" >&2
+  exit 2
+}
+
+zsh_bin=$(command -v zsh || :)
+[ -n "$zsh_bin" ] || { echo "bench-startup: zsh is required" >&2; exit 127; }
+python_bin=${PYTHON:-$(command -v python3 || :)}
+[ -n "$python_bin" ] || { echo "bench-startup: python3 is required for PTY timing" >&2; exit 127; }
+hyperfine_bin=${HYPERFINE_BIN:-$(command -v hyperfine || :)}
+
+sh_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+workspace=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-bench.XXXXXX")
+trap 'rm -rf -- "$workspace"' EXIT
+trap 'exit 130' HUP INT TERM
+
+home=$workspace/home
+mkdir -p "$home"
+bench_path=/usr/bin:/bin:/usr/sbin:/sbin
+# Preserve only the directory needed for zsh (python3 is invoked by absolute path)
+# so host tool or shim directories cannot leak into the benchmarked shells.
+zsh_dir=$(dirname -- "$zsh_bin")
+case ":$bench_path:" in
+  *":$zsh_dir:"*) ;;
+  *) bench_path="$zsh_dir:$bench_path" ;;
+esac
+
+# Install offline into the throwaway HOME with no agent markers.
+env -i HOME="$home" PATH="$PATH" TERM=dumb SHELL=/bin/sh LANG=C MARKSHARC_NOTIFY=0 \
+  sh "$checkout/install.sh" --home "$checkout" --no-plugins > "$workspace/install.log" 2>&1 || {
+    cat "$workspace/install.log" >&2
+    echo "bench-startup: install.sh failed" >&2
+    exit 1
+  }
+
+# Verify session classification and warm up ZDOTDIR and caches.
+batch_rc=0
+# shellcheck disable=SC2016 # zsh variable expands in the child shell
+batch_session=$(env -i HOME="$home" PATH="$bench_path" TERM=dumb LANG=C MARKSHARC_NOTIFY=0 \
+  "$zsh_bin" -c 'print -r -- "$MARKSHARC_SESSION"' 2>"$workspace/batch.err") || batch_rc=$?
+if [ "$batch_rc" -ne 0 ] || [ "$batch_session" != batch ] || [ -s "$workspace/batch.err" ]; then
+  cat "$workspace/batch.err" >&2
+  echo "bench-startup: expected batch session (rc=$batch_rc), got '$batch_session'" >&2
+  exit 1
+fi
+
+pty_rc=0
+# shellcheck disable=SC2016 # zsh variable expands in the child shell
+pty_out=$(env -i HOME="$home" PATH="$bench_path" TERM=xterm-256color LANG=C MARKSHARC_NOTIFY=0 \
+  "$python_bin" "$checkout/tests/support/pty_socket.py" pty \
+  "$zsh_bin" -ic 'print -r -- "SESSION=$MARKSHARC_SESSION"; exit' 2>&1) || pty_rc=$?
+case $pty_out in
+  *SESSION=interactive*)
+    if [ "$pty_rc" -ne 0 ]; then
+      printf '%s\n' "$pty_out" >&2
+      echo "bench-startup: interactive PTY check failed (rc=$pty_rc)" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    printf '%s\n' "$pty_out" >&2
+    echo "bench-startup: expected interactive PTY session (rc=$pty_rc)" >&2
+    exit 1
+    ;;
+esac
+
+# Write self-contained wrapper scripts so hyperfine never struggles with quoting.
+cat > "$workspace/run-batch.sh" <<EOF
+#!/bin/sh
+exec env -i HOME=$(sh_quote "$home") PATH=$(sh_quote "$bench_path") TERM=dumb LANG=C MARKSHARC_NOTIFY=0 $(sh_quote "$zsh_bin") -c exit
+EOF
+cat > "$workspace/run-interactive.sh" <<EOF
+#!/bin/sh
+exec env -i HOME=$(sh_quote "$home") PATH=$(sh_quote "$bench_path") TERM=xterm-256color LANG=C MARKSHARC_NOTIFY=0 $(sh_quote "$python_bin") $(sh_quote "$checkout/tests/support/pty_socket.py") pty $(sh_quote "$zsh_bin") -ic exit >/dev/null
+EOF
+chmod +x "$workspace/run-batch.sh" "$workspace/run-interactive.sh"
+
+raw_json=$workspace/results.json
+if [ -n "$hyperfine_bin" ] && [ -x "$hyperfine_bin" ]; then
+  runner_name="hyperfine"
+  "$hyperfine_bin" \
+    --warmup "$warmup" \
+    --runs "$runs" \
+    --export-json "$raw_json" \
+    -n "zsh batch" "$(sh_quote "$workspace/run-batch.sh")" \
+    -n "zsh interactive (PTY)" "$(sh_quote "$workspace/run-interactive.sh")"
+else
+  runner_name="python3 fallback"
+  echo "bench-startup: hyperfine not found; using python3 timing fallback"
+  "$python_bin" - "$warmup" "$runs" "$raw_json" "$workspace/run-batch.sh" "$workspace/run-interactive.sh" <<'PY'
+import json
+import statistics
+import subprocess
+import sys
+import time
+
+warmup = int(sys.argv[1])
+runs = int(sys.argv[2])
+out_path = sys.argv[3]
+cases = [
+    ("zsh batch", sys.argv[4]),
+    ("zsh interactive (PTY)", sys.argv[5]),
+]
+results = []
+for name, script in cases:
+    for _ in range(warmup):
+        subprocess.run([script], check=True)
+    times = []
+    for _ in range(runs):
+        t0 = time.monotonic()
+        subprocess.run([script], check=True)
+        times.append(time.monotonic() - t0)
+    results.append({
+        "command": name,
+        "mean": statistics.mean(times),
+        "median": statistics.median(times),
+        "min": min(times),
+        "max": max(times),
+        "times": times,
+    })
+with open(out_path, "w", encoding="utf-8") as fh:
+    json.dump({"results": results}, fh, indent=2)
+PY
+fi
+
+if [ -n "$json_out" ]; then
+  cp -- "$raw_json" "$json_out"
+fi
+
+"$python_bin" - "$raw_json" "$batch_budget_ms" "$interactive_budget_ms" "$strict" "$runner_name" <<'PY'
+import json
+import os
+import sys
+
+json_path = sys.argv[1]
+budgets = {
+    "zsh batch": float(sys.argv[2]),
+    "zsh interactive (PTY)": float(sys.argv[3]),
+}
+strict = int(sys.argv[4]) == 1
+runner = sys.argv[5]
+
+with open(json_path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+over = False
+lines = [
+    "### Advisory startup-time check",
+    "",
+    f"Runner: `{runner}`",
+    "",
+    "| Mode | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Budget (ms) | Status |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+]
+
+for entry in data.get("results", []):
+    name = entry["command"]
+    median_ms = entry["median"] * 1000.0
+    mean_ms = entry["mean"] * 1000.0
+    min_ms = entry["min"] * 1000.0
+    max_ms = entry["max"] * 1000.0
+    budget = budgets.get(name, 500.0)
+    if median_ms <= budget:
+        status = "ok"
+    else:
+        status = "advisory-over"
+        over = True
+    print(
+        f"bench: {name}: median={median_ms:.1f}ms "
+        f"(mean={mean_ms:.1f}ms, min={min_ms:.1f}ms, max={max_ms:.1f}ms, "
+        f"budget={budget:.0f}ms, status={status})"
+    )
+    lines.append(
+        f"| {name} | {median_ms:.1f} | {mean_ms:.1f} | {min_ms:.1f} | {max_ms:.1f} | {budget:.0f} | {status} |"
+    )
+
+summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+if summary_path:
+    with open(summary_path, "a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+if strict and over:
+    sys.exit(1)
+PY

@@ -44,6 +44,33 @@ Describe 'fish plugin loading'
     The status should be success
   End
 
+  fzf_fish_plugin_case() {
+    sha=$(awk '$1 == "plugin" && $2 == "fzf.fish" { print $4 }' "$MARKSHARC_ROOT/modules/fzf-fish/fish.plugins")
+    [ -n "$sha" ] || return 1
+    root="$XDG_CACHE_HOME/marksharc/plugins/fzf.fish@$sha"
+    mkdir -p "$root/conf.d" "$XDG_CONFIG_HOME/marksharc"
+    printf 'set -g FZF_FISH_ACTIVATED yes\n' > "$root/conf.d/fzf_key_bindings.fish"
+    printf 'module path\nmodule fzf-fish\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    env MARKSHARC_HOME="$MARKSHARC_ROOT" zsh -f "$MARKSHARC_ROOT/core/cli/render" > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 2
+    host=$(hostname)
+    host=${host%%.*}
+    fish --no-config -c '
+      source "$MARKSHARC_ROOT/core/fish/lib/path.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/modules.fish"
+      source "$MARKSHARC_ROOT/core/fish/lib/plugins.fish"
+      set MARKSHARC_SESSION batch
+      source "$argv[1]"
+      not set -q FZF_FISH_ACTIVATED; or exit 2
+      set MARKSHARC_SESSION interactive
+      source "$argv[1]"
+      test "$FZF_FISH_ACTIVATED" = yes
+    ' "$XDG_CACHE_HOME/marksharc/$host/env.fish"
+  }
+  It 'loads the fzf-fish pinned plugin only during interactive Fish sessions'
+    When run fzf_fish_plugin_case
+    The status should be success
+  End
+
   owned_node_plugin_case() {
     sha=85cadd56f71b11574566dbd6c32e0027e361d085
     root="$XDG_CACHE_HOME/marksharc/plugins/nvm.fish@$sha"

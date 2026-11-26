@@ -22,8 +22,11 @@ pin, check out the commit in `tests/shellspec.pin` and point
 tests/check
 ```
 
-This runs `tests/lint` and every suite, in the same order as CI. See
-[tests/README.md](../tests/README.md) for single suites and the test rules.
+This runs `tests/lint` and every suite, in the same order as CI (including the
+contract-inventory check in `tests/spec/repo/inventory_spec.sh`). See
+[tests/README.md](../tests/README.md) for single suites, the contract inventory
+and the test rules. Run `tests/bench-startup` for an advisory batch and PTY
+interactive startup-time check in a throwaway HOME.
 CI runs on `macos-latest` and `ubuntu-latest` for every pull request and every
 push to `main`; both must be green before a merge.
 
