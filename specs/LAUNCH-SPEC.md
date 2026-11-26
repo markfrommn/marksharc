@@ -401,7 +401,9 @@ The caller-state protocol (MARKSHARC-SPEC 6.11) gains one line:
 |---|---|
 | `exit [<status>]` | After the remaining directives are applied and the directive file is removed, exit the shell with the status, 0 by default. |
 
-The status must be a number from 0 to 255; any other value is ignored with a message. The zsh and fish appliers implement it. An applier without it reports an unknown directive and continues, and a direct call from bash ignores the file.
+The status must be a number from 0 to 255; any other value is ignored with a message.
+The zsh, Fish and interactive Bash wrappers apply it. Calling the executable directly
+leaves the caller's state alone.
 
 ## 10. Configuration
 

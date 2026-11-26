@@ -10,7 +10,7 @@ _ms_render_cache_valid() {
     local require_completions=${1:-0}
     local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local current= completed= file
-    [[ -r $cache/render-id && -r $cache/env.zsh && -r $cache/env.bash && -r $cache/bash-context ]] || return 1
+    [[ -r $cache/render-id && -r $cache/env.zsh && -r $cache/env.bash && -r $cache/init.bash && -r $cache/bash-context ]] || return 1
     current=$(<"$cache/render-id")
     [[ $current == "$_ms_env_id_value" ]] || return 1
     (( require_completions )) && [[ ! -r $cache/completion-id ]] && return 1
@@ -39,7 +39,8 @@ _ms_render_refresh() {
     local full=${1:-0} cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
     local current= need=0 generate=0
     [[ -r $cache/render-id ]] && current=$(<"$cache/render-id")
-    [[ -n $_ms_env_id_value && -r $cache/env.zsh && -r $cache/env.bash && -r $cache/bash-context && $current == "$_ms_env_id_value" ]] || need=1
+    [[ -n $_ms_env_id_value && -r $cache/env.zsh && -r $cache/env.bash && -r $cache/init.bash &&
+       -r $cache/bash-context && $current == "$_ms_env_id_value" ]] || need=1
     [[ -z ${MARKSHARC_FORCE_BASH_RENDER-} ]] || need=1
     if (( full )); then
         _ms_render_cache_valid 1 || need=1

@@ -1,7 +1,6 @@
 #!/usr/bin/env zsh
 # marksharc command (spec 6.2): dispatch to the executable zsh programs in core/cli/.
-# Commands that must change the calling shell (reload) are the marksharc function that
-# the init phase defines (core/zsh/zshrc.zsh); this program only explains that.
+# The native interactive marksharc function handles reload in the current shell.
 #
 # The framework is the checkout this file belongs to, whatever the caller's directory.
 

@@ -18,6 +18,7 @@ set -eu
 [ $# -eq 1 ] || { echo "usage: $0 <marksharc checkout>" >&2; exit 2; }
 checkout=$(CDPATH='' cd -- "$1" && pwd)
 [ -r "$checkout/install.sh" ] && [ -r "$checkout/core/zsh/zshenv.zsh" ] || { echo "e2e: $1 is not a marksharc checkout" >&2; exit 2; }
+bash_bin=${MARKSHARC_TEST_BASH:-$(command -v bash)}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/marksharc-e2e.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
@@ -171,6 +172,22 @@ EOF
     grep -q 'S=interactive F=1' "$out" || { cat "$out" >&2; fail "terminal shell: expected S=interactive F=1"; }
     # Tools on the machine (starship, atuin, ...) may print in a terminal; marksharc itself must not.
     ! grep -Ei 'marksharc:|command not found|no such file|error' "$out" > /dev/null || { cat "$out" >&2; fail "terminal shell reported a problem"; }
+    step "check interactive Bash login and non-login startup"
+    # shellcheck disable=SC2016 # the version test belongs to the selected Bash
+    if "$bash_bin" -c '(( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) ))'; then
+      bash_kind=function
+    else
+      bash_kind='file'
+    fi
+    for flags in -i -il; do
+      # shellcheck disable=SC2016 # the checks run in the spawned Bash
+      clean_env python3 "$checkout/tests/support/pty_socket.py" pty "$bash_bin" "$flags" -c '
+        [[ $MARKSHARC_SESSION == interactive && $(type -t marksharc) == "$1" ]] || exit 1
+        [[ $1 != function ]] || marksharc reload
+      ' bash "$bash_kind" > "$out" 2>&1 < /dev/null || { cat "$out" >&2; fail "Bash terminal startup ($flags) failed"; }
+      ! grep -Ei 'marksharc:|command not found|no such file|error' "$out" > /dev/null ||
+        { cat "$out" >&2; fail "Bash terminal startup reported a problem"; }
+    done
   else
     step "python3 not found; skipping the terminal check"
   fi

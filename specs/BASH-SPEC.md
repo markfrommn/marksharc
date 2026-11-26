@@ -1,6 +1,8 @@
 # MarkSharc Interactive Bash Specification
 
-Status: design approved 2026-11-25; runtime implementation pending DEV-80–DEV-83.
+Status: design approved 2026-11-25; Bash runtime and caller-state wrappers delivered
+in DEV-80. Tool integrations, native module parity and final acceptance remain
+in DEV-81–DEV-83.
 Issue: [DEV-61](https://linear.app/psols/issue/DEV-61/marksharc-l2-full-interactive-bash).
 Evidence date: 2026-11-25, checkout `624d27d`.
 Authority: [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md), especially sections 6, 6.16 and 10.
