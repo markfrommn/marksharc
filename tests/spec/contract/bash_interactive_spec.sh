@@ -11,7 +11,8 @@ Describe 'Bash interactive runtime'
     esac'
     printf '%s\n' 'source "$MARKSHARC_HOME/core/bash/bashrc.bash"' > "$HOME/.bashrc"
     cp "$HOME/.bashrc" "$HOME/.bash_profile"
-    printf '%s\n' 'set probe.choice "chosen value"' 'set agent.markers LOCAL_AGENT' > "$config/config.conf"
+    printf '%s\n' 'set probe.choice "chosen value"' 'set agent.markers LOCAL_AGENT' \
+      'module prompt-starship off' 'module history-atuin off' 'module zoxide off' > "$config/config.conf"
     cat > "$module/module.conf" <<'EOF'
 describe "Bash contract probe"
 order 90
@@ -126,7 +127,7 @@ EOF
       [[ $(probe_fn) == owned && ! -e $TEST_ROOT/cleanups ]] || exit 14
       marksharc reload >/dev/null || exit 15
       [[ $MARKSHARC_SESSION == interactive && $(kept_fn) == user && ${BASH_ALIASES[kept_alias]} == "printf user" && $PROBE_REPLACED == user ]] || exit 16
-      printf "module probe off\n" > "$MARKSHARC_CONFIG/config.conf"
+      printf "%s\n" "module probe off" "module prompt-starship off" "module history-atuin off" "module zoxide off" > "$MARKSHARC_CONFIG/config.conf"
       marksharc reload || exit 17
       if [[ -n $(type -t probe_fn) || -n $(type -t probe_alias) || -n ${PROBE_ENV+x} || -n ${PROBE_INIT+x} ]]; then
         type -t probe_fn probe_alias

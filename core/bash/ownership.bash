@@ -98,6 +98,7 @@ _ms_bash_record_definitions() {
     local -n _ms_prior=$1 _ms_current=$2
     local _ms_key
     for _ms_key in "${!_ms_current[@]}"; do
+        if [[ $_ms_key == function:* ]] && _ms_bash_is_backend_function "${_ms_key#*:}"; then continue; fi
         _ms_bash_record_effect "${_ms_key%%:*}" "${_ms_key#*:}" "${_ms_prior[$_ms_key]-}" "${_ms_current[$_ms_key]}"
     done
     for _ms_key in "${!_ms_prior[@]}"; do

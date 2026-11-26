@@ -89,6 +89,7 @@ _ms_bash_activate() {
     local _ms_bash_loading_init=1
     local -a _ms_bash_completion_files=()
     local -A _ms_bash_defs_before=() _ms_bash_defs_after=()
+    unset _ms_bash_history_backend
     _ms_bash_snapshot_definitions _ms_bash_defs_before
     _ms_bash_load_file "$1/init.bash"
     _ms_bash_snapshot_definitions _ms_bash_defs_after
@@ -134,6 +135,8 @@ function marksharc {
     if [[ ${1-} == reload ]]; then
         shift
         _ms_bash_reload "$@"
+    elif [[ ${1-} == doctor ]]; then
+        MARKSHARC_BASH_HISTORY=${_ms_bash_history_backend-} command "$MARKSHARC_HOME/bin/marksharc" "$@"
     else
         command "$MARKSHARC_HOME/bin/marksharc" "$@"
     fi

@@ -7,6 +7,12 @@ source "$MARKSHARC_HOME/core/zsh/lib/modules.zsh"
 _ms_verbose=0
 _ms_modules_discover
 integer issues=0
+case ${MARKSHARC_BASH_HISTORY-} in
+    atuin-bash-preexec)
+        print -r -- 'doctor: Bash history uses Atuin with bash-preexec; duration and exit status can be incomplete for some commands' ;;
+    atuin-unavailable)
+        print -r -- 'doctor: Atuin could not initialize recording in this Bash session; native history remains available' ;;
+esac
 mise_tools=${_ms_cfg_set[mise.tools]-${_ms_mod_optdef[mise.tools]-}}
 mise_version_files=${_ms_cfg_set[mise.version_files]-${_ms_mod_optdef[mise.version_files]-on}}
 typeset -a mise_tool_list=( ${=mise_tools} )

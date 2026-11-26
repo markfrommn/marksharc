@@ -7,7 +7,7 @@
 | Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
 | Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
-| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md): Bash runtime and caller-state wrappers in DEV-80, full acceptance pending DEV-81–DEV-83 |
+| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, caller-state wrappers, tool integrations and version managers. Native module parity and final acceptance are tracked in DEV-82 and DEV-83. |
 | Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
@@ -488,6 +488,8 @@ The approved target is substantially equivalent public interactive behavior in B
 support. Older versions never automatically exec a newer shell, and startup stays
 quiet; `doctor` reports the interactive version requirement as part of DEV-83.
 DEV-80 provides native interactive startup, reload, hooks and caller-state wrappers.
+DEV-81 provides the Starship, Atuin, native history, zoxide, direnv and version-manager
+adapters.
 
 The complete behavior contract, module coverage, accepted gaps and acceptance matrix
 are in [BASH-SPEC.md](BASH-SPEC.md). Its requirements include:
