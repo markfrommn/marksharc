@@ -35,6 +35,10 @@ and XDG directories, `TMPDIR`, `MARKSHARC_ROOT`, `REAL_GIT` and `TERM=dumb`.
 fishtape runs each test file in its own fish process. Files source
 `fish/support/helpers.fish` (`ms_fixture`, `ms_stub`, `ms_module`, `ms_cleanup`)
 for a private HOME, stubs first on PATH, and loud stubs for network and service commands.
+The runner sets `MISE_FISH_AUTO_ACTIVATE=0` inside its scrubbed environment so Homebrew's
+global mise startup hook cannot inject host paths into the parent or per-file children.
+Fish configuration loading stays enabled because fishtape shares its assertion counters
+through universal variables; `--no-config` would disable that persistence.
 
 ## Layout
 

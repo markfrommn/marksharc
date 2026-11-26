@@ -44,6 +44,31 @@ EOF
     The line 3 of output should include 'modules/ps/tests/ps_test.fish'
   End
 
+  fish_startup_isolation_case() {
+    mkdir -p "$TEST_ROOT/fake"
+    cat > "$TEST_ROOT/fake/fishtape.fish" <<'EOF'
+function fishtape
+    if test "$argv[1]" = --version
+        echo 'fishtape, version 3.0.1'
+        return 0
+    end
+    if test "$MISE_FISH_AUTO_ACTIVATE" != 0
+        echo 'not ok 1 parent mise activation enabled'
+        return 1
+    end
+    fish -c 'if test "$MISE_FISH_AUTO_ACTIVATE" = 0; echo "ok 1 child mise activation disabled"; else; echo "not ok 1 child mise activation enabled"; exit 1; end'
+end
+EOF
+    env MISE_FISH_AUTO_ACTIVATE=1 FISHTAPE_FUNC="$TEST_ROOT/fake/fishtape.fish" \
+      "$MARKSHARC_ROOT/tests/run-fish-units" modules/ps/tests/ps_test.fish
+  }
+  It 'disables host mise activation in the scrubbed parent and per-file children'
+    When run fish_startup_isolation_case
+    The status should be success
+    The output should include 'ok 1 child mise activation disabled'
+    The output should not include 'not ok'
+  End
+
   # fake_reporting_fishtape LINE: a pinned-version fishtape that prints LINE and exits 0.
   fake_reporting_fishtape() {
     mkdir -p "$TEST_ROOT/fake"
