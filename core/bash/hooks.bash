@@ -94,7 +94,8 @@ _ms_bash_bp_replace() {
 }
 
 _ms_bash_has_bash_preexec() {
-    [[ -n ${bash_preexec_imported-}${__bp_imported-} ]] &&
+    [[ -n ${bash_preexec_imported-}${__bp_imported-} &&
+       ${PROMPT_COMMAND[*]-} == *'__bp_'* ]] &&
         declare -F __bp_precmd_invoke_cmd >/dev/null
 }
 

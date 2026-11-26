@@ -144,6 +144,11 @@ exit
   atuin_case() {
     prepare_tools
     printf 'module history-atuin\n' >> "$MARKSHARC_CONFIG/config.conf"
+    mkdir "$MARKSHARC_CONFIG/local"
+    cat > "$MARKSHARC_CONFIG/local/post.bash" <<'EOF'
+record_prompt() { printf 'prompt\n' >> "$TEST_ROOT/atuin-prompt"; }
+_ms_bash_register_prompt record_prompt
+EOF
     # These are the documented callback arrays injected into Readline by bash-preexec.
     cat > "$HOME/.bashrc" <<'EOF'
 foreign_preexec() { :; }
@@ -194,6 +199,16 @@ EOF
         bind -m emacs -X
         exit 29
       }
+      printf "module history-atuin\n" >> "$MARKSHARC_CONFIG/config.conf"
+      marksharc reload || exit 30
+      [[ -z ${HISTFILE-} ]] || exit 31
+      PROMPT_COMMAND=": user"
+      marksharc reload || exit 32
+      [[ $HISTFILE == "$XDG_STATE_HOME/marksharc/history.bash" &&
+         ${preexec_functions[*]} == foreign_preexec ]] || exit 33
+      : > "$TEST_ROOT/atuin-prompt"
+      eval "$PROMPT_COMMAND"
+      [[ -s $TEST_ROOT/atuin-prompt ]] || exit 34
     ' || return
     [ "$(grep -Fxc start:sample "$TEST_ROOT/record")" = 1 ] &&
       [ "$(wc -l < "$TEST_ROOT/generated")" -eq 1 ]

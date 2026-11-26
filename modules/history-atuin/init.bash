@@ -16,7 +16,13 @@ _ms_bash_atuin_init() {
     if declare -F blehook >/dev/null; then
         initial_backend=ble
         cache_backend=ble
-    elif _ms_bash_has_bash_preexec && [[ ${PROMPT_COMMAND[*]-} == *'__bp_'* ]]; then
+    elif [[ -n ${bash_preexec_imported-}${__bp_imported-} ]]; then
+        # A replacement PROMPT_COMMAND can detach bash-preexec while its
+        # import guard remains set. A fresh shell is needed to reinstall it.
+        if ! _ms_bash_has_bash_preexec; then
+            _ms_bash_history_backend=atuin-unavailable
+            return 1
+        fi
         initial_backend=bash-preexec
     fi
     # Leave an explicitly configured Atuin instance to its owner.
@@ -50,8 +56,7 @@ _ms_bash_atuin_init() {
         # part of Atuin init fails. Its definitions must survive a reload.
         _ms_bash_atuin_loaded_preexec=1
     fi
-    if [[ $initial_backend != ble ]] && _ms_bash_has_bash_preexec &&
-       [[ ${PROMPT_COMMAND[*]-} == *'__bp_'* ]]; then
+    if [[ $initial_backend != ble ]] && _ms_bash_has_bash_preexec; then
         initial_backend=bash-preexec
     fi
     if (( status != 0 )) || [[ -z $initial_backend || -z ${ATUIN_SESSION-} || ! -o history ]] ||
