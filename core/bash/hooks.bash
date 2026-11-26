@@ -147,6 +147,22 @@ _ms_bash_prompt_build_replay() {
 
 _ms_bash_prompt_return() { return "$1"; }
 
+# A directory widget runs between prompts. Update the same callbacks and let
+# the editor redraw the current buffer with the new prompt.
+_ms_bash_widget_redraw() {
+    if [[ ${_ms_bash_prompt_owned-} ]]; then
+        _ms_bash_prompt_capture 0 0
+        eval "$_ms_bash_prompt_replay"
+    else
+        _ms_bash_prompt_dispatch 0 0
+    fi
+    if declare -F ble/widget/redraw-line >/dev/null; then
+        ble/widget/redraw-line
+    else
+        printf '\r\033[2K%s' "${PS1@P}"
+    fi
+}
+
 _ms_bash_prompt_install() {
     local declaration flags
     local -a indices

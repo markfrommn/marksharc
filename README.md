@@ -2,13 +2,13 @@
 
 Mark's shell RC files, rebuilt for the modern, agentic era.
 
-marksharc is a modular shell framework for **zsh** and **fish**, with the same
-environment in **bash** for scripts and agents. Functional areas are modules.
+marksharc is a modular shell framework for **zsh**, **fish**, and **Bash 4.4+**.
+Older Bash can load the environment for scripts and agents. Functional areas are modules.
 Configuration lives in a separate overlay that you own, so the framework
 checkout stays read-only on every host.
 
 > **Status:** early development. The zsh framework, the public modules, the
-> installer, Bash environment, and `marksharc` bootstrap, update, and install commands
+> installer, Bash startup, and `marksharc` bootstrap, update, and install commands
 > are in place. Fish runs every module natively; see [docs/fish.md](docs/fish.md)
 > for the parity table and how to retire an old fish configuration and fisher.
 
@@ -17,7 +17,8 @@ checkout stays read-only on every host.
 - macOS or Linux
 - zsh 5.9 or later
 - fish 4.x (optional)
-- bash 5.x (environment only)
+- Bash 4.4 or later for interactive features, optional. The macOS Bash 3.2
+  system shell supports the environment.
 - git
 
 The `marksharc` command uses zsh. Fish also uses it to refresh the environment
@@ -144,7 +145,7 @@ Modules and overlay configuration register `update <label> <command> [args...]` 
 installer paths and update executable paths beginning `./` resolve from the declaring
 module or overlay root. Missing update commands are skipped; other failures are reported
 after remaining steps run. `marksharc install` runs only an executable registered script.
-The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv`, `nvm` and `mise`.
+The included installer names are `krew`, `gvm`, `wezterm-terminfo`, `pyenv`, `nvm`, `mise` and `ble.sh`.
 
 For per-host Node, Go, Python, and Ruby ownership through mise, including startup behavior,
 fallback, compatibility commands, and migration, see [the mise guide](docs/mise.md).
@@ -159,9 +160,10 @@ The interactive layer is on by default and degrades to native behaviour for each
 | `ps` | The ps helpers drawn by procs | `procs` |
 | `launch` | Open a local or remote terminal through Herdr Core, Herdr TUI or tmux | `prefer`, `place`, `focus` |
 | `prompt-starship` | A starship config file or the bundled `rich` preset | `config` |
-| `completion-carapace` | Opt-in Carapace completion for zsh; disables `completion-fzf-tab` unless forced | `enable`, `bridges`, `excludes`, `allow_fzf_tab` |
+| `completion-carapace` | Opt-in Carapace completion for zsh and Bash | `enable`, `bridges`, `excludes`, `allow_fzf_tab` (zsh) |
+| `line-editor-ble` | Optional Bash editor with suggestions, highlighting, and menu completion | |
 
-Switch between `fzf-tab` and `carapace` persistently via `set completion-carapace.enable on|off`
+In zsh, switch between `fzf-tab` and `carapace` persistently via `set completion-carapace.enable on|off`
 or for a single session with `completion-ui carapace|fzf-tab|both|native|reset` (followed by
 `exec zsh -l`).
 
@@ -193,10 +195,40 @@ the generated artifacts. Render again after adding or removing a provider or Her
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
 its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
-Module commands and generated provider and session shims are on PATH in zsh and fish sessions and
-are inherited by child processes, including `bash -c`. Native wrappers apply caller-state changes
-for commands such as `cwf-new` in either shell. See the
+Module commands and generated provider and session shims are on PATH in zsh, Fish, and Bash
+and are inherited by child processes. Native wrappers apply caller-state changes
+for commands such as `cwf-new` in all three shells. See the
 [write-once command and provider migration guide](docs/write-once.md) for configuration and hooks.
+
+## Interactive Bash
+
+Open the Bash 4.4+ executable you want to use. Login and non-login terminals
+load the same interactive features. Older Bash, no-TTY sessions, and configured
+agents use the environment layer.
+
+Run `marksharc install ble.sh` with Git, GNU make, and GNU awk available to build
+the pinned editor in the plugin cache. `marksharc update --only ble-sh` refreshes
+an existing installation when the pin changes. Open a fresh Bash session after
+installing it. `module line-editor-ble off` in the overlay selects Readline.
+Readline supplies completion and listing, and ble.sh adds a selectable menu,
+suggestions, and highlighting.
+
+Bash loads bash-completion when installed. Set `completion-carapace.enable` to
+`on` to add Carapace, with `completion-carapace.bridges` and
+`completion-carapace.excludes` for its command sources. zoxide and MarkSharc's
+launch, CWF, and Herdr completions retain their own registrations. Run
+`completion-ui status` to see the active and pending editor and completion
+provider. `completion-ui readline|ble|native|carapace|reset` sets or clears a
+session override. Apply backend and Carapace setting changes with an explicit
+`exec bash -l`. `marksharc reload` applies ordinary module changes in place.
+
+With fzf 0.48 or later, Ctrl-T inserts selected files and Alt-C changes to a
+selected directory. Atuin owns Ctrl-R and Up when it initializes successfully.
+Otherwise Bash keeps native history at
+`${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/history.bash`. Directory-driven
+integrations run before the next prompt, so `cd project; node …` may run before
+an automatic version switch. Run `marksharc doctor` for the active editor and
+history mode and any missing build prerequisites.
 
 ## Bash and agents
 

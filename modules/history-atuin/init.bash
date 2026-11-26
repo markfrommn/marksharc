@@ -7,7 +7,7 @@ _ms_bash_atuin_cleanup() {
 }
 
 _ms_bash_atuin_init() {
-    local name initial_backend='' status=0 context config cache_backend=readline
+    local name initial_backend='' status=0 context config cache_backend=readline history_file=''
     # shellcheck disable=SC2034 # The key snapshots are passed by name.
     local -A old_keys=() new_keys=() old_variables=()
     local -a variables=(ATUIN_SESSION ATUIN_SHLVL ATUIN_PREEXEC_BACKEND)
@@ -16,6 +16,9 @@ _ms_bash_atuin_init() {
     if declare -F blehook >/dev/null; then
         initial_backend=ble
         cache_backend=ble
+        # ble.sh also reads this during attach. A null device preserves
+        # in-memory recall without an empty-file warning or native persistence.
+        history_file=/dev/null
     elif [[ -n ${bash_preexec_imported-}${__bp_imported-} ]]; then
         # A replacement PROMPT_COMMAND can detach bash-preexec while its
         # import guard remains set. A fresh shell is needed to reinstall it.
@@ -28,7 +31,7 @@ _ms_bash_atuin_init() {
     # Leave an explicitly configured Atuin instance to its owner.
     if [[ ${__atuin_initialized-} == true && -n ${ATUIN_SESSION-} && -n $initial_backend ]]; then
         _ms_bash_history_backend=atuin-$initial_backend
-        _ms_bash_set_option HISTFILE ''
+        _ms_bash_set_option HISTFILE "$history_file"
         return
     fi
     for name in "${variables[@]}"; do old_variables[$name]=$(_ms_bash_effect variable "$name"); done
@@ -61,7 +64,7 @@ _ms_bash_atuin_init() {
     fi
     if (( status != 0 )) || [[ -z $initial_backend || -z ${ATUIN_SESSION-} || ! -o history ]] ||
        ! declare -F __atuin_preexec __atuin_precmd >/dev/null ||
-       ! _ms_bash_set_option HISTFILE ''; then
+       ! _ms_bash_set_option HISTFILE "$history_file"; then
         _ms_bash_atuin_cleanup
         for name in "${variables[@]}"; do
             _ms_bash_restore_effect variable "$name" "${old_variables[$name]}"

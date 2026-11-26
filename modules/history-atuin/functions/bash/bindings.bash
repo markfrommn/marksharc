@@ -14,7 +14,7 @@ _ms_bash_atuin_keymap() {
                 key=$map:${BASH_REMATCH[1]}
                 # shellcheck disable=SC2034 # Writes to the caller's map.
                 bindings[$key]=$kind:$line
-            done < <(bind -m "$map" "-$kind" 2>/dev/null)
+            done < <(_ms_bash_binding_dump -m "$map" "-$kind" 2>/dev/null)
         done
     done
 }

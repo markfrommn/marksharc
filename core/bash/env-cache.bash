@@ -22,7 +22,9 @@ _ms_bash_context_valid() {
         IFS= read -r context_id
     } < "$cache/bash-context" || return 1
     IFS= read -r render_id < "$cache/render-id" || return 1
-    [[ $context_home == "$HOME" && $context_framework == "$MARKSHARC_HOME" &&
+    # The CLI resolves its framework path physically; installed stubs can retain
+    # a logical path (for example /var versus /private/var on macOS).
+    [[ $context_home == "$HOME" && $context_framework -ef $MARKSHARC_HOME &&
        $context_config == "${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}" &&
        -n $render_id && $context_id == "$render_id" ]] || return 1
     _ms_bash_artifact_matches "$cache/env.bash" "$render_id" || return 1

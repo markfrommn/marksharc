@@ -6,6 +6,8 @@ source "$MARKSHARC_HOME/core/bash/cache.bash"
 source "$MARKSHARC_HOME/core/bash/directives.bash"
 # shellcheck source=core/bash/hooks.bash
 source "$MARKSHARC_HOME/core/bash/hooks.bash"
+# shellcheck source=core/bash/backends.bash
+source "$MARKSHARC_HOME/core/bash/backends.bash"
 
 declare -ga _ms_bash_cleanup_order=()
 declare -gA _ms_bash_cleanup_definitions=()
@@ -115,6 +117,10 @@ _ms_bash_activate() {
     _ms_bash_snapshot_definitions _ms_bash_defs_after
     _ms_bash_record_definitions _ms_bash_defs_before _ms_bash_defs_after
     _ms_bash_hooks_install
+    if [[ ${_ms_bash_ble_attach_pending-} ]]; then
+        unset _ms_bash_ble_attach_pending
+        ble-attach
+    fi
     return 0
 }
 
@@ -156,7 +162,11 @@ function marksharc {
         shift
         _ms_bash_reload "$@"
     elif [[ ${1-} == doctor ]]; then
-        MARKSHARC_BASH_HISTORY=${_ms_bash_history_backend-} command "$MARKSHARC_HOME/bin/marksharc" "$@"
+        _ms_bash_select_backends
+        MARKSHARC_BASH_VERSION=$BASH_VERSION MARKSHARC_BASH_HISTORY=${_ms_bash_history_backend-} \
+            MARKSHARC_BASH_BACKENDS=$_ms_bash_active_editor/$_ms_bash_active_completion \
+            MARKSHARC_BASH_PENDING=$_ms_bash_pending_editor/$_ms_bash_pending_completion \
+            command "$MARKSHARC_HOME/bin/marksharc" "$@"
     else
         command "$MARKSHARC_HOME/bin/marksharc" "$@"
     fi

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Run every check CI runs: lint, the zsh suite, the contract suite, the install
-# suite, the repository suite and the fish unit suite.
+# Run lint and the local shell suites. CI also runs the pinned-interpreter
+# matrix and install and live PTY checks.
 set -eu
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 "$here/lint"

@@ -6,7 +6,9 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import tty
 
 if sys.argv[1] == 'socket':
     with socket.socket(socket.AF_UNIX) as sock:
@@ -16,12 +18,27 @@ elif sys.argv[1] == 'pty':
     # PTY_INPUT (optional) is typed into the terminal once the child has started; the child
     # does not see the variable.
     typed = os.environ.get('PTY_INPUT')
+    if typed is not None:
+        # Avoid the kernel's canonical input limit during scripted startup;
+        # interactive editors manage their own input once they initialize.
+        tty.setcbreak(slave)
     child_env = {k: v for k, v in os.environ.items() if k != 'PTY_INPUT'}
     proc = subprocess.Popen(sys.argv[2:], stdin=slave, stdout=slave, stderr=slave,
                             start_new_session=True, close_fds=True, env=child_env)
     os.close(slave)
+    def send_input():
+        pending = memoryview(typed.encode())
+        try:
+            while pending:
+                pending = pending[os.write(master, pending):]
+        except OSError:
+            # The child may exit without consuming all supplied input.
+            pass
+
+    # A blocking write of the whole script can fill macOS's PTY queues.
+    # Send on a separate thread so echo/output is drained at the same time.
     if typed is not None:
-        os.write(master, typed.encode())
+        threading.Thread(target=send_input, daemon=True).start()
     deadline = time.monotonic() + 15
     try:
         while True:

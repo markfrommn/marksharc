@@ -169,7 +169,7 @@ _ms_modules_discover() {
             # Rendered directives are read by render.zsh only. Warm startup discovers
             # metadata here and must not tokenize the cached vocabulary a second time.
             case $line in
-                env\ *|path\ *|alias\ *|completion\ *) continue ;;
+                env\ *|path\ *|alias\ *|completion\ *|completion-bash\ *) continue ;;
             esac
             _ms_words "$line" || continue
             case ${reply[1]} in
