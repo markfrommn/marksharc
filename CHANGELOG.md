@@ -11,6 +11,7 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 ## [Unreleased]
 
 Fixed the `pager` module replacing `MANPATH` with a fixed list, which hid Homebrew and PATH-derived man pages; it now keeps what earlier modules set and ends with one empty entry, identically in zsh, fish and Bash. (DEV-70)
+Made doctor identify and quote blocked compinit and new-user startup prompts promptly, with deterministic insecure-directory coverage and cleanup of blocked shells. (DEV-67)
 
 Added `install.sh --coexist` mode so zsh users can try MarkSharc via one marked source line in `~/.zshenv` and `~/.zshrc` without redirecting `ZDOTDIR` or replacing existing startup files, with full doctor diagnostics and clean uninstall. (DEV-63)
 
