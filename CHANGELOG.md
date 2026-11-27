@@ -10,6 +10,8 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Added `install.sh --coexist` mode so zsh users can try MarkSharc via one marked source line in `~/.zshenv` and `~/.zshrc` without redirecting `ZDOTDIR` or replacing existing startup files, with full doctor diagnostics and clean uninstall. (DEV-63)
+
 Completed the contract inventory covering all public modules with an automated CI check enforcing 90%+ coverage, added Linux-specific and PTY interactive test cases, and added an advisory startup-time benchmark check. (DEV-48)
 
 Added launched `cwf-new` sessions on local or remote hosts, with post-create hooks after interactive startup and terminal closure after successful `gwt-clean` cleanup. (DEV-76)

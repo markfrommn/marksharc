@@ -69,6 +69,13 @@ What it does:
   `marksharc update` fetches them later. `--no-plugins` skips this step.
 - **Login shell.** It never runs `chsh`; it prints the command when your login shell is not zsh.
 
+`sh install.sh --coexist` installs alongside your existing zsh startup files
+instead of backing them up or redirecting `ZDOTDIR`: it writes managed coexist
+stubs under `${XDG_STATE_HOME:-~/.local/state}/marksharc/coexist/` and adds one
+marked source line to `~/.zshenv` and `~/.zshrc` while leaving your existing
+zsh, Bash, and Fish startup files in place. `marksharc uninstall` removes those
+source lines and the coexist stubs while keeping your own edits.
+
 `sh install.sh --clobber` answers yes to optional cleanup. For the piped install,
 pass the flag as `| sh -s -- --clobber`. Without a terminal, optional cleanup
 defaults to no unless you pass `--clobber`. Add `--dry-run` to preview the

@@ -46,9 +46,12 @@ done < "$manifest"
 
 [[ ${mf[version]-} == 1 ]] || die "unsupported manifest version in $manifest"
 [[ ${mf[home]-} == "$HOME" ]] || die "the manifest is for HOME ${mf[home]-unknown}, not $HOME"
+install_mode=${mf[mode]-takeover}
+[[ $install_mode == (takeover|coexist) ]] || die "unsupported install mode '$install_mode' in $manifest"
 
 stub=$HOME/.zshenv
 stub_mark='# marksharc: managed stub'
+coexist_mark='# marksharc: coexist'
 stub_is_ours() {
     local first check=${1:-$stub}
     [[ -f $check && ! -L $check ]] || return 1
@@ -57,69 +60,84 @@ stub_is_ours() {
 }
 
 typeset -a problems=()
-fish_stub=${mf[fish_stub]-}
+fish_stub=
 fish_config_base=${XDG_CONFIG_HOME:-$HOME/.config}
 while [[ $fish_config_base == ?*/ ]]; do fish_config_base=${fish_config_base%/}; done
 fish_dir=${fish_config_base%/}/fish
-if [[ -n $fish_stub && $fish_stub != "$fish_dir/conf.d/00-marksharc.fish" ]]; then
-    problems+=( "fish stub $fish_stub is outside the current XDG_CONFIG_HOME; restore the install-time XDG_CONFIG_HOME" )
-fi
-fish_backup=${mf[fish_backup]-}
-fish_original=$fish_backup/fish
-fish_checkpoint=$fish_backup/.restore-inode
+fish_backup=
+fish_original=
+fish_checkpoint=
 fish_restored=0
 fish_inode() {
     local -a inode
     zstat -L -A inode +inode -- "$1" || return 1
     print -r -- "$inode[1]"
 }
-if [[ -n $fish_backup ]]; then
-    zmodload zsh/stat || die "could not load zsh/stat to restore the Fish configuration"
-    if [[ $fish_backup != "${fish_config_base%/}/.marksharc-fish-backup."* || ${fish_backup:h} != "$fish_config_base" ||
-          ! -d $fish_backup || -L $fish_backup ]]; then
-        problems+=( "the Fish configuration backup is missing or outside the current XDG_CONFIG_HOME: $fish_backup" )
-    elif [[ ! -e $fish_original && ! -L $fish_original ]]; then
-        restored_inode=$(fish_inode "$fish_dir" 2>/dev/null) || restored_inode=
-        if [[ -n $restored_inode && -f $fish_checkpoint && ! -L $fish_checkpoint &&
-              $restored_inode == "$(< "$fish_checkpoint")" ]]; then
-            fish_restored=1
-        else
-            problems+=( "the original Fish configuration is missing from $fish_backup" )
+typeset -a names=() files_to_restore=() links_to_restore=() restore_targets=() already_restored=()
+backup=${mf[backup]-}
+if [[ $install_mode == coexist ]]; then
+    for name in .zshenv .zshrc; do
+        if [[ -L $HOME/$name && ! -e $HOME/$name ]]; then
+            problems+=( "$HOME/$name is a broken symlink; fix or remove it before uninstalling" )
+        elif [[ -e $HOME/$name && ! -f $HOME/$name ]]; then
+            problems+=( "$HOME/$name is not a regular file; move it aside before uninstalling" )
+        fi
+    done
+else
+    fish_stub=${mf[fish_stub]-}
+    if [[ -n $fish_stub && $fish_stub != "$fish_dir/conf.d/00-marksharc.fish" ]]; then
+        problems+=( "fish stub $fish_stub is outside the current XDG_CONFIG_HOME; restore the install-time XDG_CONFIG_HOME" )
+    fi
+    fish_backup=${mf[fish_backup]-}
+    fish_original=$fish_backup/fish
+    fish_checkpoint=$fish_backup/.restore-inode
+    if [[ -n $fish_backup ]]; then
+        zmodload zsh/stat || die "could not load zsh/stat to restore the Fish configuration"
+        if [[ $fish_backup != "${fish_config_base%/}/.marksharc-fish-backup."* || ${fish_backup:h} != "$fish_config_base" ||
+              ! -d $fish_backup || -L $fish_backup ]]; then
+            problems+=( "the Fish configuration backup is missing or outside the current XDG_CONFIG_HOME: $fish_backup" )
+        elif [[ ! -e $fish_original && ! -L $fish_original ]]; then
+            restored_inode=$(fish_inode "$fish_dir" 2>/dev/null) || restored_inode=
+            if [[ -n $restored_inode && -f $fish_checkpoint && ! -L $fish_checkpoint &&
+                  $restored_inode == "$(< "$fish_checkpoint")" ]]; then
+                fish_restored=1
+            else
+                problems+=( "the original Fish configuration is missing from $fish_backup" )
+            fi
         fi
     fi
-fi
-backup=${mf[backup]-}
-typeset -a names=( $files $linknames ) files_to_restore=() links_to_restore=() restore_targets=() already_restored=()
-for name in $names; do
-    [[ $name == (.zshenv|.zshrc|.zprofile|.zlogin|.zlogout|.bashrc|.bash_profile|.bash_login|.profile|.login) ]] || problems+=( "the manifest names an unexpected file: $name" )
-done
-for name in $files; do
-    if [[ -z $backup || ! -f $backup/$name || -L $backup/$name ]]; then
-        problems+=( "the backup copy of $name is missing (looked in ${backup:-no backup directory})" )
-    elif [[ -f $HOME/$name && ! -L $HOME/$name ]] && command cmp -s -- "$HOME/$name" "$backup/$name"; then
-        # A previous attempt can have restored this file before another operation failed.
-        already_restored+=( "$name" )
-    else
-        files_to_restore+=( "$name" )
+    names=( $files $linknames )
+    for name in $names; do
+        [[ $name == (.zshenv|.zshrc|.zprofile|.zlogin|.zlogout|.bashrc|.bash_profile|.bash_login|.profile|.login) ]] || problems+=( "the manifest names an unexpected file: $name" )
+    done
+    for name in $files; do
+        if [[ -z $backup || ! -f $backup/$name || -L $backup/$name ]]; then
+            problems+=( "the backup copy of $name is missing (looked in ${backup:-no backup directory})" )
+        elif [[ -f $HOME/$name && ! -L $HOME/$name ]] && command cmp -s -- "$HOME/$name" "$backup/$name"; then
+            # A previous attempt can have restored this file before another operation failed.
+            already_restored+=( "$name" )
+        else
+            files_to_restore+=( "$name" )
+            restore_targets+=( "$name" )
+        fi
+    done
+    integer i
+    for (( i = 1; i <= ${#linknames}; i++ )); do
+        name=${linknames[i]}
+        if [[ -L $HOME/$name && $(command readlink "$HOME/$name") == "${linktargets[i]}" ]]; then
+            already_restored+=( "$name" )
+            continue
+        fi
+        links_to_restore+=( "$i" )
         restore_targets+=( "$name" )
-    fi
-done
-integer i
-for (( i = 1; i <= ${#linknames}; i++ )); do
-    name=${linknames[i]}
-    if [[ -L $HOME/$name && $(command readlink "$HOME/$name") == "${linktargets[i]}" ]]; then
-        already_restored+=( "$name" )
-        continue
-    fi
-    links_to_restore+=( "$i" )
-    restore_targets+=( "$name" )
-done
-for name in $restore_targets; do
-    if [[ -e $HOME/$name || -L $HOME/$name ]]; then
-        if [[ $name == (.zshenv|.bashrc|.bash_profile) ]] && stub_is_ours "$HOME/$name"; then continue; fi
-        problems+=( "$HOME/$name exists and is not the marksharc stub; move it aside so the original can be restored" )
-    fi
-done
+    done
+    for name in $restore_targets; do
+        if [[ -e $HOME/$name || -L $HOME/$name ]]; then
+            if [[ $name == (.zshenv|.bashrc|.bash_profile) ]] && stub_is_ours "$HOME/$name"; then continue; fi
+            problems+=( "$HOME/$name exists and is not the marksharc stub; move it aside so the original can be restored" )
+        fi
+    done
+fi
 
 # Purge targets: only directories that are plainly marksharc's, and never the overlay.
 typeset -a purge_targets=()
@@ -224,45 +242,82 @@ trap 'exit 130' HUP INT TERM
 current_manifest=$(command cksum < "$manifest") || die "could not read $manifest"
 [[ $current_manifest == "$initial_manifest" ]] || die "the install manifest changed; re-run uninstall"
 
-if (( ${already_restored[(Ie).zshenv]} == 0 )) && stub_is_ours; then
-    # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
-    # file. The fingerprint recorded at install time tells an edit from the stub as written.
-    cur=$(command cksum < "$stub")
+coexist_remove_line() {
+    local dotfile=$1 created=$2 target tmp
+    [[ -e $dotfile ]] || return 0
+    target=${dotfile:A}
+    MS_MARK=$coexist_mark command awk 'index($0, ENVIRON["MS_MARK"]) > 0 { found = 1 } END { exit !found }' "$target" || return 0
+    tmp=$target.marksharc-uninstall.$$
+    command cp -p -- "$target" "$tmp" || die "could not stage edit of $dotfile"
+    if ! MS_MARK=$coexist_mark command awk 'index($0, ENVIRON["MS_MARK"]) == 0 { print }' "$target" >| "$tmp"; then
+        command rm -f -- "$tmp"
+        die "could not remove the marksharc coexist line from $dotfile"
+    fi
+    if [[ $created == 1 && ! -L $dotfile && ! -s $tmp ]]; then
+        command rm -f -- "$tmp" "$dotfile" || die "could not remove empty $dotfile"
+    else
+        command mv -f -- "$tmp" "$target" || { command rm -f -- "$tmp"; die "could not update $dotfile"; }
+    fi
+}
+coexist_save_if_edited() {
+    local file=$1 sum=$2 dest_base=$3 cur saved
+    [[ -n $file && -f $file && ! -L $file ]] || return 0
+    cur=$(command cksum < "$file")
     cur=${(j: :)${=cur}}
-    if [[ $cur != "${mf[stub_sum]-}" ]]; then
-        saved=$HOME/.zshenv.marksharc-removed
+    if [[ -n $sum && $cur != "${(j: :)${=sum}}" ]]; then
+        saved=$dest_base.marksharc-removed
         [[ -e $saved || -L $saved ]] && saved=$saved.$$
-        command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
-        print -r -- "marksharc: the stub had been edited; your copy is in $saved (merge any lines you still need)."
+        command cp -p -- "$file" "$saved" || die "could not save the edited coexist stub to $saved"
+        print -r -- "marksharc: the coexist stub had been edited; your copy is in $saved (merge any lines you still need)."
     fi
-    command rm -f -- "$stub" || die "could not remove $stub"
-fi
-for name in .bashrc .bash_profile; do
-    (( ${already_restored[(Ie)$name]} == 0 )) || continue
-    stub=$HOME/$name
-    stub_is_ours || continue
-    cur=$(command cksum < "$stub")
-    cur=${(j: :)${=cur}}
-    if [[ $cur != "${mf[bash_stub_sum]-}" ]]; then
-        saved=$stub.marksharc-removed
-        [[ -e $saved || -L $saved ]] && saved=$saved.$$
-        command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
-    fi
-    command rm -f -- "$stub" || die "could not remove $stub"
-done
-stub=$HOME/.zshenv
-for name in $files_to_restore; do
-    temporary=$(command mktemp "$HOME/$name.marksharc-restore.XXXXXX") ||
-        die "could not stage the restore of $HOME/$name"
-    if ! { command cp -p -- "$backup/$name" "$temporary" && command mv -f -- "$temporary" "$HOME/$name"; }; then
-        command rm -f -- "$temporary"
-        die "could not restore $HOME/$name (the backup is in $backup)"
-    fi
-done
-for i in $links_to_restore; do
-    command ln -s -- "${linktargets[i]}" "$HOME/${linknames[i]}" || die "could not restore the link $HOME/${linknames[i]}"
-done
+}
+
 state=${mf[state]-}
+if [[ $install_mode == coexist ]]; then
+    coexist_remove_line "$HOME/.zshenv" "${mf[coexist_zshenv_created]-0}"
+    coexist_remove_line "$HOME/.zshrc" "${mf[coexist_zshrc_created]-0}"
+    coexist_save_if_edited "${mf[coexist_zshenv]-}" "${mf[coexist_zshenv_sum]-}" "$HOME/.zshenv"
+    coexist_save_if_edited "${mf[coexist_zshrc]-}" "${mf[coexist_zshrc_sum]-}" "$HOME/.zshrc"
+else
+    if (( ${already_restored[(Ie).zshenv]} == 0 )) && stub_is_ours; then
+        # Lines added to the stub by hand (an installer's PATH line, say) are kept beside the restored
+        # file. The fingerprint recorded at install time tells an edit from the stub as written.
+        cur=$(command cksum < "$stub")
+        cur=${(j: :)${=cur}}
+        if [[ $cur != "${mf[stub_sum]-}" ]]; then
+            saved=$HOME/.zshenv.marksharc-removed
+            [[ -e $saved || -L $saved ]] && saved=$saved.$$
+            command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
+            print -r -- "marksharc: the stub had been edited; your copy is in $saved (merge any lines you still need)."
+        fi
+        command rm -f -- "$stub" || die "could not remove $stub"
+    fi
+    for name in .bashrc .bash_profile; do
+        (( ${already_restored[(Ie)$name]} == 0 )) || continue
+        stub=$HOME/$name
+        stub_is_ours || continue
+        cur=$(command cksum < "$stub")
+        cur=${(j: :)${=cur}}
+        if [[ $cur != "${mf[bash_stub_sum]-}" ]]; then
+            saved=$stub.marksharc-removed
+            [[ -e $saved || -L $saved ]] && saved=$saved.$$
+            command cp -p -- "$stub" "$saved" || die "could not save the edited stub to $saved"
+        fi
+        command rm -f -- "$stub" || die "could not remove $stub"
+    done
+    stub=$HOME/.zshenv
+    for name in $files_to_restore; do
+        temporary=$(command mktemp "$HOME/$name.marksharc-restore.XXXXXX") ||
+            die "could not stage the restore of $HOME/$name"
+        if ! { command cp -p -- "$backup/$name" "$temporary" && command mv -f -- "$temporary" "$HOME/$name"; }; then
+            command rm -f -- "$temporary"
+            die "could not restore $HOME/$name (the backup is in $backup)"
+        fi
+    done
+    for i in $links_to_restore; do
+        command ln -s -- "${linktargets[i]}" "$HOME/${linknames[i]}" || die "could not restore the link $HOME/${linknames[i]}"
+    done
+fi
 
 if (( purge )); then
     # Copies of hand-edited stubs that install re-runs kept in the state directory would go with
@@ -273,6 +328,8 @@ if (( purge )); then
             bashrc.*) dest=$HOME/.bashrc.marksharc-replaced.${name#bashrc.} ;;
             bash_profile.*) dest=$HOME/.bash_profile.marksharc-replaced.${name#bash_profile.} ;;
             fish.*) dest=${fish_config_base%/}/fish.marksharc-replaced.${name#fish.} ;;
+            coexist-zshenv.*) dest=$HOME/.zshenv.marksharc-replaced.${name#coexist-zshenv.} ;;
+            coexist-zshrc.*) dest=$HOME/.zshrc.marksharc-replaced.${name#coexist-zshrc.} ;;
             *) dest=$HOME/.zshenv.marksharc-replaced.${name#zshenv.} ;;
         esac
         [[ -e $dest || -L $dest ]] && dest=$dest.$$
@@ -281,13 +338,17 @@ if (( purge )); then
     done
 fi
 
-if (( ! fish_restored )); then
-    if [[ -n $fish_stub && ! -L $fish_dir && ! -L $fish_dir/conf.d ]]; then
-        remove_fish_stub "$fish_stub" "${mf[fish_stub_sum]-}"
+if [[ $install_mode == coexist ]]; then
+    [[ ${state:t} != marksharc ]] || command rm -rf -- "$state/coexist"
+else
+    if (( ! fish_restored )); then
+        if [[ -n $fish_stub && ! -L $fish_dir && ! -L $fish_dir/conf.d ]]; then
+            remove_fish_stub "$fish_stub" "${mf[fish_stub_sum]-}"
+        fi
+        [[ -z $fish_backup ]] || restore_fish_config
     fi
-    [[ -z $fish_backup ]] || restore_fish_config
+    [[ ${state:t} != marksharc ]] || command rm -rf -- "$state/zdot"
 fi
-[[ ${state:t} != marksharc ]] || command rm -rf -- "$state/zdot"
 if (( purge )); then
     for dir in $purge_targets; do command rm -rf -- "$dir" || die "could not purge $dir"; done
 else
@@ -299,8 +360,12 @@ if [[ -n $fish_backup ]]; then
     command rmdir -- "$fish_backup" 2>/dev/null || :
 fi
 
-print -r -- "marksharc: uninstalled. Restored: ${names:-nothing to restore}. Removed the stub and the generated zsh startup files."
-[[ -e $stub || -L $stub ]] && (( ${names[(Ie).zshenv]} == 0 )) && print -r -- "marksharc: left $stub alone (it is not a marksharc stub)."
+if [[ $install_mode == coexist ]]; then
+    print -r -- "marksharc: uninstalled (coexist mode). Removed the marksharc source lines from ~/.zshenv and ~/.zshrc and kept your existing startup files."
+else
+    print -r -- "marksharc: uninstalled. Restored: ${names:-nothing to restore}. Removed the stub and the generated zsh startup files."
+    [[ -e $stub || -L $stub ]] && (( ${names[(Ie).zshenv]} == 0 )) && print -r -- "marksharc: left $stub alone (it is not a marksharc stub)."
+fi
 if (( purge )); then
     print -r -- "marksharc: removed ${(j:, :)purge_targets}."
     [[ ${mf[framework_cloned]-0} == 1 ]] || print -r -- "marksharc: kept the framework checkout ${mf[framework]} (not created by the installer)."
@@ -314,7 +379,11 @@ else
     fi
     print -r -- "  overlay    ${mf[config]}    (your configuration; marksharc never removes it)"
     print -r -- "  cache      ${mf[cache]}    (rm -rf)"
-    print -r -- "  state      ${mf[state]}    (backup of the replaced files; rm -rf)"
+    if [[ $install_mode == coexist ]]; then
+        print -r -- "  state      ${mf[state]}    (installer state; rm -rf)"
+    else
+        print -r -- "  state      ${mf[state]}    (backup of the replaced files; rm -rf)"
+    fi
     print -r -- "  Or run: marksharc uninstall --purge   (cache, state and an installer-made clone)"
 fi
 print -r -- "Open a new terminal to get the restored shell configuration."
