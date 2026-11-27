@@ -51,7 +51,7 @@ without scanning or connecting. Remote inventory reads contact the remote host
 each time so it can detect changed roots and removed worktrees; the local copy
 serves offline completion.
 
-`launch-session` opens a terminal in a directory on this host or on a machine known to Herdr. The default-enabled `launch` module makes the command available on PATH and provides completions in zsh and fish.
+`launch-session` opens a terminal in a directory on this host or on a machine known to Herdr. The default-enabled `launch` module makes the command available on PATH and provides declarative completions in zsh, Bash 4.4+, Fish, and Carapace (see [docs/completions.md](completions.md)).
 
 ```sh
 launch-session ~/src

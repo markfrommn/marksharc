@@ -196,9 +196,15 @@ tiers "manager brew system user app local"
 ```
 
 `marksharc render` writes per-host `env.zsh`, `env.bash` and `env.fish` in the cache,
-along with generated completions and command shims.
-Startup refreshes stale env without running generators; install, update and explicit reload refresh
-the generated artifacts. Render again after adding or removing a provider or Herdr session.
+along with rendered declarative completions (zsh, Bash 4.4+, Fish, and Carapace YAML),
+generated completions, and command shims. When `completion-carapace` is enabled, render
+also reconciles manifest-tracked symlinks in Carapace's specs directory without touching
+user-authored specs.
+Startup refreshes stale env without running generators or changing Carapace symlinks;
+install, update and explicit reload refresh the generated artifacts. Render again after
+adding or removing a provider, Herdr session, or `.comp` file. See
+[docs/completions.md](docs/completions.md) for declarative completion authoring and
+Carapace lifecycle details.
 The `cwf shell zsh` contract is shell integration rather than a completion definition: render caches
 its exports, aliases and helpers at the same artifact path, and only interactive cwf init sources it.
 
@@ -222,8 +228,11 @@ suggestions, and highlighting.
 
 Bash loads bash-completion when installed. Set `completion-carapace.enable` to
 `on` to add Carapace, with `completion-carapace.bridges` and
-`completion-carapace.excludes` for its command sources. zoxide and MarkSharc's
-launch, CWF, and Herdr completions retain their own registrations. Run
+`completion-carapace.excludes` for its command sources. When Carapace is active,
+it owns commands with managed specs (`marksharc`, `launch-session`, `launch-repo`,
+`cwf-new`) unless excluded via `CARAPACE_EXCLUDES` (falling back to native Bash
+completions when inactive or excluded); zoxide, CWF (`cwf`), and Herdr retain their
+own registrations. Run
 `completion-ui status` to see the active and pending editor and completion
 provider. `completion-ui readline|ble|native|carapace|reset` sets or clears a
 session override. Apply backend and Carapace setting changes with an explicit
@@ -281,6 +290,7 @@ set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a sessi
 ## Documentation
 
 - [Developing marksharc](docs/DEVELOPING.md)
+- [Completions and Carapace](docs/completions.md)
 - [Tests](tests/README.md)
 - [Multiplexer titles, forwarding, and adapters](docs/MUX-ADAPTERS.md)
 - [Launch a terminal session](docs/launch.md)
