@@ -10,6 +10,8 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Fixed the `pager` module replacing `MANPATH` with a fixed list, which hid Homebrew and PATH-derived man pages; it now keeps what earlier modules set and ends with one empty entry, identically in zsh, fish and Bash. (DEV-70)
+
 Added `install.sh --coexist` mode so zsh users can try MarkSharc via one marked source line in `~/.zshenv` and `~/.zshrc` without redirecting `ZDOTDIR` or replacing existing startup files, with full doctor diagnostics and clean uninstall. (DEV-63)
 
 Completed the contract inventory covering all public modules with an automated CI check enforcing 90%+ coverage, added Linux-specific and PTY interactive test cases, and added an advisory startup-time benchmark check. (DEV-48)

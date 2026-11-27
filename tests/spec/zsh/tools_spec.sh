@@ -150,18 +150,29 @@ Describe 'interactive tool modules (init phase)'
     stub_command diff 'printf "diff %s\n" "$*" >> "$OPLOG"'
     stub_command less 'printf "less %s\n" "$*" >> "$OPLOG"; cat >/dev/null'
     hash -r
+    local system=/usr/share/man scenario
+    [[ -d /usr/local/man ]] && system+=:/usr/local/man
     unset PAGER LESS MANPATH
     source "$MARKSHARC_ROOT/modules/pager/init.zsh" || return 1
-    [[ $PAGER == 'less -R' && $LESS == -FRX && $MANPATH == /usr/share/man* ]] || return 2
+    [[ $PAGER == 'less -R' && $LESS == -FRX && $MANPATH == "$system:" ]] || return 2
     (( ${+functions[diff]} + ${+functions[diffcp]} == 2 )) || return 3
     [[ ${(t)MANPATH} == *export* && ${(t)PAGER} == *export* ]] || return 4
+    # MANPATH is extended, not replaced: what an earlier module (brew) set stays in front, each
+    # entry appears once, and one empty entry ends the list however it started (Homebrew's
+    # leading-colon form; a nested shell that already ends in one).
+    for scenario in '/opt/brew/share/man|/opt/brew/share/man:' ":$system|" "$system:|" \
+      '/opt/My Tools/share/man:/opt/My Tools/share/man::/usr/share/man:|/opt/My Tools/share/man:'; do
+      MANPATH=${scenario%%|*}
+      source "$MARKSHARC_ROOT/modules/pager/init.zsh" || return 5
+      [[ $MANPATH == "${scenario#*|}$system:" ]] || { print -r -- "$MANPATH" >&2; return 6; }
+    done
     : > "$OPLOG"
-    diff a b || return 5
-    diffcp a b || return 6
+    diff a b || return 7
+    diffcp a b || return 8
     [[ $(<"$OPLOG") == $'diff --color=auto a b\ndiff --color=always a b\nless -R' ||
-       $(<"$OPLOG") == $'diff --color=auto a b\nless -R\ndiff --color=always a b' ]] || { cat "$OPLOG"; return 7; }
+       $(<"$OPLOG") == $'diff --color=auto a b\nless -R\ndiff --color=always a b' ]] || { cat "$OPLOG"; return 9; }
   }
-  It 'sets PAGER, LESS and MANPATH and defines the coloured diff wrappers'
+  It 'sets PAGER, LESS and an extended MANPATH and defines the coloured diff wrappers'
     When run pager_options_case
     The status should be success
   End

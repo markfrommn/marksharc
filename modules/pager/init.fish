@@ -4,9 +4,21 @@ if _ms_fish_command_available less
     set -gx PAGER 'less -R'
 end
 set -gx LESS -FRX
-set -l _ms_manpath /usr/share/man
-test -d /usr/local/man; and set -a _ms_manpath /usr/local/man
-set -gx MANPATH $_ms_manpath
+# Extend MANPATH rather than replace it: what earlier modules set (brew's share/man) stays
+# first, the system directories follow when absent, each entry appears once, and one empty
+# entry goes last so man still searches its defaults and the share/man directory beside
+# each bin on PATH.
+set -l _ms_manpath
+for _ms_dir in $MANPATH
+    if test -n "$_ms_dir"; and not contains -- "$_ms_dir" $_ms_manpath
+        set -a _ms_manpath "$_ms_dir"
+    end
+end
+contains -- /usr/share/man $_ms_manpath; or set -a _ms_manpath /usr/share/man
+if test -d /usr/local/man; and not contains -- /usr/local/man $_ms_manpath
+    set -a _ms_manpath /usr/local/man
+end
+set -gx MANPATH $_ms_manpath ''
 
 # The termcap values (bold red blink and bold, bold yellow on blue standout, bold green
 # underline), kept apart from the environment so only man and colored see them.
