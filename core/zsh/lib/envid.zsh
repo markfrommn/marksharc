@@ -11,8 +11,8 @@ _ms_env_id() {
     integer h=17
     local -A st
     local -a files=(
-        "$MARKSHARC_HOME"/core/**/*(.N) "$MARKSHARC_HOME"/modules/**/*(.N)
-        "$config"/**/*(.N)
+        "$MARKSHARC_HOME"/core/**/*(-.N) "$MARKSHARC_HOME"/modules/**/*(-.N)
+        "$config"/**/*(-.N)
     )
     for f in $files; do
         zstat -H st -- "$f" 2>/dev/null || continue
