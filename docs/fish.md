@@ -7,7 +7,7 @@ enabled module's fish setup in module order:
 
 - `modules/<name>/init.fish` for hooks, key bindings, cached tool init and greetings;
 - `modules/<name>/functions/fish/<fn>.fish` on `fish_function_path` (autoloaded);
-- `modules/<name>/completions/fish/<cmd>.fish` on `fish_complete_path`;
+- `modules/<name>/completions/fish/<cmd>.fish` and rendered `$cache/completions/fish` (from `.comp` specs) on `fish_complete_path`;
 - pinned plugins from `fish.plugins` (nvm.fish, fzf.fish) from the cache.
 
 Tool integrations (starship, atuin, zoxide, direnv, pyenv, cwf, herdr, brew) go through
@@ -30,7 +30,8 @@ same capability in a different way. *Not applicable* means the module has no mea
 | cc-providers | supported | Provider wrappers are shims on PATH. |
 | cloud | supported | Installers run from any shell. |
 | command-not-found | native-equivalent | fish's native handler (apt and similar); Homebrew's `handler.fish` when present. |
-| completion | native-equivalent | fish's native completion; modules add `completions/fish` and `marksharc` completes its subcommands. |
+| completion | native-equivalent | fish's native completion; modules add `completions/fish` and rendered `.comp` specs complete `marksharc`, `launch-session`, `launch-repo`, and `cwf-new`. |
+| completion-carapace | optional | When enabled, `marksharc render` links Carapace YAML specs into Carapace's specs directory so `carapace _carapace fish` picks them up automatically. |
 | completion-fzf-tab | not applicable | zsh line-editor plugin; fish uses `fzf-fish`. |
 | cuda | supported | App-tier path and env. |
 | cwf | supported | Hook registries, cached `cwf shell fish`, `cwf-new` wrapper and branch completion. |
