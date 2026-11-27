@@ -1,0 +1,12 @@
+# Declarative completion spec for cwf-new (COMPLETION-SPEC section 7.4)
+command cwf-new "Create a CWF worktree session"
+
+flag _ --repo value ms:base-repos-or-dir "Select base repository"
+flag _ --host value ms:launch-hosts "Select host"
+flag _ --mux value choices:hc,herdr,tmux,herdr-core "Select multiplexer"
+flag _ --mux-id value string "Select instance"
+flag _ --place value choices:workspace,tab,hidden "Set placement"
+flag _ --launch "Launch in a new terminal"
+flag _ --pick "Choose a repository"
+
+arg _ 1 ms:git-branches "Local branch"

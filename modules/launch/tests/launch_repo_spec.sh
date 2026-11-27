@@ -261,12 +261,14 @@ Describe 'repository inventory and launcher'
   completion_case() {
     [[ -n $REAL_FISH ]] || return 0
     export MARKSHARC_HOST=test
-    mkdir -p "$XDG_CACHE_HOME/marksharc/test/repos"
+    mkdir -p "$XDG_CONFIG_HOME/marksharc" "$XDG_CACHE_HOME/marksharc/test/repos"
+    printf 'module launch\n' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    HOST=test MARKSHARC_HOME="$MARKSHARC_ROOT" MARKSHARC_HOST=test "$MARKSHARC_ROOT/bin/marksharc" render >/dev/null || return 1
     printf '# marksharc-repos\t1\t0\t\nalpha\t/tmp/alpha\tbase\t/tmp/alpha\tmain\n' > "$XDG_CACHE_HOME/marksharc/test/repos/local.tsv"
     stub_command ssh 'exit 99'
     stub_command git 'exit 99'
     local out
-    out=$("$REAL_FISH" -c 'source "$MARKSHARC_ROOT/modules/launch/completions/fish/launch-repo.fish"; complete -C "launch-repo al"') || return 1
+    out=$(MARKSHARC_HOME="$MARKSHARC_ROOT" "$REAL_FISH" -c 'source "$XDG_CACHE_HOME/marksharc/test/completions/fish/launch-repo.fish"; complete -C "launch-repo al"') || return 1
     [[ $out == *alpha* ]]
   }
   It 'completes cached names without contacting a service'

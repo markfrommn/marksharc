@@ -109,8 +109,10 @@ if test "$MARKSHARC_SESSION" = interactive
     # Startup prints nothing by default (spec 6.10): fish's own welcome text stays off unless
     # the user set fish_greeting. The greeting module owns any greeting.
     set -q fish_greeting; or set -g fish_greeting ''
-    if not contains -- "$MARKSHARC_HOME/core/fish/completions" $fish_complete_path
-        set -gp fish_complete_path "$MARKSHARC_HOME/core/fish/completions"
+    set -l _ms_fish_completions "$_ms_cache_home/marksharc/$_ms_host/completions/fish"
+    if test -d "$_ms_fish_completions"; and not contains -- "$_ms_fish_completions" $fish_complete_path
+        set -gp fish_complete_path "$_ms_fish_completions"
+        set -ga _ms_fish_completion_paths "$_ms_fish_completions"
     end
     function marksharc
         if test "$argv[1]" != reload

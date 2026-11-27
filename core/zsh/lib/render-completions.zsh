@@ -414,7 +414,9 @@ _ms_rc_emit_zsh() {
     print -r -- "_ms_comp_${slug}_run() {"
     print -r -- "    local helper=\${MARKSHARC_HOME:-$home_sq}/core/cli/complete"
     print -r -- '    [[ -r $helper ]] || return 0'
-    print -r -- '    command zsh -f "$helper" "$@" 2>/dev/null'
+    print -r -- '    local -a env_vars=( "MARKSHARC_HOST=${MARKSHARC_HOST:-${HOST%%.*}}" )'
+    print -r -- '    [[ -n ${MARKSHARC_CONFIG-} ]] && env_vars+=( "MARKSHARC_CONFIG=$MARKSHARC_CONFIG" )'
+    print -r -- '    command env "${env_vars[@]}" zsh -f "$helper" "$@" 2>/dev/null'
     print -r -- '}'
     print -r -- ''
     print -r -- "_ms_comp_${slug}_choices() {"
@@ -464,8 +466,8 @@ _ms_rc_emit_zsh() {
     print -r -- "_ms_comp_${slug}_kind() {"
     print -r -- '    local kind=$1'
     print -r -- '    local cur=${words[CURRENT]-}'
-    print -r -- '    local host=${opt_args[--host]-${_ms_scan_host-}}'
-    print -r -- '    local repo=${opt_args[--repo]-${_ms_scan_repo-}}'
+    print -r -- '    local host=${(Q)${opt_args[--host]-${_ms_scan_host-}}}'
+    print -r -- '    local repo=${(Q)${opt_args[--repo]-${_ms_scan_repo-}}}'
     print -r -- '    local -a extra=()'
     print -r -- '    local line val h rest expl'
     print -r -- '    local -a repos=() hosts=()'
@@ -563,8 +565,8 @@ _ms_rc_emit_zsh() {
         print -r -- '        _ms_tok=${words[_ms_i]}'
         print -r -- '        if [[ -n $_ms_pending ]]; then'
         print -r -- '            case $_ms_pending in'
-        print -r -- '                --host) _ms_scan_host=$_ms_tok ;;'
-        print -r -- '                --repo) _ms_scan_repo=$_ms_tok ;;'
+        print -r -- '                --host) _ms_scan_host=${(Q)_ms_tok} ;;'
+        print -r -- '                --repo) _ms_scan_repo=${(Q)_ms_tok} ;;'
         print -r -- '                --command) _ms_scan_has_cmd=1 ;;'
         print -r -- '            esac'
         if (( $#lock_list )); then
@@ -633,6 +635,7 @@ _ms_rc_emit_zsh() {
             [[ -n $f_desc_esc ]] && tail="[$f_desc_esc]"
             if [[ -n $f_kind ]]; then
                 _ms_rc_zsh_action_for_kind "$slug" "$f_kind"
+                [[ $REPLY == _ms_comp_* ]] && REPLY=" $REPLY"
                 tail+=":value:$REPLY"
             fi
             if (( $#f_names > 1 )); then
@@ -671,6 +674,7 @@ _ms_rc_emit_zsh() {
                         _ms_rc_sh_sq "${pos}:${label}:->pos1"
                     else
                         _ms_rc_zsh_action_for_kind "$slug" "${arg_kind[${scope}:$pos]}"
+                        [[ $REPLY == _ms_comp_* ]] && REPLY=" $REPLY"
                         _ms_rc_sh_sq "${pos}:${label}:${REPLY}"
                     fi
                     print -r -- ' \'
@@ -681,6 +685,7 @@ _ms_rc_emit_zsh() {
                 _ms_rc_zsh_desc "${arg_desc[${scope}:rest]:-argument}"
                 label=$REPLY
                 _ms_rc_zsh_action_for_kind "$slug" "${arg_kind[${scope}:rest]}"
+                [[ $REPLY == _ms_comp_* ]] && REPLY=" $REPLY"
                 _ms_rc_sh_sq "*:${label}:${REPLY}"
                 print -r -- ' \'
                 print -rn -- "        $REPLY"
@@ -864,13 +869,15 @@ _ms_rc_emit_bash() {
     print -r -- '        local word=$1 prefix=$2 line val; shift 2'
     print -r -- "        local helper=\${MARKSHARC_HOME:-$home_sq}/core/cli/complete"
     print -r -- '        [[ -r $helper ]] || return 0'
+    print -r -- '        local -a env_vars=("MARKSHARC_HOST=${MARKSHARC_HOST:-${HOSTNAME%%.*}}")'
+    print -r -- '        [[ -n ${MARKSHARC_CONFIG-} ]] && env_vars+=("MARKSHARC_CONFIG=$MARKSHARC_CONFIG")'
     print -r -- '        while IFS= read -r line; do'
     print -r -- '            [[ -n $line ]] || continue'
     print -r -- '            val=${line%%$'\''\t'\''*}'
     print -r -- '            [[ $val == "$word"* ]] || continue'
     print -r -- '            COMPREPLY+=("$prefix$val")'
     print -r -- '            [[ $val == *: ]] && compopt -o nospace 2>/dev/null || :'
-    print -r -- '        done < <(command zsh -f "$helper" "$@" 2>/dev/null)'
+    print -r -- '        done < <(command env "${env_vars[@]}" zsh -f "$helper" "$@" 2>/dev/null)'
     print -r -- '    }'
     print -r -- '    _ms_bash_comp_launch_session_target() {'
     print -r -- '        local word=$1 trim=$2 host='\'''\'' prefix='\'''\'''
@@ -1198,7 +1205,14 @@ _ms_rc_emit_fish() {
     print -r -- '    set -l home "$MARKSHARC_HOME"'
     print -r -- "    test -n \"\$home\"; or set home $home_sq"
     print -r -- '    test -r "$home/core/cli/complete"; or return 0'
-    print -r -- '    command zsh -f "$home/core/cli/complete" $argv 2>/dev/null'
+    print -r -- '    set -l env_args'
+    print -r -- '    if set -q MARKSHARC_HOST; and test -n "$MARKSHARC_HOST"'
+    print -r -- '        set -a env_args "MARKSHARC_HOST=$MARKSHARC_HOST"'
+    print -r -- '    end'
+    print -r -- '    if set -q MARKSHARC_CONFIG; and test -n "$MARKSHARC_CONFIG"'
+    print -r -- '        set -a env_args "MARKSHARC_CONFIG=$MARKSHARC_CONFIG"'
+    print -r -- '    end'
+    print -r -- '    command env $env_args zsh -f "$home/core/cli/complete" $argv 2>/dev/null'
     print -r -- 'end'
     print -r -- ''
     print -r -- "function __ms_comp_${slug}_ctx"
@@ -1364,6 +1378,18 @@ _ms_rc_emit_fish() {
     print -r -- '        case launch-repo-target'
     print -r -- '            if string match -qr '\''^(/|~)'\'' -- "$cur"'
     print -r -- '                __fish_complete_directories "$cur"'
+    print -r -- '            else if string match -q "*:*" -- "$cur"'
+    print -r -- '                set -l parts (string split -m 1 : -- "$cur")'
+    print -r -- '                if contains -- "$parts[1]" "" local localhost "$machine"; and string match -qr '\''^(/|~)'\'' -- "$parts[2]"'
+    print -r -- '                    for d in (__fish_complete_directories "$parts[2]")'
+    print -r -- '                        echo "$parts[1]:$d"'
+    print -r -- '                    end'
+    print -r -- '                else'
+    print -r -- '                    set -l args launch-repo-target --current "$cur"'
+    print -r -- '                    test -n "$host"; and set -a args --host "$host"'
+    print -r -- '                    test "$base_only" -eq 1; and set -a args --base-only'
+    print -r -- "                    __ms_comp_${slug}_helper \$args"
+    print -r -- '                end'
     print -r -- '            else'
     print -r -- '                set -l args launch-repo-target --current "$cur"'
     print -r -- '                test -n "$host"; and set -a args --host "$host"'

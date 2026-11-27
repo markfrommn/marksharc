@@ -1,0 +1,23 @@
+# Declarative completion spec for launch-session (COMPLETION-SPEC section 7.2)
+command launch-session "Launch a terminal session in a multiplexer"
+mode _ flag-form-locks-positional
+
+flag _ -h,--help "Show usage"
+flag _ --host value ms:launch-hosts locks-positional "Choose a host"
+flag _ --pwd value dir locks-positional "Set the starting directory"
+flag _ --command value command locks-positional "Choose a program"
+flag _ --mux value choices:hc,herdr,tmux,herdr-core "Choose a multiplexer"
+flag _ --mux-id value string "Choose a multiplexer instance"
+flag _ --place value choices:workspace,tab,hidden "Set terminal placement"
+flag _ --name value string "Set a display name"
+flag _ --env value string repeatable "Set a session variable"
+flag _ --in-shell "Run after interactive startup"
+flag _ --no-focus "Keep the current view"
+flag _ --dry-run "Preview multiplexer commands"
+flag _ --quiet "Suppress the result line"
+
+arg _ 1 ms:launch-session-target "Target host or directory"
+arg _ 2 command "Program to run"
+arg _ rest file "Program arguments"
+arg _ dash1 command "Program to run"
+arg _ dash-rest file "Program arguments"

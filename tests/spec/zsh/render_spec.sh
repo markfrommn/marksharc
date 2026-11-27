@@ -221,7 +221,7 @@ completion demo demo-gen "two words" when command demo-gen'
     local cache="$XDG_CACHE_HOME/marksharc/testhost"
     [[ $(<"$OPLOG") == 'ARGS:two words' ]] || { cat "$OPLOG"; return 2; }
     [[ $(<"$cache/completions/zsh/_demo") == $'#compdef demo\n# generated:two words' ]] || { cat "$cache/completions/zsh/_demo"; return 3; }
-    [[ -s $cache/render-id && $(<"$cache/completion-id") == $(<"$cache/render-id") && $(<"$cache/completion-files") == _demo ]] || { print -r -- "IDS $(<$cache/render-id) $(<$cache/completion-id) FILES=$(<$cache/completion-files)"; return 4; }
+    [[ -s $cache/render-id && $(<"$cache/completion-id") == $(<"$cache/render-id") && ${(M)${(@f)$(<"$cache/completion-files")}:#_demo} == _demo ]] || { print -r -- "IDS $(<$cache/render-id) $(<$cache/completion-id) FILES=$(<$cache/completion-files)"; return 4; }
     print '# remove the completion' > "$MS_HOME/modules/completer/module.conf"
     render_cli || return 5
     [[ ! -e $cache/completions/zsh/_demo ]]

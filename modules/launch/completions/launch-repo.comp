@@ -1,0 +1,26 @@
+# Declarative completion spec for launch-repo (COMPLETION-SPEC section 7.3)
+command launch-repo "Launch a repository or worktree in a multiplexer"
+mode _ flag-form-locks-positional
+
+flag _ -h,--help "Show usage"
+flag _ --host value ms:launch-hosts locks-positional "Choose a host"
+flag _ --repo value ms:base-repos-or-dir locks-positional "Choose a repository"
+flag _ --worktree value ms:worktrees locks-positional "Choose a worktree"
+flag _ --command value command locks-positional "Choose a program"
+flag _ --mux value choices:hc,herdr,tmux,herdr-core "Choose a multiplexer"
+flag _ --mux-id value string "Choose an instance"
+flag _ --place value choices:workspace,tab,hidden "Set placement"
+flag _ --name value string "Set a display name"
+flag _ --env value string repeatable "Set a session variable"
+flag _ --rescan "Refresh the inventory"
+flag _ --base-only "Limit selection to base repositories"
+flag _ --in-shell "Run after shell init"
+flag _ --no-focus "Keep focus"
+flag _ --dry-run "Preview multiplexer commands"
+flag _ --quiet "Suppress result"
+
+arg _ 1 ms:launch-repo-target "Target repository or directory"
+arg _ 2 command "Program to run"
+arg _ rest file "Program arguments"
+arg _ dash1 command "Program to run"
+arg _ dash-rest file "Program arguments"
