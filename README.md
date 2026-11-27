@@ -273,6 +273,33 @@ than `sync.check_hours` (12 hours by default). A later interactive shell prints 
 notice when the cached result is behind. The fetch does not merge or update plugins;
 set `MARKSHARC_NOTIFY=0` to suppress the notice and background check for a session.
 
+## Migrating legacy zsh history
+
+The `history-atuin` module ships a one-shot importer at
+`modules/history-atuin/bin/import-legacy-history` (available on `PATH` as
+`import-legacy-history` once `atuin` is installed and `history-atuin` is active;
+invoke it by full path for `--dry-run` before installing `atuin`).
+
+```sh
+import-legacy-history --dry-run
+import-legacy-history
+import-legacy-history --source ~/.zsh_history-otherhost --tree ~/.cache/zsh-directory-history-otherhost
+```
+
+By default it reads `~/.zsh_history`, `~/.zhistory`, `$ZDOTDIR/.zsh_history`,
+and `~/.cache/zsh-directory-history`, deduplicates entries on `(timestamp,
+command)` preferring copies with a directory, and imports via a temporary SQLite
+`zsh-histdb` database (`--route auto` / `histdb`, preserving directories and
+host labels when `sqlite3` is available, or falling back to `--route plain`
+without directories). Passing any `--source FILE[=LABEL]` or `--tree
+DIR[=LABEL]` replaces the defaults; conventional `-<NAME>` suffixes on copied
+files set the host label automatically. Re-running on the same route adds no
+duplicate rows, while switching routes can duplicate imported rows; imported
+rows are not deduplicated against Atuin's own live recording. Running an import
+against a real home directory and verifying with `atuin stats` and `history |
+egrep <pattern>` is an operator step — automated tests never touch a real Atuin
+database.
+
 ## Layout
 
 | Path | Contents |
