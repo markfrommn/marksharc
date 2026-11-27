@@ -45,16 +45,16 @@ startup environment and staged framework; they did not emulate creation or
 cleanup. Neither installed framework nor overlay was changed. Production
 launching still runs the target host's own installation and ships no code.
 
-| Check | Observed result |
-| --- | --- |
-| Pre-implementation gate, Mac to sol Core | `sol-ts/t2f` classified itself as interactive, registered the real overlay hook and generated `POSTGRES_PORT=5098` from disposable input after run-after-init. |
-| Mac Core/app creation and cleanup | `t29`, then final-code `t2b`, entered the new worktree, set `LAUNCH_WORKTREE` and ran the overlay hook. Both exited 0 after cleanup; the final-code terminal was visually inspected in the Mac app. |
-| Mac TUI creation and cleanup | `w3:p1` created its session and its workspace disappeared after `gwt-clean`. Final-code `w4:p1` confirmed clean output and successful creation with the copied-file witness hook, then also closed after cleanup. |
-| Mac to sol Core/app | `sol-ts/t2g` and final-code `sol-ts/t2h` created sessions in sol worktrees and set the marker. The Mac app's rendered frame showed sol's worktree, branch and shell state. Both exited 0 after successful cleanup. |
-| Mac to sol TUI | `w2E:p1` created a session, ran both hooks, and its workspace disappeared after cleanup. The saved TUI machine is named `sol-ts`; it does not report a hostname matching the separate `sol` SSH alias. |
-| Failed cleanup | A deliberately untracked file made final-code `sol-ts/t2h` return 1, retain its marker/worktree and stay at its prompt. Removing only that test file allowed normal cleanup and exit 0. |
-| Plain creation inside a launched base terminal | Mac `t2c` and sol-local `t2j` ran plain `cwf-new`, entered the new worktree with an empty marker, cleaned it, returned to the base, printed a success marker and stayed open. |
-| Failed launched creation | Sol TUI `w2F:p1` reached a deliberately failing post-create hook, printed the retained-session error and stayed open in the base with an empty marker. Manual cleanup returned successfully to the base and kept it open. |
+| Check                                          | Observed result                                                                                                                                                                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre-implementation gate, Mac to sol Core       | `sol-ts/t2f` classified itself as interactive, registered the real overlay hook and generated `POSTGRES_PORT=5098` from disposable input after run-after-init.                                                            |
+| Mac Core/app creation and cleanup              | `t29`, then final-code `t2b`, entered the new worktree, set `LAUNCH_WORKTREE` and ran the overlay hook. Both exited 0 after cleanup; the final-code terminal was visually inspected in the Mac app.                       |
+| Mac TUI creation and cleanup                   | `w3:p1` created its session and its workspace disappeared after `gwt-clean`. Final-code `w4:p1` confirmed clean output and successful creation with the copied-file witness hook, then also closed after cleanup.         |
+| Mac to sol Core/app                            | `sol-ts/t2g` and final-code `sol-ts/t2h` created sessions in sol worktrees and set the marker. The Mac app's rendered frame showed sol's worktree, branch and shell state. Both exited 0 after successful cleanup.        |
+| Mac to sol TUI                                 | `w2E:p1` created a session, ran both hooks, and its workspace disappeared after cleanup. The saved TUI machine is named `sol-ts`; it does not report a hostname matching the separate `sol` SSH alias.                    |
+| Failed cleanup                                 | A deliberately untracked file made final-code `sol-ts/t2h` return 1, retain its marker/worktree and stay at its prompt. Removing only that test file allowed normal cleanup and exit 0.                                   |
+| Plain creation inside a launched base terminal | Mac `t2c` and sol-local `t2j` ran plain `cwf-new`, entered the new worktree with an empty marker, cleaned it, returned to the base, printed a success marker and stayed open.                                             |
+| Failed launched creation                       | Sol TUI `w2F:p1` reached a deliberately failing post-create hook, printed the retained-session error and stayed open in the base with an empty marker. Manual cleanup returned successfully to the base and kept it open. |
 
 Sol's default Herdr app socket refused connections and no local app process was
 visible over SSH. Sol Core terminals were visually verified through the Mac

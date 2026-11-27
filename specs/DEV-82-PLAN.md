@@ -32,12 +32,12 @@ Startup measurements use a disposable installed Linux HOME, with sync
 and Starship disabled. Time runs from process start to the visible prompt.
 Each row records one cold start and five warm starts.
 
-| Revision and Bash | Cold | Warm median | Warm max |
-| --- | ---: | ---: | ---: |
-| `d1899a3`, 5.2.37 | 1,221 ms | 465 ms | 477 ms |
-| DEV-82, 4.4.0 | 3,868 ms | 880 ms | 924 ms |
-| DEV-82, 5.2.37 | 1,610 ms | 666 ms | 679 ms |
-| DEV-82, 5.3.0 | 1,671 ms | 673 ms | 709 ms |
+| Revision and Bash |     Cold | Warm median | Warm max |
+| ----------------- | -------: | ----------: | -------: |
+| `d1899a3`, 5.2.37 | 1,221 ms |      465 ms |   477 ms |
+| DEV-82, 4.4.0     | 3,868 ms |      880 ms |   924 ms |
+| DEV-82, 5.2.37    | 1,610 ms |      666 ms |   679 ms |
+| DEV-82, 5.3.0     | 1,671 ms |      673 ms |   709 ms |
 
 Warm Linux startup remains above the 500 ms target. DEV-83 owns the full
 real-tool and startup-budget acceptance on Linux and macOS.

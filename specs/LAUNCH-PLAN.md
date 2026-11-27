@@ -14,36 +14,36 @@
 
 DEV-78 reviewed DEV-74, DEV-75, and DEV-76 as one design. It changed four things.
 
-| Finding | Effect |
-|---|---|
-| No multiplexer passes the caller's environment to a new terminal, and `hc run` has no environment option. | Launch metadata is passed explicitly; on `hc` through an `env` wrapper (4.2, 5.4, 7.1). |
-| A terminal started with `hc` is hidden from the Herdr app unless it carries `herdr.space`. Live checks showed that an unused id creates a space, from any core the app watches. | Placement by label alone, with no dependence on `herdr-app` (5.4, 4.6). |
-| `hc run --cwd` does not expand `~`, and any `hc` command starts a core. | The wrapper changes directory for a path under a remote home, and adapters read the socket to see whether a core runs (4.2, 5.4). |
-| Each multiplexer keeps its own machine list, beside `hosts.conf`, and machine names are local to each core. | Host-to-machine resolution in the foundation, by name, reported hostname, then target (5.2). |
-| `cwf-new` hooks register during interactive init, so a non-interactive remote run would skip them. | Launch, then create: the new terminal runs `cwf-new` itself (9.1). This needs run-after-init (6.4) and removes the need to pass `cwf` exports or run setup over ssh. |
+| Finding                                                                                                                                                                         | Effect                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No multiplexer passes the caller's environment to a new terminal, and `hc run` has no environment option.                                                                       | Launch metadata is passed explicitly; on `hc` through an `env` wrapper (4.2, 5.4, 7.1).                                                                              |
+| A terminal started with `hc` is hidden from the Herdr app unless it carries `herdr.space`. Live checks showed that an unused id creates a space, from any core the app watches. | Placement by label alone, with no dependence on `herdr-app` (5.4, 4.6).                                                                                              |
+| `hc run --cwd` does not expand `~`, and any `hc` command starts a core.                                                                                                         | The wrapper changes directory for a path under a remote home, and adapters read the socket to see whether a core runs (4.2, 5.4).                                    |
+| Each multiplexer keeps its own machine list, beside `hosts.conf`, and machine names are local to each core.                                                                     | Host-to-machine resolution in the foundation, by name, reported hostname, then target (5.2).                                                                         |
+| `cwf-new` hooks register during interactive init, so a non-interactive remote run would skip them.                                                                              | Launch, then create: the new terminal runs `cwf-new` itself (9.1). This needs run-after-init (6.4) and removes the need to pass `cwf` exports or run setup over ssh. |
 
 Functionality the three issues did not anticipate, and where it lands:
 
-| Need | Entry |
-|---|---|
-| A shared picker and JSON helpers | P3.9.1 |
-| Host resolution across three machine lists | P3.9.1 |
-| Placement and its fallbacks for the Herdr app | P3.9.1 |
-| `--env`, `--in-shell`, and run-after-init | P3.9.2 |
-| A remote repository inventory over ssh | P3.9.3 |
+| Need                                                  | Entry  |
+| ----------------------------------------------------- | ------ |
+| A shared picker and JSON helpers                      | P3.9.1 |
+| Host resolution across three machine lists            | P3.9.1 |
+| Placement and its fallbacks for the Herdr app         | P3.9.1 |
+| `--env`, `--in-shell`, and run-after-init             | P3.9.2 |
+| A remote repository inventory over ssh                | P3.9.3 |
 | The `exit` directive and the `LAUNCH_WORKTREE` marker | P3.9.4 |
 
 Operator decisions are in LAUNCH-SPEC section 13.
 
 ## Boundaries
 
-| Entry | Issue | Title | Estimate | Depends on |
-|---|---|---|---|---|
-| P3.9.0 | DEV-78 | Spec and plan the launch, repo, and cwf-new work | 3 | P3.3, P3.5, P3.8 |
-| P3.9.1 | DEV-79 | Launch foundation: pickers, host resolution, and mux launch adapters | 3 | P3.9.0 |
-| P3.9.2 | DEV-74 | Add the launch-session command | 3 | P3.9.1 |
-| P3.9.3 | DEV-75 | Add the launch-repo command | 3 | P3.9.2 |
-| P3.9.4 | DEV-76 | cwf-new and gwt-clean in launched sessions | 3 | P3.9.3 |
+| Entry  | Issue  | Title                                                                | Estimate | Depends on       |
+| ------ | ------ | -------------------------------------------------------------------- | -------- | ---------------- |
+| P3.9.0 | DEV-78 | Spec and plan the launch, repo, and cwf-new work                     | 3        | P3.3, P3.5, P3.8 |
+| P3.9.1 | DEV-79 | Launch foundation: pickers, host resolution, and mux launch adapters | 3        | P3.9.0           |
+| P3.9.2 | DEV-74 | Add the launch-session command                                       | 3        | P3.9.1           |
+| P3.9.3 | DEV-75 | Add the launch-repo command                                          | 3        | P3.9.2           |
+| P3.9.4 | DEV-76 | cwf-new and gwt-clean in launched sessions                           | 3        | P3.9.3           |
 
 ```mermaid
 flowchart LR
@@ -204,22 +204,22 @@ DEV-74 and DEV-75 each asked for a `specs/DEV-<id>-PLAN.md` holding the design. 
 
 ## Gates
 
-| Gate | Check before moving on |
-|---|---|
-| After P3.9.1 | The table in 4.6 has no open row and 5.4 matches it. |
-| After P3.9.2 | A few days of launching by hand on the Mac and sol, in the Herdr app and in tmux. |
+| Gate          | Check before moving on                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| After P3.9.1  | The table in 4.6 has no open row and 5.4 matches it.                                                     |
+| After P3.9.2  | A few days of launching by hand on the Mac and sol, in the Herdr app and in tmux.                        |
 | Before P3.9.4 | The overlay's post-create hooks are confirmed to run in a session started through run-after-init on sol. |
 
 ## Spec coverage
 
-| LAUNCH-SPEC section | Delivered by |
-|---|---|
-| 4 Multiplexer behaviour | DEV-78 (review and most live checks), DEV-79 (the open checks in 4.6) |
-| 5.1 to 5.4 Parts, hosts, picker, adapters | DEV-79 |
-| 5.5 Choosing the multiplexer | DEV-74 |
-| 6 launch-session | DEV-74 |
-| 7 Launch metadata | DEV-74 |
-| 8 launch-repo | DEV-75 |
-| 9 cwf-new, gwt-clean, and the exit directive | DEV-76 |
-| 10 Configuration | DEV-74, DEV-75 |
-| 11 Testing | Every entry |
+| LAUNCH-SPEC section                          | Delivered by                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| 4 Multiplexer behaviour                      | DEV-78 (review and most live checks), DEV-79 (the open checks in 4.6) |
+| 5.1 to 5.4 Parts, hosts, picker, adapters    | DEV-79                                                                |
+| 5.5 Choosing the multiplexer                 | DEV-74                                                                |
+| 6 launch-session                             | DEV-74                                                                |
+| 7 Launch metadata                            | DEV-74                                                                |
+| 8 launch-repo                                | DEV-75                                                                |
+| 9 cwf-new, gwt-clean, and the exit directive | DEV-76                                                                |
+| 10 Configuration                             | DEV-74, DEV-75                                                        |
+| 11 Testing                                   | Every entry                                                           |

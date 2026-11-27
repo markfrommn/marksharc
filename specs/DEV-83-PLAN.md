@@ -67,11 +67,11 @@ The macOS job also uses `/bin/bash` 3.2 for the environment-only regression.
 The real-tool PTY check prints platform-specific cold and five-sample warm
 times to the first visible prompt.
 
-| Platform | Profile | Cold tool cache | Warm median | Warm max |
-| --- | --- | ---: | ---: | ---: |
-| Linux | Bash 5.3.0, ble.sh, Starship, Atuin, bash-completion, Carapace, zoxide, fzf | 5,109 ms | 3,034 ms | 3,127 ms |
-| macOS (local) | Homebrew Bash 5.3.20, same full profile | 2,965 ms | 1,415 ms | 1,582 ms |
-| macOS | Same profile on hosted CI | Pending | Pending | Pending |
+| Platform      | Profile                                                                     | Cold tool cache | Warm median | Warm max |
+| ------------- | --------------------------------------------------------------------------- | --------------: | ----------: | -------: |
+| Linux         | Bash 5.3.0, ble.sh, Starship, Atuin, bash-completion, Carapace, zoxide, fzf |        5,109 ms |    3,034 ms | 3,127 ms |
+| macOS (local) | Homebrew Bash 5.3.20, same full profile                                     |        2,965 ms |    1,415 ms | 1,582 ms |
+| macOS         | Same profile on hosted CI                                                   |         Pending |     Pending |  Pending |
 
 The Linux and local macOS warm results exceed the 500 ms budget. Startup profiling found
 editor initialization and editor-compatible Atuin, directory and fzf binding

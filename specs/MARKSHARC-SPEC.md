@@ -1,14 +1,15 @@
 # MarkSharc Specification
 
-| | |
-|---|---|
-| Status | Design approved 2026-11-20; implementation in progress |
-| Source issue | DEV-33 "Mark Sharc - Planning Kickoff" (Linear, project MarkSharc) |
-| Target repo | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`) |
-| Home | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy |
-| Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
-| Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, public modules, line editor and completion. [DEV-83](DEV-83-PLAN.md) records final acceptance evidence. |
-| Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
+|                         |                                                                                                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                  | Design approved 2026-11-20; implementation in progress                                                                                                                                        |
+| Source issue            | DEV-33 "Mark Sharc - Planning Kickoff" (Linear, project MarkSharc)                                                                                                                            |
+| Target repo             | `markfrommn/marksharc` (local checkout `/data/work/mark/marksharc`)                                                                                                                           |
+| Home                    | `marksharc/specs/` is the authoritative home; `mark-desktop-files/specs/` retains a historical copy                                                                                           |
+| Companion               | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md)                                                                                                                                                        |
+| Interactive Bash        | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, public modules, line editor and completion. [DEV-83](DEV-83-PLAN.md) records final acceptance evidence.                                      |
+| Related                 | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1                                                                                       |
+| Declarative Completions | [COMPLETION-SPEC.md](COMPLETION-SPEC.md) specifies the `.comp` format, `core/cli/complete`, four-target rendering, and Carapace spec wiring (L8: DEV-84 design, DEV-85–DEV-87 implementation) |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
 
@@ -47,21 +48,21 @@ Ground rules:
 
 ### 2.1 Structure
 
-| Area | Today |
-|---|---|
+| Area              | Today                                                                                                                                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Entry chain (zsh) | `~/.zshenv` sets `ZDOTDIR` to `config/zsh` → `.zshrc` / `.zlogin` → `zsh.zshrc` / `zsh.login` → `zsh.common` (host facts) → `zsh.functions` (helpers, loads `functions/*.zsh`) → `build_path` → `zsh.zshrc.interactive` (925 lines) → `zsh.zshrc.ohmyzsh` → `etc/zsh.zshrc.user` |
-| Idempotency | PID sentinels (`zshrc_done`, `_mdf_*_done`), force flags (`zdo_zshrc`, `zdo_login`, `zdo_functions`), reload aliases `cs` and `li` |
-| Host facts | `ostype`, `hwtype`, `osrel`, `shorthost`, `hostbase`, `distro`, `dname` (site: iserver, plesk-phorn, manifest, google, or DNS domain), all computed with forks |
-| PATH | `build_path` (306 lines): opt dirs × bin subdirs, X and Solaris quirk dirs, Go/GVM/Cargo, CUDA, LM Studio, `.` for non-root, Homebrew first, inherited entries preserved, managed entries tracked |
-| Tool init | brew, nvm + `.nvmrc` hook, gvm + `go.mod` hook, uv or pyenv, rbenv, pnpm, bun, envman, gcloud SDK, kubectl, cwf, herdr, zoxide, starship, atuin, p10k (loaded, then replaced by starship) |
-| Oh-My-Zsh | About 25 plugins chosen at startup from installed commands; fzf-tab as a custom plugin; `git pull` of custom plugins and p10k on every interactive start; three custom themes |
-| Completion | `compinit -D`, a block of zstyles, fzf-tab, OMZ plugin completions, generated completions evaluated at startup (herdr, kubectl, cwf) |
-| History | Native zsh history with `sharehistory`; a per-directory history plugin until 2026-11-07; atuin since then |
-| Functions | 27 files in `config/zsh/functions/` (see 3.2) |
-| Fish | `config.fish`, `common.fish`, `functions.fish`, `interactive.fish`, 20 function files; fisher plugins fzf.fish, nvm.fish, bass, fish-gvm |
-| bash, csh | `.bashrc` echoes "In .bashrc..." and initialises atuin; `.profile`, `.cshrc`, `.login` are legacy |
-| Tests | ShellSpec 0.28.1 zsh suite (9 specs) under `tests/shell`; `config/fish/tests/test_parity.py` |
-| Day 0 / Day 2 | `bin/bootstrap-mac.sh`, `bin/bootstrap-mac-2.sh`, `scripts/basepkgs.sh`, `bin/do_updates.sh`, `bin/go_installs.sh`, `bin/uv_setup.sh`, `mdflinks*.tar` link bundles, `mdf-sync` + `link-cleanup` |
+| Idempotency       | PID sentinels (`zshrc_done`, `_mdf_*_done`), force flags (`zdo_zshrc`, `zdo_login`, `zdo_functions`), reload aliases `cs` and `li`                                                                                                                                               |
+| Host facts        | `ostype`, `hwtype`, `osrel`, `shorthost`, `hostbase`, `distro`, `dname` (site: iserver, plesk-phorn, manifest, google, or DNS domain), all computed with forks                                                                                                                   |
+| PATH              | `build_path` (306 lines): opt dirs × bin subdirs, X and Solaris quirk dirs, Go/GVM/Cargo, CUDA, LM Studio, `.` for non-root, Homebrew first, inherited entries preserved, managed entries tracked                                                                                |
+| Tool init         | brew, nvm + `.nvmrc` hook, gvm + `go.mod` hook, uv or pyenv, rbenv, pnpm, bun, envman, gcloud SDK, kubectl, cwf, herdr, zoxide, starship, atuin, p10k (loaded, then replaced by starship)                                                                                        |
+| Oh-My-Zsh         | About 25 plugins chosen at startup from installed commands; fzf-tab as a custom plugin; `git pull` of custom plugins and p10k on every interactive start; three custom themes                                                                                                    |
+| Completion        | `compinit -D`, a block of zstyles, fzf-tab, OMZ plugin completions, generated completions evaluated at startup (herdr, kubectl, cwf)                                                                                                                                             |
+| History           | Native zsh history with `sharehistory`; a per-directory history plugin until 2026-11-07; atuin since then                                                                                                                                                                        |
+| Functions         | 27 files in `config/zsh/functions/` (see 3.2)                                                                                                                                                                                                                                    |
+| Fish              | `config.fish`, `common.fish`, `functions.fish`, `interactive.fish`, 20 function files; fisher plugins fzf.fish, nvm.fish, bass, fish-gvm                                                                                                                                         |
+| bash, csh         | `.bashrc` echoes "In .bashrc..." and initialises atuin; `.profile`, `.cshrc`, `.login` are legacy                                                                                                                                                                                |
+| Tests             | ShellSpec 0.28.1 zsh suite (9 specs) under `tests/shell`; `config/fish/tests/test_parity.py`                                                                                                                                                                                     |
+| Day 0 / Day 2     | `bin/bootstrap-mac.sh`, `bin/bootstrap-mac-2.sh`, `scripts/basepkgs.sh`, `bin/do_updates.sh`, `bin/go_installs.sh`, `bin/uv_setup.sh`, `mdflinks*.tar` link bundles, `mdf-sync` + `link-cleanup`                                                                                 |
 
 ### 2.2 Problems the redesign must fix
 
@@ -78,12 +79,12 @@ Ground rules:
 
 ### 3.1 Corpus
 
-| Source | Host | Range | Human commands |
-|---|---|---|---|
-| atuin (`author = mark`) | Mac | 2026-11-07 → 11-20 | 4,062 |
-| `~/.zsh_history`, `~/.zhistory`, `$ZDOTDIR/.zsh_history` | Mac | 2026-08-04 → 11-20 | 3,635 |
-| `~/.cache/zsh-directory-history` (465 files) | Mac | 2026-08-19 → 11-07 | 7,145 |
-| `.zsh_history-sol`, `.zhistory-sol`, directory history | sol (Linux) | 2020-09 → 2026-11-20, mostly 2026 | 9,715 |
+| Source                                                   | Host        | Range                             | Human commands |
+| -------------------------------------------------------- | ----------- | --------------------------------- | -------------- |
+| atuin (`author = mark`)                                  | Mac         | 2026-11-07 → 11-20                | 4,062          |
+| `~/.zsh_history`, `~/.zhistory`, `$ZDOTDIR/.zsh_history` | Mac         | 2026-08-04 → 11-20                | 3,635          |
+| `~/.cache/zsh-directory-history` (465 files)             | Mac         | 2026-08-19 → 11-07                | 7,145          |
+| `.zsh_history-sol`, `.zhistory-sol`, directory history   | sol (Linux) | 2020-09 → 2026-11-20, mostly 2026 | 9,715          |
 
 After de-duplication that is about 8,200 unique commands on the Mac and 7,700 on sol. Agent-run commands in atuin (9,350 claude-code, 2,650 codex) are excluded. Keybinding-driven features (Ctrl-R, Tab menus, Alt-arrows) leave no trace in history; those were settled by interview.
 
@@ -91,27 +92,27 @@ After de-duplication that is about 8,200 unique commands on the Mac and 7,700 on
 
 Counts are Mac / sol.
 
-| Feature | Count | Reading |
-|---|---|---|
-| OMZ aliases and functions | 568 defined, ~0 used | No `gst`, `gco`, `take`, `x`. Only the `ls` and `grep` colour wrappers fire. |
-| `git` with plain subcommands | 3,867 / 1,843 | No git aliases. |
-| `cwf`, `cwf-new`, `gwt-clean` | 473, 317, 106 / 240, 217, 38 | Core workflow. |
-| `claudek`, `claudez`, `collie-default` | 120, 70, 63 / 79, 61, 30 | Generated wrappers are heavily used. |
-| `cd`, `pushd`, `dirs`, `popd` | 504, 227, 114, 44 / 400, 121, 48, 1 | The directory stack is the navigation model. |
-| `z` (zoxide) | 1 / 0 | Initialised everywhere, unused. Kept on by choice. |
-| `fg` with `emacs -nw` | 436, 409 / 26, 238 | Suspend and resume editing. |
-| `history` (mostly piped to `egrep`) | 151 / 47 | A list-style history command is still wanted. |
-| `cs`, `li` | 38, 37 / 22, 26 | Reload in place is a real modality. |
-| `more`, `less`, `glow`, `bat` | 161, 111, 70, 52 / 129, 55, 16, 29 | |
-| `pss` vs the other six ps helpers | 22 vs 0 / 27 vs 0 | |
-| `ll`, `la`, `dir`, `lf`, `lsf` | ≤2 each / ≤5 each | Plain `ls` is 1,003 / 767. |
-| `nvm`, `uv`, `gvm`, `pyenv`, `rbenv` | 33, 65, 5, 0, 0 / 9, 42, 33, 8, 0 | |
-| `docker`, `brew`, `apt`, `sudo` | 59, 235, 0, 40 / 178, 218, 76, 357 | Linuxbrew is in real use. |
-| `kubectl`, `gcloud`, `aws`, `helm` | 3, 0, 0, 0 / 0, 2, 0, 0 | |
-| `ssh-add`, `xauth`, `tmux` | 5, 17, 7 / 22, 13, 10 | |
-| `run-fish`, `repo-sync`, `diffcp` | 5, 8, 19 / 6, 2, 2 | |
-| `mdf-sync`, `fix-tmux`, `cleanup-docker` | 0, 1, 0 / 1, 2, 1 | |
-| CVS, Perforce, sandcat, gam, `h`, `j`, `mroe` | 0 / 0 | |
+| Feature                                       | Count                               | Reading                                                                      |
+| --------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| OMZ aliases and functions                     | 568 defined, ~0 used                | No `gst`, `gco`, `take`, `x`. Only the `ls` and `grep` colour wrappers fire. |
+| `git` with plain subcommands                  | 3,867 / 1,843                       | No git aliases.                                                              |
+| `cwf`, `cwf-new`, `gwt-clean`                 | 473, 317, 106 / 240, 217, 38        | Core workflow.                                                               |
+| `claudek`, `claudez`, `collie-default`        | 120, 70, 63 / 79, 61, 30            | Generated wrappers are heavily used.                                         |
+| `cd`, `pushd`, `dirs`, `popd`                 | 504, 227, 114, 44 / 400, 121, 48, 1 | The directory stack is the navigation model.                                 |
+| `z` (zoxide)                                  | 1 / 0                               | Initialised everywhere, unused. Kept on by choice.                           |
+| `fg` with `emacs -nw`                         | 436, 409 / 26, 238                  | Suspend and resume editing.                                                  |
+| `history` (mostly piped to `egrep`)           | 151 / 47                            | A list-style history command is still wanted.                                |
+| `cs`, `li`                                    | 38, 37 / 22, 26                     | Reload in place is a real modality.                                          |
+| `more`, `less`, `glow`, `bat`                 | 161, 111, 70, 52 / 129, 55, 16, 29  |                                                                              |
+| `pss` vs the other six ps helpers             | 22 vs 0 / 27 vs 0                   |                                                                              |
+| `ll`, `la`, `dir`, `lf`, `lsf`                | ≤2 each / ≤5 each                   | Plain `ls` is 1,003 / 767.                                                   |
+| `nvm`, `uv`, `gvm`, `pyenv`, `rbenv`          | 33, 65, 5, 0, 0 / 9, 42, 33, 8, 0   |                                                                              |
+| `docker`, `brew`, `apt`, `sudo`               | 59, 235, 0, 40 / 178, 218, 76, 357  | Linuxbrew is in real use.                                                    |
+| `kubectl`, `gcloud`, `aws`, `helm`            | 3, 0, 0, 0 / 0, 2, 0, 0             |                                                                              |
+| `ssh-add`, `xauth`, `tmux`                    | 5, 17, 7 / 22, 13, 10               |                                                                              |
+| `run-fish`, `repo-sync`, `diffcp`             | 5, 8, 19 / 6, 2, 2                  |                                                                              |
+| `mdf-sync`, `fix-tmux`, `cleanup-docker`      | 0, 1, 0 / 1, 2, 1                   |                                                                              |
+| CVS, Perforce, sandcat, gam, `h`, `j`, `mroe` | 0 / 0                               |                                                                              |
 
 ## 4. Scope
 
@@ -153,9 +154,9 @@ Counts are Mac / sol.
 
 ### 4.3 Maybe later
 
-- A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm).
-- A coexist install mode that does not take over `ZDOTDIR`.
-- A generic `AGENTS.md` / `CLAUDE.md` for the public repo.
+- A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm) (deferred, DEV-60).
+- A coexist install mode that does not take over `ZDOTDIR` (implemented in DEV-63; see section 6.15).
+- A generic `AGENTS.md` / `CLAUDE.md` for the public repo (DEV-64).
 - A Go helper binary for hot-path work.
 
 ### 4.4 Planned abandonment
@@ -174,28 +175,28 @@ Counts are Mac / sol.
 
 Full findings were gathered on 2026-11-20. The decisions they drove:
 
-| Topic | Finding | Decision |
-|---|---|---|
-| Plugin managers | antidote, zim, and zinit are maintained; zsh-bench shows managers add convenience, not speed, and that deferred loading is not worth it. sheldon is not cross-shell. | No manager. A built-in loader with SHA-pinned plugins. |
-| Carapace | v1.8.2, monthly releases, zsh/fish/bash. Open bugs when combined with fzf-tab. | Opt-in module; not combined with fzf-tab by default. |
-| Cross-shell env | Good multi-shell repos render per-shell files from shared data; translating at startup (bass and friends) spawns bash each time. | Render at build time. bass is not used at startup. |
-| Helper protocol | zoxide, direnv, mise, yazi, and broot show two shapes: static init code, and data applied by a native wrapper. No shared library exists; fish quoting differs. | Helpers emit data directives; a small native applier applies them. |
-| Helper latency | Go 9 ms, bun 14 ms, python 23 ms, `brew shellenv` 31 ms. | Nothing but zsh on the startup path; cache tool init output. |
-| Deployment | chezmoi, dotbot, stow, and mise bootstrap all work, but each makes the user adopt a manager. prezto and thoughtbot show the "framework + user-owned overlay" split. | The repo is a framework that is cloned and never edited; the user owns `~/.config/marksharc/`. |
-| Startup order | macOS `path_helper` reorders PATH after `.zshenv`. Claude Code sources the rc file non-interactively. `BASH_ENV` is honoured by `bash -c` but not `sh -c`. | Env in `.zshenv`, re-asserted in `.zprofile`; interactive work gated on session class. |
-| Testing | ShellSpec is stale but works for zsh and bash; ShellCheck cannot parse zsh; `shfmt -ln zsh` exists but is incomplete; fishtape for fish. | Keep ShellSpec, add a cross-shell contract suite, lint with `zsh -n`. |
-| Version managers | Re-evaluated in DEV-62 (2026-11-24). nvm and gvm cost about 3.5 ms at startup but about 1.9 s for a `cd` into a `.nvmrc` directory and 0.7 s for the first `gvm`. mise 2026.11: `hook-env` about 30 ms, shims add about 27 ms per call, native zsh, bash, and fish, version files per tool. | An opt-in `mise` module; nvm, gvm, and pyenv stay the default and the fallback. |
-| Agents | atuin tags agent commands and exposes an MCP server; agents set `CLAUDECODE`, `AI_AGENT`, and similar. | An `agent` module: full env, no output, no interactive phase. |
+| Topic            | Finding                                                                                                                                                                                                                                                                                     | Decision                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Plugin managers  | antidote, zim, and zinit are maintained; zsh-bench shows managers add convenience, not speed, and that deferred loading is not worth it. sheldon is not cross-shell.                                                                                                                        | No manager. A built-in loader with SHA-pinned plugins.                                         |
+| Carapace         | v1.8.2, monthly releases, zsh/fish/bash. Open bugs when combined with fzf-tab.                                                                                                                                                                                                              | Opt-in module; not combined with fzf-tab by default.                                           |
+| Cross-shell env  | Good multi-shell repos render per-shell files from shared data; translating at startup (bass and friends) spawns bash each time.                                                                                                                                                            | Render at build time. bass is not used at startup.                                             |
+| Helper protocol  | zoxide, direnv, mise, yazi, and broot show two shapes: static init code, and data applied by a native wrapper. No shared library exists; fish quoting differs.                                                                                                                              | Helpers emit data directives; a small native applier applies them.                             |
+| Helper latency   | Go 9 ms, bun 14 ms, python 23 ms, `brew shellenv` 31 ms.                                                                                                                                                                                                                                    | Nothing but zsh on the startup path; cache tool init output.                                   |
+| Deployment       | chezmoi, dotbot, stow, and mise bootstrap all work, but each makes the user adopt a manager. prezto and thoughtbot show the "framework + user-owned overlay" split.                                                                                                                         | The repo is a framework that is cloned and never edited; the user owns `~/.config/marksharc/`. |
+| Startup order    | macOS `path_helper` reorders PATH after `.zshenv`. Claude Code sources the rc file non-interactively. `BASH_ENV` is honoured by `bash -c` but not `sh -c`.                                                                                                                                  | Env in `.zshenv`, re-asserted in `.zprofile`; interactive work gated on session class.         |
+| Testing          | ShellSpec is stale but works for zsh and bash; ShellCheck cannot parse zsh; `shfmt -ln zsh` exists but is incomplete; fishtape for fish.                                                                                                                                                    | Keep ShellSpec, add a cross-shell contract suite, lint with `zsh -n`.                          |
+| Version managers | Re-evaluated in DEV-62 (2026-11-24). nvm and gvm cost about 3.5 ms at startup but about 1.9 s for a `cd` into a `.nvmrc` directory and 0.7 s for the first `gvm`. mise 2026.11: `hook-env` about 30 ms, shims add about 27 ms per call, native zsh, bash, and fish, version files per tool. | An opt-in `mise` module; nvm, gvm, and pyenv stay the default and the fallback.                |
+| Agents           | atuin tags agent commands and exposes an MCP server; agents set `CLAUDECODE`, `AI_AGENT`, and similar.                                                                                                                                                                                      | An `agent` module: full env, no output, no interactive phase.                                  |
 
 ## 6. Architecture
 
 ### 6.1 Three layers
 
-| Layer | Location | Owner | Contents |
-|---|---|---|---|
-| Framework | `$MARKSHARC_HOME`, default `~/.local/share/marksharc` | The public repo. Never edited on a host. | Core loaders, public modules, the `marksharc` CLI, templates, tests, docs. |
-| Overlay | `$MARKSHARC_CONFIG`, default `~/.config/marksharc` | The user. For the author, a link to `mark-desktop-files/marksharc/`. | Module selection, options, per-host files, private modules, provider files, package bundles, host inventory, native hooks. |
-| State and cache | `~/.cache/marksharc/` and `~/.local/state/marksharc/` | The machine. Safe to delete. | Rendered env, cached tool init, generated completions and shims, compdump, plugin clones, sync status, the generated `ZDOTDIR`. |
+| Layer           | Location                                              | Owner                                                                | Contents                                                                                                                        |
+| --------------- | ----------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Framework       | `$MARKSHARC_HOME`, default `~/.local/share/marksharc` | The public repo. Never edited on a host.                             | Core loaders, public modules, the `marksharc` CLI, templates, tests, docs.                                                      |
+| Overlay         | `$MARKSHARC_CONFIG`, default `~/.config/marksharc`    | The user. For the author, a link to `mark-desktop-files/marksharc/`. | Module selection, options, per-host files, private modules, provider files, package bundles, host inventory, native hooks.      |
+| State and cache | `~/.cache/marksharc/` and `~/.local/state/marksharc/` | The machine. Safe to delete.                                         | Rendered env, cached tool init, generated completions and shims, compdump, plugin clones, sync status, the generated `ZDOTDIR`. |
 
 All three honour the XDG variables. Per-host cache lives under `~/.cache/marksharc/<shorthost>/`, because home directories are sometimes copied or shared between hosts. A developer points `MARKSHARC_HOME` at a working checkout.
 
@@ -250,7 +251,7 @@ modules/<name>/
   init.zsh  init.fish  # interactive-only setup: hooks, keybindings, options, cached tool init
   functions/zsh/<fn>   functions/fish/<fn>.fish   # native autoloaded functions
   bin/<command>        # write-once executables (6.11)
-  completions/zsh/_<cmd>   completions/fish/<cmd>.fish
+  completions/zsh/_<cmd>   completions/fish/<cmd>.fish   completions/<cmd>.comp   # static or declarative completions
   tests/               # specs for this module
 ```
 
@@ -260,12 +261,12 @@ zsh autoload files and Fish functions are not sourced into Bash.
 
 How a module covers the four impact areas:
 
-| Area | Mechanism |
-|---|---|
-| Path composition | `path` directives into named tiers (6.7) |
-| Functions and aliases | `alias` directives; native autoloaded functions; executables in `bin/` |
-| Completion | Static files in `completions/`; `completion` directives generate and cache the rest |
-| Tool setup | `env` directives; `init.<shell>` with cached `tool init` output |
+| Area                  | Mechanism                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| Path composition      | `path` directives into named tiers (6.7)                                            |
+| Functions and aliases | `alias` directives; native autoloaded functions; executables in `bin/`              |
+| Completion            | Static files in `completions/`; `completion` directives generate and cache the rest |
+| Tool setup            | `env` directives; `init.<shell>` with cached `tool init` output                     |
 
 Rules:
 
@@ -282,25 +283,25 @@ One line-oriented format serves module metadata, user configuration, and the wri
 
 Module and overlay files (`module.conf`, `config.conf`, `hosts/*.conf`):
 
-| Directive | Meaning |
-|---|---|
-| `describe <text>` | One-line description (modules only). |
-| `requires command <name>…` | Skip the module when a command is missing. |
-| `requires os darwin\|linux` | Restrict the module to an OS. |
-| `order <n>` | Load order. |
-| `option <key> <default> <text>` | Declare an option. Read as `$_ms_opt_<module>_<key>`. |
-| `env <NAME> <value> [when …]` | Export a variable. |
-| `path <tier> <dir> [when …]` | Add a directory to a PATH tier. |
-| `alias <name> <value> [when …]` | Define an interactive alias. |
-| `plugin <name> <git-url> <sha> [shell <s>] [kind source\|fpath]` | Pin a third-party plugin (6.8). |
-| `completion <cmd> <generator…>` | Generate a completion file into the cache at render time. |
-| `completion-bash <cmd> <generator…>` | Generate a Bash completion file into its own cache on explicit renders. |
-| `package <manager> <name>` | Declare a package for `bootstrap` (`brew`, `cask`, `apt`, `dnf`). |
-| `update <label> <command…>` | Register an argv-based step for `marksharc update`. A command path beginning with `./` resolves relative to its module directory or the overlay root. |
-| `installer <name> <script>` | Register an executable for `marksharc install`. Relative paths resolve from the module directory or the overlay root. |
-| `module <name> [off]` | Enable or disable a module (overlay only). |
-| `set <module>.<key> <value>` | Set an option (overlay only). |
-| `tiers <tier>…` | Override PATH tier order (overlay only). |
+| Directive                                                        | Meaning                                                                                                                                               |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `describe <text>`                                                | One-line description (modules only).                                                                                                                  |
+| `requires command <name>…`                                       | Skip the module when a command is missing.                                                                                                            |
+| `requires os darwin\|linux`                                      | Restrict the module to an OS.                                                                                                                         |
+| `order <n>`                                                      | Load order.                                                                                                                                           |
+| `option <key> <default> <text>`                                  | Declare an option. Read as `$_ms_opt_<module>_<key>`.                                                                                                 |
+| `env <NAME> <value> [when …]`                                    | Export a variable.                                                                                                                                    |
+| `path <tier> <dir> [when …]`                                     | Add a directory to a PATH tier.                                                                                                                       |
+| `alias <name> <value> [when …]`                                  | Define an interactive alias.                                                                                                                          |
+| `plugin <name> <git-url> <sha> [shell <s>] [kind source\|fpath]` | Pin a third-party plugin (6.8).                                                                                                                       |
+| `completion <cmd> <generator…>`                                  | Generate a completion file into the cache at render time.                                                                                             |
+| `completion-bash <cmd> <generator…>`                             | Generate a Bash completion file into its own cache on explicit renders.                                                                               |
+| `package <manager> <name>`                                       | Declare a package for `bootstrap` (`brew`, `cask`, `apt`, `dnf`).                                                                                     |
+| `update <label> <command…>`                                      | Register an argv-based step for `marksharc update`. A command path beginning with `./` resolves relative to its module directory or the overlay root. |
+| `installer <name> <script>`                                      | Register an executable for `marksharc install`. Relative paths resolve from the module directory or the overlay root.                                 |
+| `module <name> [off]`                                            | Enable or disable a module (overlay only).                                                                                                            |
+| `set <module>.<key> <value>`                                     | Set an option (overlay only).                                                                                                                         |
+| `tiers <tier>…`                                                  | Override PATH tier order (overlay only).                                                                                                              |
 
 Guards: `when command <c>`, `when dir <d>`, `when file <f>`, `when os <o>`, `when host <h>`. Several guards on one line must all hold.
 
@@ -325,11 +326,11 @@ In the MVP, `module.conf` carries metadata only (`describe`, `requires`, `order`
 
 Three facts are independent: login or not, interactive or not, and agent or not. The core sets `MARKSHARC_SESSION`:
 
-| Value | Condition | Gets |
-|---|---|---|
-| `interactive` | Interactive, a terminal on stdin and stdout, no agent or editor-injection marker | env phase, then init phase |
-| `agent` | Any of `CLAUDECODE`, `AI_AGENT`, `CODEX_SESSION_ID`, `CODEX_SANDBOX`, `OPENCODE`, `GEMINI_CLI`, `CURSOR_AGENT`, `COPILOT_CLI`, `KILO_CLI_MODE`, `VSCODE_INJECTION`, `VSCODE_NONCE` | env phase only, no output |
-| `batch` | Everything else | env phase only, no output |
+| Value         | Condition                                                                                                                                                                          | Gets                       |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `interactive` | Interactive, a terminal on stdin and stdout, no agent or editor-injection marker                                                                                                   | env phase, then init phase |
+| `agent`       | Any of `CLAUDECODE`, `AI_AGENT`, `CODEX_SESSION_ID`, `CODEX_SANDBOX`, `OPENCODE`, `GEMINI_CLI`, `CURSOR_AGENT`, `COPILOT_CLI`, `KILO_CLI_MODE`, `VSCODE_INJECTION`, `VSCODE_NONCE` | env phase only, no output  |
+| `batch`       | Everything else                                                                                                                                                                    | env phase only, no output  |
 
 The marker list is an option of the `agent` module so it can grow without a release.
 
@@ -342,11 +343,11 @@ Host facts use shell built-ins (`$OSTYPE`, `$HOST`, `$CPUTYPE`, `$EUID`) and are
 
 Wiring per shell:
 
-| Shell | Stub written by the installer | Then |
-|---|---|---|
-| zsh | `~/.zshenv`: set `MARKSHARC_HOME`, source `core/zsh/zshenv.zsh` | `zshenv.zsh` sets `ZDOTDIR` to `~/.local/state/marksharc/zdot` (four one-line stubs) and runs the env phase. `.zprofile` re-asserts PATH after macOS `path_helper`. `.zshrc` runs the init phase. |
-| fish | `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish` | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. Existing Fish configuration is preserved by default. |
-| bash | `~/.bashrc` and `~/.bash_profile` | Source the rendered `env.bash` in every mode and native interactive init when eligible (6.16). `BASH_ENV` loads the environment and is set only when `agent.bash_env` is on. |
+| Shell | Stub written by the installer                                   | Then                                                                                                                                                                                              |
+| ----- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| zsh   | `~/.zshenv`: set `MARKSHARC_HOME`, source `core/zsh/zshenv.zsh` | `zshenv.zsh` sets `ZDOTDIR` to `~/.local/state/marksharc/zdot` (four one-line stubs) and runs the env phase. `.zprofile` re-asserts PATH after macOS `path_helper`. `.zshrc` runs the init phase. |
+| fish  | `${XDG_CONFIG_HOME:-~/.config}/fish/conf.d/00-marksharc.fish`   | Sources the rendered `env.fish`; runs init when `status is-interactive` and the session class allows. Existing Fish configuration is preserved by default.                                        |
+| bash  | `~/.bashrc` and `~/.bash_profile`                               | Source the rendered `env.bash` in every mode and native interactive init when eligible (6.16). `BASH_ENV` loads the environment and is set only when `agent.bash_env` is on.                      |
 
 The zsh env phase sets shell-local `skip_global_compinit=1`, so a distro global rc file cannot run a competing `compinit` before session classification. The `completion` module is the sole completion initializer.
 
@@ -367,18 +368,18 @@ Modules and the overlay add directories to named tiers. The builder concatenates
 
 Default order, chosen to reproduce today's result except that version managers come first (operator decision, DEV-38: correct gvm and nvm behaviour wins over historical order, so Homebrew's `go` or `node` never shadows the manager-selected one) and, on Linux, `local` follows `app`. A `tiers` override lists the order; any tier it omits follows in the default order:
 
-| Tier | Typical contents |
-|---|---|
-| `first` | Explicit user overrides |
-| *(inherited, unmanaged, before any managed entry)* | Virtualenv and tool activations, including an explicit `nvm use` or `gvm use` |
-| `manager` | Version-manager directories (gvm Go and pkgset bin, nvm default node bin, pyenv shims, and the mise shim directory for tools the `mise` module owns), contributed without sourcing the manager; always ahead of `brew` in every session class, including after the `.zprofile` re-assert |
-| `brew` | Homebrew `bin` and `sbin` |
-| `local` | `/usr/local`, `/opt`, Linuxbrew (unless `brew.linuxbrew_tier` is `brew`), `/opt/dell`, `~/.opencode/bin`, and on macOS LM Studio. Before `system` on macOS; on Linux after `app`, the last tier before `last` |
-| `system` | `/bin`, `/usr/bin`, `/sbin`, `/usr/sbin` |
-| `user` | `~/bin`, `~/bin/bin.<OS>.<arch>`, `~/.local/bin`, Go, Cargo, bun, pnpm, krew |
-| `app` | Application dirs that follow `user`: CUDA (Linux, when the NVIDIA driver is loaded) and, on Linux, LM Studio |
-| *(inherited, unmanaged, after a managed entry)* | |
-| `last` | `.` when `core.dot_in_path` is on and the user is not root |
+| Tier                                               | Typical contents                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first`                                            | Explicit user overrides                                                                                                                                                                                                                                                                  |
+| _(inherited, unmanaged, before any managed entry)_ | Virtualenv and tool activations, including an explicit `nvm use` or `gvm use`                                                                                                                                                                                                            |
+| `manager`                                          | Version-manager directories (gvm Go and pkgset bin, nvm default node bin, pyenv shims, and the mise shim directory for tools the `mise` module owns), contributed without sourcing the manager; always ahead of `brew` in every session class, including after the `.zprofile` re-assert |
+| `brew`                                             | Homebrew `bin` and `sbin`                                                                                                                                                                                                                                                                |
+| `local`                                            | `/usr/local`, `/opt`, Linuxbrew (unless `brew.linuxbrew_tier` is `brew`), `/opt/dell`, `~/.opencode/bin`, and on macOS LM Studio. Before `system` on macOS; on Linux after `app`, the last tier before `last`                                                                            |
+| `system`                                           | `/bin`, `/usr/bin`, `/sbin`, `/usr/sbin`                                                                                                                                                                                                                                                 |
+| `user`                                             | `~/bin`, `~/bin/bin.<OS>.<arch>`, `~/.local/bin`, Go, Cargo, bun, pnpm, krew                                                                                                                                                                                                             |
+| `app`                                              | Application dirs that follow `user`: CUDA (Linux, when the NVIDIA driver is loaded) and, on Linux, LM Studio                                                                                                                                                                             |
+| _(inherited, unmanaged, after a managed entry)_    |                                                                                                                                                                                                                                                                                          |
+| `last`                                             | `.` when `core.dot_in_path` is on and the user is not root                                                                                                                                                                                                                               |
 
 The builder records the entries it manages. On reload it drops managed directories that have vanished and leaves everything else alone. `fpath`, `manpath`, and fish's function and completion paths follow the same idempotent pattern.
 
@@ -397,6 +398,7 @@ Planned plugins: fzf-tab (MVP); zsh-autosuggestions and zsh-syntax-highlighting 
 - Generated completions (`herdr completion zsh`, `cwf shell zsh`, `kubectl completion zsh`) are written to cache files by `render` and `update`, not evaluated at startup.
 - `completion-fzf-tab` and `completion-carapace` are alternative UI modules. Enabling Carapace disables fzf-tab unless the overlay forces both.
 - fish keeps native completions; modules add files to its completion path.
+- Declarative `.comp` specs (`core/completions/*.comp` and module `completions/*.comp`) render through `marksharc render` into native zsh, Bash 4.4+, Fish, and Carapace YAML artifacts under `~/.cache/marksharc/<host>/completions/`, backed by one offline dynamic candidate helper (`core/cli/complete`). When `completion-carapace` is enabled, `marksharc render` wires manifest-tracked symlinks from Carapace's platform specs directory to the rendered YAML files without overwriting user-authored specs; `doctor` checks those links and `uninstall` removes them. Full contract in [COMPLETION-SPEC.md](COMPLETION-SPEC.md) (approved in DEV-84; runtime delivery in DEV-85–DEV-87).
 
 ### 6.10 Caching, reload, and verbosity
 
@@ -411,13 +413,13 @@ Complex commands are implemented once as executable zsh scripts in a module's `b
 
 When a command must change the caller's state, a native wrapper function sets `MARKSHARC_DIRECTIVES` to a temporary file, runs the executable with the terminal still attached, then applies the file:
 
-| Directive line | Effect in the calling shell |
-|---|---|
-| `cd <dir>` | Change directory |
-| `pushd <dir>` | Push onto the directory stack |
-| `setenv <NAME> <value>` | Export a variable |
-| `unsetenv <NAME>` | Unset a variable |
-| `exit [<status>]` | Exit the calling shell once the remaining directives are applied ([LAUNCH-SPEC.md](LAUNCH-SPEC.md) 9.3) |
+| Directive line          | Effect in the calling shell                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `cd <dir>`              | Change directory                                                                                        |
+| `pushd <dir>`           | Push onto the directory stack                                                                           |
+| `setenv <NAME> <value>` | Export a variable                                                                                       |
+| `unsetenv <NAME>`       | Unset a variable                                                                                        |
+| `exit [<status>]`       | Exit the calling shell once the remaining directives are applied ([LAUNCH-SPEC.md](LAUNCH-SPEC.md) 9.3) |
 
 Fields are tab-separated. Tab, newline, and `%` inside a value are percent-encoded. The applier is about 20 lines per shell and never evaluates text as code. A wrapper that needs no state change is not written at all; the executable is called directly.
 
@@ -435,12 +437,12 @@ First candidates: `cwf-new`, `gwt-clean`, `repo-sync`, ssh-agent discovery (emit
 
 Multiplexers change faster than the rest of the environment, so they sit behind an adapter interface in the `mux` module. More than one adapter can be active (herdr inside WezTerm).
 
-| Adapter function | Purpose |
-|---|---|
-| `detect` | Is this multiplexer present in the current session? |
-| `set_titles <workspace> <tab> <pane>` | Push titles to the multiplexer |
-| `refresh_env` | Re-import `SSH_AUTH_SOCK`, `DISPLAY`, and similar from the client (today's `fix-tmux`) |
-| `sessions` | List sessions, for generated attach shims |
+| Adapter function                      | Purpose                                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------------------- |
+| `detect`                              | Is this multiplexer present in the current session?                                    |
+| `set_titles <workspace> <tab> <pane>` | Push titles to the multiplexer                                                         |
+| `refresh_env`                         | Re-import `SSH_AUTH_SOCK`, `DISPLAY`, and similar from the client (today's `fix-tmux`) |
+| `sessions`                            | List sessions, for generated attach shims                                              |
 
 Adapters: `tmux`, `herdr` (TUI and app/core), `wezterm`, and `plain` (OSC 0/1/2). A new multiplexer is one adapter file. The `titles` module computes the workspace, tab, and pane strings once (repository, branch, cwf session, path tail) and hands them to every active adapter. The `x11` module asks the active adapter for the client DISPLAY first and falls back to the SSH-derived guess; the ping and the one-second sleep go away.
 
@@ -459,15 +461,15 @@ A host has two checkouts: the framework and the overlay (plus any private module
 
 ### 6.15 Day 0 and Day 2
 
-| Command | Purpose |
-|---|---|
-| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up startup files and write the stubs, fetch the plugin pins (`--no-plugins` skips and a failed fetch warns), then render. `--coexist` adds one marked source line to `~/.zshenv` and `~/.zshrc` instead of redirecting `ZDOTDIR` or replacing dotfiles. `--clobber` answers yes to optional cleanup and `--dry-run` previews changes without prompting. |
-| `marksharc bootstrap` | Install packages declared by enabled modules for the current OS and by overlay bundles. Generate a temporary Brewfile for Homebrew on macOS and Linux. Print apt or dnf commands and require confirmation before invoking sudo. |
-| `marksharc update` | Sync repositories, refresh plugin pins, run module and overlay steps, and render. Continue after individual failures and report each step's result. `--list` lists the steps, `--only <label>` selects one, and `--dry-run` prints commands without running them. Replaces `bin/do_updates.sh` and all startup-time pulls. |
-| `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |
-| `marksharc doctor` | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget. |
-| `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay. |
-| `marksharc uninstall` | Restore the backed-up dotfiles and remove stubs. |
+| Command                                  | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `install.sh`                             | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up startup files and write the stubs, fetch the plugin pins (`--no-plugins` skips and a failed fetch warns), then render. `--coexist` adds one marked source line to `~/.zshenv` and `~/.zshrc` instead of redirecting `ZDOTDIR` or replacing dotfiles. `--clobber` answers yes to optional cleanup and `--dry-run` previews changes without prompting. |
+| `marksharc bootstrap`                    | Install packages declared by enabled modules for the current OS and by overlay bundles. Generate a temporary Brewfile for Homebrew on macOS and Linux. Print apt or dnf commands and require confirmation before invoking sudo.                                                                                                                                                                                                                                                                |
+| `marksharc update`                       | Sync repositories, refresh plugin pins, run module and overlay steps, and render. Continue after individual failures and report each step's result. `--list` lists the steps, `--only <label>` selects one, and `--dry-run` prints commands without running them. Replaces `bin/do_updates.sh` and all startup-time pulls.                                                                                                                                                                     |
+| `marksharc install <name>`               | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm).                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `marksharc doctor`                       | Verify stubs and links, cache and environment ID freshness (render freshness once the renderer exists), missing commands for modules the overlay enables by name (a module enabled by default skips itself when its required command is absent), plugin clones, repo state, foreign lines in dotfiles, duplicate PATH entries, and startup time against a budget.                                                                                                                              |
+| `marksharc module list\|enable\|disable` | Inspect and edit module selection in the overlay.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `marksharc uninstall`                    | Restore the backed-up dotfiles and remove stubs.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 The Bash backup includes `.bashrc`, `.bash_profile`, `.bash_login`,
 `.profile` and `.login`. Confirmed Fish cleanup moves the entire Fish
@@ -522,70 +524,70 @@ are in [BASH-SPEC.md](BASH-SPEC.md). Its requirements include:
 
 ### 7.1 Public modules
 
-| Module | Phase | Contents | Replaces |
-|---|---|---|---|
-| `core` | MVP | Session class, host facts, guards, cache helpers, reload, verbose trace, directive applier | `zsh.common`, `zsh.functions` helpers, sentinels |
-| `path` | MVP | Tiered PATH builder, `bin.<OS>.<arch>` support, `dot_in_path` option | `build_path` |
-| `agent` | MVP | Agent markers, quiet env; later `bash_env` option and atuin agent hooks | `interactive_shell` |
-| `brew` | MVP | Cached `brew shellenv` for macOS and Linuxbrew | `setup-homebrew` |
-| `zsh-options` | MVP | The kept `setopt` set, locale, umask rule | Interactive option block |
-| `editor` | MVP | `EDITOR` from an option (default `emacs -nw` when present, else `vi`) | emacs/xemacs detection |
-| `pager` | MVP | `PAGER`, `LESS`, coloured man pages, coloured `diff`, `diffcp` | OMZ colored-man-pages, diff overrides |
-| `ls` | MVP | `ll`, `la`, `dir`, `lf`, `lsf`, eza-backed when installed; bare `ls` stays native | eza alias block |
-| `ps` | MVP | The seven ps helpers, fixed; ps selects and procs draws the selection when installed (`ps.procs`); bare `ps` untouched | ps function block |
-| `nav` | MVP | Directory stack options, Alt-arrow directory widgets | OMZ dirhistory and dircycle |
-| `zoxide` | MVP | Cached init | |
-| `completion` | MVP | `compinit`, zstyles, completion cache | Completion block, OMZ lib |
-| `completion-fzf-tab` | MVP | fzf-tab plugin | OMZ custom plugin |
-| `command-not-found` | MVP | Homebrew and apt handlers | OMZ command-not-found |
-| `history-atuin` | MVP | atuin init, `history` and `h` | History option block, per-directory plugin |
-| `history-native` | MVP | Fallback file-based history | |
-| `prompt-starship` | MVP | Cached init; `config` option selects a file or a bundled preset (`rich`) as `STARSHIP_CONFIG` | OMZ themes, p10k |
-| `node-nvm` | MVP | nvm load, `.nvmrc` hook | nvm block, `load-nvmrc` |
-| `go-gvm` | MVP | gvm activation, `go.mod` hook, consistent `GOROOT` | gvm blocks |
-| `python` | MVP | uv preferred, pyenv fallback | pyenv/uv block |
-| `bun`, `pnpm`, `rust`, `go` | MVP | Paths and env | Assorted lines |
-| `mise` | Later | Opt-in owner of the tools named in `mise.tools` (node, go, python, ruby): shim directory in the `manager` tier in every session class, cached `mise activate` in interactive shells (run on directory change by default, not at every prompt), `MISE_*` settings from options, optional `nvm` and `gvm` translation functions. The owned tools' legacy modules stand aside; without mise they run as before | `node-nvm`, `go-gvm`, and pyenv, per tool, when enabled |
-| `ssh-agent` | MVP | Agent discovery and cache under the state dir, `clean-ssh-agents` | `setup-ssh-agent`, `clean-ssh-agents` |
-| `x11` | MVP | DISPLAY inference; mux-aware in Modernization | `setup-x11-display` |
-| `docker` | MVP | `cleanup-docker`, `fix-docker-socket`, container detection | Same names |
-| `mux` | MVP | `fix-tmux`; adapters in Modernization | `fix-ssh.zsh` |
-| `titles` | MVP | Title computation and the chdir hook | `chdir-set-title`, `set-title` |
-| `herdr` | MVP | Session and collie wrappers, completion | `setup-herdr-sessions` |
-| `wezterm` | MVP | Terminfo installer | `install-wezterm-terminfo` |
-| `cc-providers` | MVP | Claude provider wrappers from overlay provider files | `setup-cc-providers` |
-| `git-worktree` | MVP | `gwt-clean` with pre-remove hooks, `git-managed`, `git-unmanaged`, `repo-sync` with `roots` and `orgs` options | Same names |
-| `cwf` | MVP | `cwf shell` init, generic `cwf-new` with post-create hooks | cwf block, `cwf-new` |
-| `fish-bridge` | MVP | `run-fish` | `runfish.zsh` |
-| `greeting` | MVP | fortune, opt-in | fortune line |
-| `direnv` | MVP | Cached hook, opt-in | fish-only today |
-| `lmstudio`, `cuda` | MVP | App-tier paths and env | `build_path` fragments |
-| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins at 95 and 99, after fzf-tab and atuin; an atuin suggestion strategy when atuin is installed; syntax highlighting loads last of all | |
-| `theme` | Modernization | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include through `GIT_CONFIG_COUNT`, fzf defaults and previews (fzf-tab included); order 21, before completion reads `LS_COLORS` | |
-| `completion-carapace` | Modernization | Opt-in zsh completion via cached `carapace _carapace zsh` at order 72 with `enable`, `bridges`, `excludes`, and `allow_fzf_tab` options; disables `completion-fzf-tab` unless forced; `completion-ui` / `MARKSHARC_COMPLETION_UI` switches between UIs for a fresh shell (`exec zsh -l`) | |
-| `launch` | Modernization | `launch-session` and `launch-repo`: a new terminal session on a chosen host, directory, or repository under tmux, the Herdr TUI, or Herdr Core; launch metadata and run-after-init ([LAUNCH-SPEC.md](LAUNCH-SPEC.md)) | |
-| `cloud` | Later | kubectl, krew, kubectx, gcloud, aws, helm | k8s and gcloud blocks |
+| Module                                           | Phase         | Contents                                                                                                                                                                                                                                                                                                                                                                                                    | Replaces                                                |
+| ------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `core`                                           | MVP           | Session class, host facts, guards, cache helpers, reload, verbose trace, directive applier                                                                                                                                                                                                                                                                                                                  | `zsh.common`, `zsh.functions` helpers, sentinels        |
+| `path`                                           | MVP           | Tiered PATH builder, `bin.<OS>.<arch>` support, `dot_in_path` option                                                                                                                                                                                                                                                                                                                                        | `build_path`                                            |
+| `agent`                                          | MVP           | Agent markers, quiet env; later `bash_env` option and atuin agent hooks                                                                                                                                                                                                                                                                                                                                     | `interactive_shell`                                     |
+| `brew`                                           | MVP           | Cached `brew shellenv` for macOS and Linuxbrew                                                                                                                                                                                                                                                                                                                                                              | `setup-homebrew`                                        |
+| `zsh-options`                                    | MVP           | The kept `setopt` set, locale, umask rule                                                                                                                                                                                                                                                                                                                                                                   | Interactive option block                                |
+| `editor`                                         | MVP           | `EDITOR` from an option (default `emacs -nw` when present, else `vi`)                                                                                                                                                                                                                                                                                                                                       | emacs/xemacs detection                                  |
+| `pager`                                          | MVP           | `PAGER`, `LESS`, coloured man pages, coloured `diff`, `diffcp`                                                                                                                                                                                                                                                                                                                                              | OMZ colored-man-pages, diff overrides                   |
+| `ls`                                             | MVP           | `ll`, `la`, `dir`, `lf`, `lsf`, eza-backed when installed; bare `ls` stays native                                                                                                                                                                                                                                                                                                                           | eza alias block                                         |
+| `ps`                                             | MVP           | The seven ps helpers, fixed; ps selects and procs draws the selection when installed (`ps.procs`); bare `ps` untouched                                                                                                                                                                                                                                                                                      | ps function block                                       |
+| `nav`                                            | MVP           | Directory stack options, Alt-arrow directory widgets                                                                                                                                                                                                                                                                                                                                                        | OMZ dirhistory and dircycle                             |
+| `zoxide`                                         | MVP           | Cached init                                                                                                                                                                                                                                                                                                                                                                                                 |                                                         |
+| `completion`                                     | MVP           | `compinit`, zstyles, completion cache                                                                                                                                                                                                                                                                                                                                                                       | Completion block, OMZ lib                               |
+| `completion-fzf-tab`                             | MVP           | fzf-tab plugin                                                                                                                                                                                                                                                                                                                                                                                              | OMZ custom plugin                                       |
+| `command-not-found`                              | MVP           | Homebrew and apt handlers                                                                                                                                                                                                                                                                                                                                                                                   | OMZ command-not-found                                   |
+| `history-atuin`                                  | MVP           | atuin init, `history` and `h`                                                                                                                                                                                                                                                                                                                                                                               | History option block, per-directory plugin              |
+| `history-native`                                 | MVP           | Fallback file-based history                                                                                                                                                                                                                                                                                                                                                                                 |                                                         |
+| `prompt-starship`                                | MVP           | Cached init; `config` option selects a file or a bundled preset (`rich`) as `STARSHIP_CONFIG`                                                                                                                                                                                                                                                                                                               | OMZ themes, p10k                                        |
+| `node-nvm`                                       | MVP           | nvm load, `.nvmrc` hook                                                                                                                                                                                                                                                                                                                                                                                     | nvm block, `load-nvmrc`                                 |
+| `go-gvm`                                         | MVP           | gvm activation, `go.mod` hook, consistent `GOROOT`                                                                                                                                                                                                                                                                                                                                                          | gvm blocks                                              |
+| `python`                                         | MVP           | uv preferred, pyenv fallback                                                                                                                                                                                                                                                                                                                                                                                | pyenv/uv block                                          |
+| `bun`, `pnpm`, `rust`, `go`                      | MVP           | Paths and env                                                                                                                                                                                                                                                                                                                                                                                               | Assorted lines                                          |
+| `mise`                                           | Later         | Opt-in owner of the tools named in `mise.tools` (node, go, python, ruby): shim directory in the `manager` tier in every session class, cached `mise activate` in interactive shells (run on directory change by default, not at every prompt), `MISE_*` settings from options, optional `nvm` and `gvm` translation functions. The owned tools' legacy modules stand aside; without mise they run as before | `node-nvm`, `go-gvm`, and pyenv, per tool, when enabled |
+| `ssh-agent`                                      | MVP           | Agent discovery and cache under the state dir, `clean-ssh-agents`                                                                                                                                                                                                                                                                                                                                           | `setup-ssh-agent`, `clean-ssh-agents`                   |
+| `x11`                                            | MVP           | DISPLAY inference; mux-aware in Modernization                                                                                                                                                                                                                                                                                                                                                               | `setup-x11-display`                                     |
+| `docker`                                         | MVP           | `cleanup-docker`, `fix-docker-socket`, container detection                                                                                                                                                                                                                                                                                                                                                  | Same names                                              |
+| `mux`                                            | MVP           | `fix-tmux`; adapters in Modernization                                                                                                                                                                                                                                                                                                                                                                       | `fix-ssh.zsh`                                           |
+| `titles`                                         | MVP           | Title computation and the chdir hook                                                                                                                                                                                                                                                                                                                                                                        | `chdir-set-title`, `set-title`                          |
+| `herdr`                                          | MVP           | Session and collie wrappers, completion                                                                                                                                                                                                                                                                                                                                                                     | `setup-herdr-sessions`                                  |
+| `wezterm`                                        | MVP           | Terminfo installer                                                                                                                                                                                                                                                                                                                                                                                          | `install-wezterm-terminfo`                              |
+| `cc-providers`                                   | MVP           | Claude provider wrappers from overlay provider files                                                                                                                                                                                                                                                                                                                                                        | `setup-cc-providers`                                    |
+| `git-worktree`                                   | MVP           | `gwt-clean` with pre-remove hooks, `git-managed`, `git-unmanaged`, `repo-sync` with `roots` and `orgs` options                                                                                                                                                                                                                                                                                              | Same names                                              |
+| `cwf`                                            | MVP           | `cwf shell` init, generic `cwf-new` with post-create hooks                                                                                                                                                                                                                                                                                                                                                  | cwf block, `cwf-new`                                    |
+| `fish-bridge`                                    | MVP           | `run-fish`                                                                                                                                                                                                                                                                                                                                                                                                  | `runfish.zsh`                                           |
+| `greeting`                                       | MVP           | fortune, opt-in                                                                                                                                                                                                                                                                                                                                                                                             | fortune line                                            |
+| `direnv`                                         | MVP           | Cached hook, opt-in                                                                                                                                                                                                                                                                                                                                                                                         | fish-only today                                         |
+| `lmstudio`, `cuda`                               | MVP           | App-tier paths and env                                                                                                                                                                                                                                                                                                                                                                                      | `build_path` fragments                                  |
+| `zsh-autosuggestions`, `zsh-syntax-highlighting` | Modernization | Pinned plugins at 95 and 99, after fzf-tab and atuin; an atuin suggestion strategy when atuin is installed; syntax highlighting loads last of all                                                                                                                                                                                                                                                           |                                                         |
+| `theme`                                          | Modernization | Cached vivid `LS_COLORS`, bat man pager, opt-in delta include through `GIT_CONFIG_COUNT`, fzf defaults and previews (fzf-tab included); order 21, before completion reads `LS_COLORS`                                                                                                                                                                                                                       |                                                         |
+| `completion-carapace`                            | Modernization | Opt-in zsh completion via cached `carapace _carapace zsh` at order 72 with `enable`, `bridges`, `excludes`, and `allow_fzf_tab` options; disables `completion-fzf-tab` unless forced; `completion-ui` / `MARKSHARC_COMPLETION_UI` switches between UIs for a fresh shell (`exec zsh -l`)                                                                                                                    |                                                         |
+| `launch`                                         | Modernization | `launch-session` and `launch-repo`: a new terminal session on a chosen host, directory, or repository under tmux, the Herdr TUI, or Herdr Core; launch metadata and run-after-init ([LAUNCH-SPEC.md](LAUNCH-SPEC.md))                                                                                                                                                                                       |                                                         |
+| `cloud`                                          | Later         | kubectl, krew, kubectx, gcloud, aws, helm                                                                                                                                                                                                                                                                                                                                                                   | k8s and gcloud blocks                                   |
 
 ### 7.2 Private modules (author's overlay)
 
-| Module | Contents |
-|---|---|
-| `convoy` | `COMMON_DEV_TOOLS` discovery, `repo-sync` roots and orgs, the `core-platform` post-create hook for `cwf-new` (port offset, PostgreSQL data dir, `.env` rewrite) |
-| `site-bac` | Plesk and BAC aliases and functions, `glogin`, `gbacstart`, `gbacstat`, the site umask |
-| `mark-tools` | sandcat, gam, envman |
-| *(not modules)* | `providers/*.conf`, `packages/` bundles from `bootstrap-mac*.sh` and `basepkgs.sh`, `hosts.conf`, `set core.dot_in_path on` |
+| Module          | Contents                                                                                                                                                        |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `convoy`        | `COMMON_DEV_TOOLS` discovery, `repo-sync` roots and orgs, the `core-platform` post-create hook for `cwf-new` (port offset, PostgreSQL data dir, `.env` rewrite) |
+| `site-bac`      | Plesk and BAC aliases and functions, `glogin`, `gbacstart`, `gbacstat`, the site umask                                                                          |
+| `mark-tools`    | sandcat, gam, envman                                                                                                                                            |
+| _(not modules)_ | `providers/*.conf`, `packages/` bundles from `bootstrap-mac*.sh` and `basepkgs.sh`, `hosts.conf`, `set core.dot_in_path on`                                     |
 
 ## 8. Testing and quality
 
-| Layer | Tool | What it proves |
-|---|---|---|
-| zsh and bash units | ShellSpec 0.28.1, pinned | Function behaviour in a temporary HOME with stubbed commands (the existing approach) |
-| Cross-shell contract | ShellSpec under `sh`, launching `zsh`, `fish`, and `bash` | Same PATH and env in every shell; silent batch and agent startup; idempotent re-source; no writes outside cache and state |
-| fish units | fishtape (Fish phase) | Native fish functions; replaces `test_parity.py` |
-| PTY cases | The existing Python PTY helper | Interactive classification, reload, one-time init |
-| Lint | `zsh -n`; `shfmt -ln zsh -d` (advisory); shellcheck for `sh` and `bash` files; `fish --no-execute` and `fish_indent --check` | Syntax and formatting |
-| Startup budget | hyperfine, advisory | Regression check on interactive and batch startup |
-| CI | GitHub Actions, `macos-latest` and `ubuntu-latest` | All of the above on every PR |
+| Layer                | Tool                                                                                                                         | What it proves                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| zsh and bash units   | ShellSpec 0.28.1, pinned                                                                                                     | Function behaviour in a temporary HOME with stubbed commands (the existing approach)                                      |
+| Cross-shell contract | ShellSpec under `sh`, launching `zsh`, `fish`, and `bash`                                                                    | Same PATH and env in every shell; silent batch and agent startup; idempotent re-source; no writes outside cache and state |
+| fish units           | fishtape (Fish phase)                                                                                                        | Native fish functions; replaces `test_parity.py`                                                                          |
+| PTY cases            | The existing Python PTY helper                                                                                               | Interactive classification, reload, one-time init                                                                         |
+| Lint                 | `zsh -n`; `shfmt -ln zsh -d` (advisory); shellcheck for `sh` and `bash` files; `fish --no-execute` and `fish_indent --check` | Syntax and formatting                                                                                                     |
+| Startup budget       | hyperfine, advisory                                                                                                          | Regression check on interactive and batch startup                                                                         |
+| CI                   | GitHub Actions, `macos-latest` and `ubuntu-latest`                                                                           | All of the above on every PR                                                                                              |
 
 Rules, carried from the existing suite:
 
@@ -595,25 +597,25 @@ Rules, carried from the existing suite:
 
 ## 9. Migration map
 
-| Today (`mark-desktop-files`) | Destination |
-|---|---|
-| `config/zsh/.zshenv.*`, `.zshrc`, `.zlogin`, `zsh.zshrc`, `zsh.login` | Installer stubs and `core/zsh/` |
-| `zsh.common`, `zsh.functions` | `core` module and `core/zsh/lib` |
-| `functions/build_path.zsh` | `path` module plus per-module `path` lines |
-| `zsh.zshrc.interactive` | Split across the modules in 7.1 |
-| `zsh.zshrc.ohmyzsh`, `zsh.zshrc.reference.dont`, `etc/oh-my-zsh/`, `etc/links/*.zsh-theme`, `etc/zsh_plugins.txt` | Deleted |
-| `functions/*.zsh` | The owning module's `functions/zsh/`, later `bin/` |
-| `functions/mdf-sync.zsh`, `link-cleanup.zsh` | `marksharc sync`, `install.sh`, `doctor` |
-| `functions/mdf-switch.zsh`, `setup-terminal.zsh` | Deleted |
-| `etc/zsh.zshrc.user`, `etc/zsh.gcp-mcp`, `etc/zsh.manifest-cloud` | Overlay `site-bac` module; Google and Manifest parts deleted |
-| `ai/providers/*.provider` | Overlay `providers/` |
-| `config/fish/` | `core/fish/` and module `init.fish` and `functions/fish/` (Fish phase) |
-| `tests/shell/`, `config/fish/tests/` | `marksharc/tests/` |
-| `docs/fish-zsh-*.md`, `docs/zsh-*.md`, `specs/MARKSHARC-*.md` | `marksharc/docs/` and `marksharc/specs/` (design rules extended, bug lists closed out) |
-| `bin/do_updates.sh`, `bin/bootstrap-mac*.sh`, `scripts/basepkgs.sh`, `bin/go_installs.sh`, `bin/uv_setup.sh` | `update` and `package` directives; personal lists to overlay `packages/` |
-| `.bashrc`, `.bash_profile`, `.bash_login`, `.profile` | Installer stubs and `core/bash/` |
-| `config/starship.toml` | Stays in `mark-desktop-files` (user configuration) |
-| ssh keys, `ai/`, non-shell `config/*`, `etc/gitconfig`, emacs | Stay in `mark-desktop-files` |
+| Today (`mark-desktop-files`)                                                                                      | Destination                                                                            |
+| ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `config/zsh/.zshenv.*`, `.zshrc`, `.zlogin`, `zsh.zshrc`, `zsh.login`                                             | Installer stubs and `core/zsh/`                                                        |
+| `zsh.common`, `zsh.functions`                                                                                     | `core` module and `core/zsh/lib`                                                       |
+| `functions/build_path.zsh`                                                                                        | `path` module plus per-module `path` lines                                             |
+| `zsh.zshrc.interactive`                                                                                           | Split across the modules in 7.1                                                        |
+| `zsh.zshrc.ohmyzsh`, `zsh.zshrc.reference.dont`, `etc/oh-my-zsh/`, `etc/links/*.zsh-theme`, `etc/zsh_plugins.txt` | Deleted                                                                                |
+| `functions/*.zsh`                                                                                                 | The owning module's `functions/zsh/`, later `bin/`                                     |
+| `functions/mdf-sync.zsh`, `link-cleanup.zsh`                                                                      | `marksharc sync`, `install.sh`, `doctor`                                               |
+| `functions/mdf-switch.zsh`, `setup-terminal.zsh`                                                                  | Deleted                                                                                |
+| `etc/zsh.zshrc.user`, `etc/zsh.gcp-mcp`, `etc/zsh.manifest-cloud`                                                 | Overlay `site-bac` module; Google and Manifest parts deleted                           |
+| `ai/providers/*.provider`                                                                                         | Overlay `providers/`                                                                   |
+| `config/fish/`                                                                                                    | `core/fish/` and module `init.fish` and `functions/fish/` (Fish phase)                 |
+| `tests/shell/`, `config/fish/tests/`                                                                              | `marksharc/tests/`                                                                     |
+| `docs/fish-zsh-*.md`, `docs/zsh-*.md`, `specs/MARKSHARC-*.md`                                                     | `marksharc/docs/` and `marksharc/specs/` (design rules extended, bug lists closed out) |
+| `bin/do_updates.sh`, `bin/bootstrap-mac*.sh`, `scripts/basepkgs.sh`, `bin/go_installs.sh`, `bin/uv_setup.sh`      | `update` and `package` directives; personal lists to overlay `packages/`               |
+| `.bashrc`, `.bash_profile`, `.bash_login`, `.profile`                                                             | Installer stubs and `core/bash/`                                                       |
+| `config/starship.toml`                                                                                            | Stays in `mark-desktop-files` (user configuration)                                     |
+| ssh keys, `ai/`, non-shell `config/*`, `etc/gitconfig`, emacs                                                     | Stay in `mark-desktop-files`                                                           |
 
 ## 10. Design rules
 
@@ -636,44 +638,45 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 
 ## 11. Risks and open questions
 
-| Risk or question | Handling |
-|---|---|
-| Removing OMZ changes keybindings and completion feel in ways history cannot show. | Its own pre-migration PR, lived in on the Mac before sol; rollback is one revert. |
-| How agent harnesses find rc files when `ZDOTDIR` is redirected is not fully verified (Claude Code is documented to source `~/.zshrc` or `~/.bashrc`; Codex is undocumented). | Contract tests for `zsh -c`, `zsh -ic`, and `bash -c` under agent markers; a manual check per harness in the core-loader issue. |
-| Per-directory history may not import into atuin with its directory. | A short spike inside the history issue; fall back to importing without directory. Resolved in DEV-36: a temporary zsh-histdb database imported with `atuin import zsh-hist-db` preserves the directory. |
-| ShellSpec has had no release since 2021. | Pin the version; the contract suite is plain enough to port to bats if needed. |
-| The directive format could grow into a language. | The vocabulary in 6.5 is closed; anything else is native code in `env.<shell>` or `init.<shell>`. |
-| fish users need zsh for the CLI and write-once commands. | Stated as a requirement; revisit with the Go helper under "maybe later". |
-| Shims add a directory of generated executables to PATH. | The directory is per-host, mode 0700, regenerated by `render`, and holds no secrets. |
-| A dev checkout as `MARKSHARC_HOME` can break every new shell. | The stub falls back to a minimal safe PATH and prints one error line when the core fails to load. |
-| Is `cwf` itself public? | The public `cwf` module only calls documented `cwf` commands; if `cwf` is private the module moves to the overlay with no design change. |
+| Risk or question                                                                                                                                                             | Handling                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Removing OMZ changes keybindings and completion feel in ways history cannot show.                                                                                            | Its own pre-migration PR, lived in on the Mac before sol; rollback is one revert.                                                                                                                       |
+| How agent harnesses find rc files when `ZDOTDIR` is redirected is not fully verified (Claude Code is documented to source `~/.zshrc` or `~/.bashrc`; Codex is undocumented). | Contract tests for `zsh -c`, `zsh -ic`, and `bash -c` under agent markers; a manual check per harness in the core-loader issue.                                                                         |
+| Per-directory history may not import into atuin with its directory.                                                                                                          | A short spike inside the history issue; fall back to importing without directory. Resolved in DEV-36: a temporary zsh-histdb database imported with `atuin import zsh-hist-db` preserves the directory. |
+| ShellSpec has had no release since 2021.                                                                                                                                     | Pin the version; the contract suite is plain enough to port to bats if needed.                                                                                                                          |
+| The directive format could grow into a language.                                                                                                                             | The vocabulary in 6.5 is closed; anything else is native code in `env.<shell>` or `init.<shell>`.                                                                                                       |
+| fish users need zsh for the CLI and write-once commands.                                                                                                                     | Stated as a requirement; revisit with the Go helper under "maybe later".                                                                                                                                |
+| Shims add a directory of generated executables to PATH.                                                                                                                      | The directory is per-host, mode 0700, regenerated by `render`, and holds no secrets.                                                                                                                    |
+| A dev checkout as `MARKSHARC_HOME` can break every new shell.                                                                                                                | The stub falls back to a minimal safe PATH and prints one error line when the core fails to load.                                                                                                       |
+| Is `cwf` itself public?                                                                                                                                                      | The public `cwf` module only calls documented `cwf` commands; if `cwf` is private the module moves to the overlay with no design change.                                                                |
 
 ## 12. Decision log
 
-| Decision | Choice | Source |
-|---|---|---|
-| Legacy platforms and sites | Drop dead OS and Google/Manifest logic; live site code to the overlay | Interview |
-| Workflow integrations | Generic parts public, Convoy-specific parts private | Interview |
-| OMZ keepers | fzf-tab menu, Alt-arrow dir nav, coloured man, command-not-found | Interview |
-| Cloud and k8s | Later | Interview, history |
-| Version managers | nvm, gvm, pyenv kept; rbenv dropped | Interview |
-| System helpers | ssh-agent, X11, docker, explicit installers kept; installers leave the core | Interview |
-| ps and ls helpers | Keep all, fix, rebuild on procs and eza; bare `ls` and `ps` untouched | Interview |
-| zoxide | Enabled | Interview |
-| History | atuin only, with import | Interview |
-| Startup output | Quiet; chatty `cs` and `li` | Interview |
-| Interactive upgrades | Autosuggestions, syntax highlighting, colour defaults; Carapace opt-in without fzf-tab | Interview |
-| Sync | Pull and notify in MVP; timer and ssh push after | Interview |
-| Notify exception | Detached interactive fetch, throttled to 12 hours by default; cached behind notice on a subsequent eligible shell | Operator, DEV-45 |
-| Overlay location | `mark-desktop-files/marksharc/` linked to `~/.config/marksharc` | Interview |
-| Write-once language | zsh executables | Interview |
-| Bash | Interactive on 4.4+, older versions env-only, no automatic exec, optional recommended ble.sh | Interview; operator, DEV-61 |
-| Config format | Line directives, no parser dependency | Interview |
-| `.` on PATH | Off by default; on in the author's overlay | Interview |
-| Pre-migration depth | Full mirror of the target layout, in place | Interview |
-| Plugin manager | None; built-in pinned loader | Research |
-| Deployment tool | None imposed; own installer and stubs | Research |
-| Test runner | ShellSpec plus a cross-shell contract suite | Research, existing suite |
-| Version managers (revisited) | mise as an opt-in module that owns tools per host; shims for agent and batch shells, activation for interactive ones; nvm, gvm, and pyenv remain the default and the fallback | Operator, DEV-62 |
-| Version-manager PATH order | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order | Operator, DEV-38 |
-| Launch commands | `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue precedes the command. Full log in [LAUNCH-SPEC.md](LAUNCH-SPEC.md) section 13 | Operator, DEV-78 |
+| Decision                     | Choice                                                                                                                                                                                                                                                                                                                      | Source                      |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Legacy platforms and sites   | Drop dead OS and Google/Manifest logic; live site code to the overlay                                                                                                                                                                                                                                                       | Interview                   |
+| Workflow integrations        | Generic parts public, Convoy-specific parts private                                                                                                                                                                                                                                                                         | Interview                   |
+| OMZ keepers                  | fzf-tab menu, Alt-arrow dir nav, coloured man, command-not-found                                                                                                                                                                                                                                                            | Interview                   |
+| Cloud and k8s                | Later                                                                                                                                                                                                                                                                                                                       | Interview, history          |
+| Version managers             | nvm, gvm, pyenv kept; rbenv dropped                                                                                                                                                                                                                                                                                         | Interview                   |
+| System helpers               | ssh-agent, X11, docker, explicit installers kept; installers leave the core                                                                                                                                                                                                                                                 | Interview                   |
+| ps and ls helpers            | Keep all, fix, rebuild on procs and eza; bare `ls` and `ps` untouched                                                                                                                                                                                                                                                       | Interview                   |
+| zoxide                       | Enabled                                                                                                                                                                                                                                                                                                                     | Interview                   |
+| History                      | atuin only, with import                                                                                                                                                                                                                                                                                                     | Interview                   |
+| Startup output               | Quiet; chatty `cs` and `li`                                                                                                                                                                                                                                                                                                 | Interview                   |
+| Interactive upgrades         | Autosuggestions, syntax highlighting, colour defaults; Carapace opt-in without fzf-tab                                                                                                                                                                                                                                      | Interview                   |
+| Sync                         | Pull and notify in MVP; timer and ssh push after                                                                                                                                                                                                                                                                            | Interview                   |
+| Notify exception             | Detached interactive fetch, throttled to 12 hours by default; cached behind notice on a subsequent eligible shell                                                                                                                                                                                                           | Operator, DEV-45            |
+| Overlay location             | `mark-desktop-files/marksharc/` linked to `~/.config/marksharc`                                                                                                                                                                                                                                                             | Interview                   |
+| Write-once language          | zsh executables                                                                                                                                                                                                                                                                                                             | Interview                   |
+| Bash                         | Interactive on 4.4+, older versions env-only, no automatic exec, optional recommended ble.sh                                                                                                                                                                                                                                | Interview; operator, DEV-61 |
+| Config format                | Line directives, no parser dependency                                                                                                                                                                                                                                                                                       | Interview                   |
+| `.` on PATH                  | Off by default; on in the author's overlay                                                                                                                                                                                                                                                                                  | Interview                   |
+| Pre-migration depth          | Full mirror of the target layout, in place                                                                                                                                                                                                                                                                                  | Interview                   |
+| Plugin manager               | None; built-in pinned loader                                                                                                                                                                                                                                                                                                | Research                    |
+| Deployment tool              | None imposed; own installer and stubs                                                                                                                                                                                                                                                                                       | Research                    |
+| Test runner                  | ShellSpec plus a cross-shell contract suite                                                                                                                                                                                                                                                                                 | Research, existing suite    |
+| Version managers (revisited) | mise as an opt-in module that owns tools per host; shims for agent and batch shells, activation for interactive ones; nvm, gvm, and pyenv remain the default and the fallback                                                                                                                                               | Operator, DEV-62            |
+| Version-manager PATH order   | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order                                                                                                                                                                                    | Operator, DEV-38            |
+| Launch commands              | `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue precedes the command. Full log in [LAUNCH-SPEC.md](LAUNCH-SPEC.md) section 13                                                                                                                                           | Operator, DEV-78            |
+| Declarative completions      | Common `.comp` line-directive specs rendered by `marksharc render` to zsh, Bash 4.4+, Fish, and Carapace YAML for `marksharc`, `launch-session`, `launch-repo`, and `cwf-new`, backed by offline `core/cli/complete` and manifest-tracked Carapace symlinks. Full log in [COMPLETION-SPEC.md](COMPLETION-SPEC.md) section 9 | Operator, DEV-84            |

@@ -50,14 +50,14 @@ end
 
 Compatibility translations preserve the remaining argv and normalize gvm’s `go` prefix:
 
-| Input | mise invocation |
-| --- | --- |
-| `nvm use V` / `gvm use goV` | `mise shell node@V` / `mise shell go@V` |
-| `nvm install V` / `gvm install goV` | `mise install node@V` / `mise install go@V` |
-| `nvm ls` / `gvm ls` / `gvm list` | `mise ls node` / `mise ls go` |
-| `nvm current` / `gvm current` | `mise current node` / `mise current go` |
-| `nvm alias default V` / `gvm alias default goV` | `mise use --global node@V` / `mise use --global go@V` |
-| any other verb | print the corresponding `mise shell`, `install`, `ls`, `current`, or `use --global` forms and return 2 |
+| Input                                           | mise invocation                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `nvm use V` / `gvm use goV`                     | `mise shell node@V` / `mise shell go@V`                                                                |
+| `nvm install V` / `gvm install goV`             | `mise install node@V` / `mise install go@V`                                                            |
+| `nvm ls` / `gvm ls` / `gvm list`                | `mise ls node` / `mise ls go`                                                                          |
+| `nvm current` / `gvm current`                   | `mise current node` / `mise current go`                                                                |
+| `nvm alias default V` / `gvm alias default goV` | `mise use --global node@V` / `mise use --global go@V`                                                  |
+| any other verb                                  | print the corresponding `mise shell`, `install`, `ls`, `current`, or `use --global` forms and return 2 |
 
 ### Task 1: Zsh and Bash ownership, activation, and legacy fallback
 

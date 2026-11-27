@@ -18,11 +18,11 @@ environment path compatible with macOS Bash 3.2. Older Bash stays environment-on
 quietly; `doctor` explains the limitation. Never search for and automatically exec a
 different Bash. Installing or choosing a newer login shell remains an explicit action.
 
-| Approach | Benefit | Cost or gap |
-| --- | --- | --- |
-| **4.4+ interactive; older versions env-only (selected)** | Supports zoxide's interactive completion and modern completion tools without requiring the newest Bash | Two prompt-hook representations must be supported across 4.4 and 5.1+; macOS users choose a newer Bash explicitly |
-| 5.1+ interactive; older versions env-only | Native `PROMPT_COMMAND` arrays simplify hook composition | Excludes 4.4 and 5.0 hosts without adding an essential interactive capability |
-| 3.2+ interactive with per-feature degradation | Native macOS Bash gets a richer experience without a shell upgrade | Carapace 1.8.5 rejects it; zoxide's enhanced completion is unavailable; maintaining several editor/completion profiles increases scope |
+| Approach                                                 | Benefit                                                                                                | Cost or gap                                                                                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **4.4+ interactive; older versions env-only (selected)** | Supports zoxide's interactive completion and modern completion tools without requiring the newest Bash | Two prompt-hook representations must be supported across 4.4 and 5.1+; macOS users choose a newer Bash explicitly                      |
+| 5.1+ interactive; older versions env-only                | Native `PROMPT_COMMAND` arrays simplify hook composition                                               | Excludes 4.4 and 5.0 hosts without adding an essential interactive capability                                                          |
+| 3.2+ interactive with per-feature degradation            | Native macOS Bash gets a richer experience without a shell upgrade                                     | Carapace 1.8.5 rejects it; zoxide's enhanced completion is unavailable; maintaining several editor/completion profiles increases scope |
 
 Write-once zsh executables already remove most command implementation differences.
 They cannot install caller functions, change the caller's directory, bind keys, draw a
@@ -37,17 +37,17 @@ explicit install/update tooling and is not performed by the design/docs PR.
 
 ## Implementation baseline at `624d27d`
 
-| Capability | Current implementation and remaining work |
-| --- | --- |
-| Environment and PATH | `core/bash/env.bash`, `path.bash` and `core/zsh/lib/render-bash.zsh` implement native exports, tiered paths, agent classification, inheritance, stale-cache recovery, legacy manager defaults and mise ownership |
-| Startup | Both installer-managed Bash files source `core/bash/bashrc.bash`; it currently sources only the environment entry point |
-| Declarative configuration | The Bash emitter handles `env` and `path`; it does not emit interactive aliases or an init plan |
-| Tooling and shims | Module `bin/` directories and generated provider/session shims already work across shells; the CLI remains a zsh executable |
-| Caller state | zsh and Fish have directive appliers and wrappers; Bash needs its own applier and functions |
-| Interactive modules | Public modules have zsh/Fish init files and native functions; there are no public `init.bash` implementations at this checkout |
-| mise | Bash has env ownership, shims and fallback filtering; interactive activation and compatibility functions remain to be added |
-| Completion | `completion-carapace` currently initializes zsh; launch/cwf static completions are zsh/Fish; Bash needs registrations and shell-specific generated artifacts |
-| Tests | Existing Bash contract suite passes: 29 examples, 0 failures. Most cases explicitly launch `/bin/bash`; a full interactive matrix must also select newer interpreters explicitly |
+| Capability                | Current implementation and remaining work                                                                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment and PATH      | `core/bash/env.bash`, `path.bash` and `core/zsh/lib/render-bash.zsh` implement native exports, tiered paths, agent classification, inheritance, stale-cache recovery, legacy manager defaults and mise ownership |
+| Startup                   | Both installer-managed Bash files source `core/bash/bashrc.bash`; it currently sources only the environment entry point                                                                                          |
+| Declarative configuration | The Bash emitter handles `env` and `path`; it does not emit interactive aliases or an init plan                                                                                                                  |
+| Tooling and shims         | Module `bin/` directories and generated provider/session shims already work across shells; the CLI remains a zsh executable                                                                                      |
+| Caller state              | zsh and Fish have directive appliers and wrappers; Bash needs its own applier and functions                                                                                                                      |
+| Interactive modules       | Public modules have zsh/Fish init files and native functions; there are no public `init.bash` implementations at this checkout                                                                                   |
+| mise                      | Bash has env ownership, shims and fallback filtering; interactive activation and compatibility functions remain to be added                                                                                      |
+| Completion                | `completion-carapace` currently initializes zsh; launch/cwf static completions are zsh/Fish; Bash needs registrations and shell-specific generated artifacts                                                     |
+| Tests                     | Existing Bash contract suite passes: 29 examples, 0 failures. Most cases explicitly launch `/bin/bash`; a full interactive matrix must also select newer interpreters explicitly                                 |
 
 This inventory is based on direct source reads. The graph index reports substantial
 shell/config parsing gaps, so graph absence is not used as evidence of missing behavior.
@@ -135,16 +135,16 @@ introduce automatic installation where the declared policy forbids it.
 
 ### Prompt, history, completion and editing
 
-| Area | Full profile | Fallback and important difference |
-| --- | --- | --- |
-| Prompt | Cached `starship init bash`, same selected config/preset | Plain Bash prompt if starship is absent; status and command duration must survive other hooks |
-| History | Atuin recording, Ctrl-R/Up, `history`, `history -N`, `h`; other arguments use Bash builtin | A Bash-specific history file under XDG state when Atuin integration is unavailable/disabled. Atuin mode keeps in-memory recall and disables the native persistent store |
-| History backend | ble.sh >= 0.4; current Atuin bundled bash-preexec on Readline | Atuin documents duration/status gaps with bash-preexec. If neither backend is usable, keep native history and report degraded recording in doctor; never silently disable all persistence |
-| Navigation | zoxide `z`/`zi`, native stack, directory keys | Native navigation if zoxide/fzf is absent; enhanced zoxide completion requires Bash 4.4+ |
-| Completion data | Opt-in Carapace; bash-completion where installed; framework static/generated registrations override overlapping generic ones | Native filename/command completion if engines are absent; no startup generation of external command completions |
-| Completion menu | ble.sh menu selection and filtering | Readline completion/listing; Carapace alone supplies candidates, not zsh's fzf-tab UI |
-| Suggestions and highlighting | ble.sh | Unavailable in plain Readline; Bash 5.x alone does not supply them |
-| fzf | File/directory selection, shared previews and theme settings | Atuin retains Ctrl-R ownership; do not stack a second history binding or promise identical fzf-tab widgets |
+| Area                         | Full profile                                                                                                                 | Fallback and important difference                                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prompt                       | Cached `starship init bash`, same selected config/preset                                                                     | Plain Bash prompt if starship is absent; status and command duration must survive other hooks                                                                                             |
+| History                      | Atuin recording, Ctrl-R/Up, `history`, `history -N`, `h`; other arguments use Bash builtin                                   | A Bash-specific history file under XDG state when Atuin integration is unavailable/disabled. Atuin mode keeps in-memory recall and disables the native persistent store                   |
+| History backend              | ble.sh >= 0.4; current Atuin bundled bash-preexec on Readline                                                                | Atuin documents duration/status gaps with bash-preexec. If neither backend is usable, keep native history and report degraded recording in doctor; never silently disable all persistence |
+| Navigation                   | zoxide `z`/`zi`, native stack, directory keys                                                                                | Native navigation if zoxide/fzf is absent; enhanced zoxide completion requires Bash 4.4+                                                                                                  |
+| Completion data              | Opt-in Carapace; bash-completion where installed; framework static/generated registrations override overlapping generic ones | Native filename/command completion if engines are absent; no startup generation of external command completions                                                                           |
+| Completion menu              | ble.sh menu selection and filtering                                                                                          | Readline completion/listing; Carapace alone supplies candidates, not zsh's fzf-tab UI                                                                                                     |
+| Suggestions and highlighting | ble.sh                                                                                                                       | Unavailable in plain Readline; Bash 5.x alone does not supply them                                                                                                                        |
+| fzf                          | File/directory selection, shared previews and theme settings                                                                 | Atuin retains Ctrl-R ownership; do not stack a second history binding or promise identical fzf-tab widgets                                                                                |
 
 The native history file is `${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/history.bash`.
 Readline loads Atuin's bundled backend once per shell. Reload changes the recording
@@ -183,12 +183,12 @@ This crosses the renderer, startup/reload lifecycle, caller-state protocol, many
 modules, plugin acquisition, completion and CI. DEV-61 delivers the design/docs PR.
 Four implementation issues deliver the runtime behavior:
 
-| Unit | Issue | Owned scope | Acceptance boundary |
-| --- | --- | --- | --- |
-| A — Bash runtime and caller state | [DEV-80](https://linear.app/psols/issue/DEV-80) | Core loader, rendered init plan/aliases/options, cache, hooks, reload, directive applier and wrappers, overlay contract | Eligible sessions initialize once; quiet env-only modes and 3.2 still pass; literal directives and caller-changing commands work; foreign state survives reload |
-| B — Tool integrations and managers | [DEV-81](https://linear.app/psols/issue/DEV-81) | starship, Atuin/native history, zoxide, direnv, mise, nvm/gvm and Python adapters | Prompt status/history capture, history fallback, manager ownership/selection and reload/fallback tests pass with isolated tool stubs |
-| C — Native modules and workflow parity | [DEV-82](https://linear.app/psols/issue/DEV-82) | Navigation/keybindings; ps/ls/pager/editor/theme; titles/mux/ssh/X11; brew/git-worktree/cwf/herdr/launch; sync notification/greeting parity | Named public behaviors work in Bash, disabled features clean up, launch argv is literal and one-shot, directory navigation is verified in a PTY |
-| D — Completion, editor and acceptance | [DEV-83](https://linear.app/psols/issue/DEV-83) | ble.sh acquisition/loading; Carapace/bash-completion/fzf; framework completions; explicit Bash CI matrix; user docs and final acceptance | Fully equipped profile meets the matrix below; Readline and missing-tool modes are usable and accurately diagnosed |
+| Unit                                   | Issue                                           | Owned scope                                                                                                                                 | Acceptance boundary                                                                                                                                             |
+| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — Bash runtime and caller state      | [DEV-80](https://linear.app/psols/issue/DEV-80) | Core loader, rendered init plan/aliases/options, cache, hooks, reload, directive applier and wrappers, overlay contract                     | Eligible sessions initialize once; quiet env-only modes and 3.2 still pass; literal directives and caller-changing commands work; foreign state survives reload |
+| B — Tool integrations and managers     | [DEV-81](https://linear.app/psols/issue/DEV-81) | starship, Atuin/native history, zoxide, direnv, mise, nvm/gvm and Python adapters                                                           | Prompt status/history capture, history fallback, manager ownership/selection and reload/fallback tests pass with isolated tool stubs                            |
+| C — Native modules and workflow parity | [DEV-82](https://linear.app/psols/issue/DEV-82) | Navigation/keybindings; ps/ls/pager/editor/theme; titles/mux/ssh/X11; brew/git-worktree/cwf/herdr/launch; sync notification/greeting parity | Named public behaviors work in Bash, disabled features clean up, launch argv is literal and one-shot, directory navigation is verified in a PTY                 |
+| D — Completion, editor and acceptance  | [DEV-83](https://linear.app/psols/issue/DEV-83) | ble.sh acquisition/loading; Carapace/bash-completion/fzf; framework completions; explicit Bash CI matrix; user docs and final acceptance    | Fully equipped profile meets the matrix below; Readline and missing-tool modes are usable and accurately diagnosed                                              |
 
 Each unit extends specs/tests for its behavior and carries its own task plan. A is a
 prerequisite for B and C; D integrates all three. Intermediate PRs do not claim DEV-61's
@@ -245,9 +245,9 @@ generation/syntax/registration probes, not interactive integration certification
 - [bash-completion upstream](https://github.com/scop/bash-completion) requires guarding
   loading for Bash >= 4.2 and avoiding duplicate sourcing.
 - [Atuin integration](https://docs.atuin.sh/latest/guide/installation/) recommends ble.sh
-  >= 0.4; documents bash-preexec capture limitations and bundled bash-preexec starting
-  at 18.18.0. Support older Atuin only with a verified backend; otherwise retain native
-  history. Do not run `atuin setup` against managed dotfiles.
+  > = 0.4; documents bash-preexec capture limitations and bundled bash-preexec starting
+  > at 18.18.0. Support older Atuin only with a verified backend; otherwise retain native
+  > history. Do not run `atuin setup` against managed dotfiles.
 - [ble.sh upstream](https://github.com/akinomyoga/ble.sh) supplies syntax highlighting,
   suggestions and menu completion; supports 3.0+ but recommends 4.0+ and restricts some
   features to it. It replaces Readline and requires deliberate integration/acquisition.
