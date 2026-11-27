@@ -66,7 +66,11 @@ set -g cwf_new_copy_exclude
 cwf-new x
 @test "empty registries pass empty values" -z "$(cat "$TEST_ROOT/hooks")"
 
-# Completion: the local branches of the current repository, for the one argument.
+# Completion: render declarative cwf-new completion and exercise local branches, options, and base repos.
+command mkdir -p "$XDG_CONFIG_HOME/marksharc"
+printf 'module cwf\n' >"$XDG_CONFIG_HOME/marksharc/config.conf"
+env COMMON_DEV_TOOLS= HOST="$MARKSHARC_HOST" MARKSHARC_HOME="$MARKSHARC_ROOT" "$MARKSHARC_ROOT/bin/marksharc" render >/dev/null
+set -gp fish_complete_path "$XDG_CACHE_HOME/marksharc/$MARKSHARC_HOST/completions/fish"
 set -l repo "$TEST_ROOT/repo"
 $REAL_GIT init -q -b main "$repo"
 $REAL_GIT -C "$repo" config user.email fixture@example.invalid
