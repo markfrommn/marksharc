@@ -40,7 +40,7 @@ deliver the renderer, command specs, and Carapace wiring.
 | 4.1 Fish | marksharc | **Done** (2/2) | Fish on the same structure | [DEV-57](https://linear.app/psols/issue/DEV-57), [DEV-58](https://linear.app/psols/issue/DEV-58) |
 | 4.2 Interactive Bash | marksharc | **Done** (5/5) | Full interactive Bash 4.4+ parity and Bash 3.2 env compatibility | [DEV-61](https://linear.app/psols/issue/DEV-61) (L2 design), [DEV-80](https://linear.app/psols/issue/DEV-80), [DEV-81](https://linear.app/psols/issue/DEV-81), [DEV-82](https://linear.app/psols/issue/DEV-82), [DEV-83](https://linear.app/psols/issue/DEV-83) (L2.1–L2.4) |
 | 5. Advanced/Forward | marksharc | **In Progress** (3 Done, 4 Active/Todo, 1 Backlog, 1 Deferred) | Opt-in mise, coexist install, declarative completions (L8), legacy history import (L9) | Done: [DEV-62](https://linear.app/psols/issue/DEV-62) (L3), [DEV-72](https://linear.app/psols/issue/DEV-72) (L6), [DEV-63](https://linear.app/psols/issue/DEV-63) (L4); Active/Todo: [DEV-84](https://linear.app/psols/issue/DEV-84) (L8 design), [DEV-85](https://linear.app/psols/issue/DEV-85), [DEV-86](https://linear.app/psols/issue/DEV-86), [DEV-87](https://linear.app/psols/issue/DEV-87) (L8.1–L8.3); Backlog: [DEV-65](https://linear.app/psols/issue/DEV-65) (L9); Deferred: [DEV-60](https://linear.app/psols/issue/DEV-60) (L1) |
-| 6. Cleanup/Wrapup & Bugs | marksharc / mark-desktop-files | **In Progress** (1 Done, 7 Backlog) | Housekeeping complete; docs, doctor/pager polish, UX retro, and final `mark-desktop-files` shell removal remain | Done: [DEV-77](https://linear.app/psols/issue/DEV-77) (P3.12); Backlog: [DEV-70](https://linear.app/psols/issue/DEV-70) (pager `MANPATH` bug), [DEV-67](https://linear.app/psols/issue/DEV-67) (W1), [DEV-66](https://linear.app/psols/issue/DEV-66) (W2), [DEV-47](https://linear.app/psols/issue/DEV-47) (P2.7), [DEV-64](https://linear.app/psols/issue/DEV-64) (L5), [DEV-73](https://linear.app/psols/issue/DEV-73) (W3), [DEV-59](https://linear.app/psols/issue/DEV-59) (P6.1) |
+| 6. Cleanup/Wrapup & Bugs | marksharc / mark-desktop-files | **In Progress** (1 Done, 7 Backlog) | Housekeeping complete; docs, doctor/pager polish, UX retro, and final `mark-desktop-files` shell removal remain | Done: [DEV-77](https://linear.app/psols/issue/DEV-77) (P3.12); Backlog: [DEV-70](https://linear.app/psols/issue/DEV-70) (pager `MANPATH` bug), [DEV-67](https://linear.app/psols/issue/DEV-67) (W1), [DEV-66](https://linear.app/psols/issue/DEV-66) (W2), [DEV-47](https://linear.app/psols/issue/DEV-47) (P2.7), [DEV-64](https://linear.app/psols/issue/DEV-64) (L5), [DEV-73](https://linear.app/psols/issue/DEV-73) (W3), [DEV-59](https://linear.app/psols/issue/DEV-59) (WY) |
 
 Total tracked in Linear: 55 issues ([DEV-33](https://linear.app/psols/issue/DEV-33)–[DEV-87](https://linear.app/psols/issue/DEV-87)): **42 Done**, **1 In Progress** ([DEV-84](https://linear.app/psols/issue/DEV-84)), **3 Todo** ([DEV-85](https://linear.app/psols/issue/DEV-85)–[DEV-87](https://linear.app/psols/issue/DEV-87)), **8 Backlog** ([DEV-47](https://linear.app/psols/issue/DEV-47), [DEV-59](https://linear.app/psols/issue/DEV-59), [DEV-64](https://linear.app/psols/issue/DEV-64), [DEV-65](https://linear.app/psols/issue/DEV-65), [DEV-66](https://linear.app/psols/issue/DEV-66), [DEV-67](https://linear.app/psols/issue/DEV-67), [DEV-70](https://linear.app/psols/issue/DEV-70), [DEV-73](https://linear.app/psols/issue/DEV-73)), and **1 Deferred** ([DEV-60](https://linear.app/psols/issue/DEV-60)).
 
@@ -54,14 +54,15 @@ Ordered execution sequence for the remaining open work (excluding Deferred [DEV-
 | 2 | L8.1 | [DEV-85](https://linear.app/psols/issue/DEV-85) | marksharc | Todo | Offline `core/cli/complete` helper, `.comp` parser, and four-target renderer |
 | 3 | L8.2 | [DEV-86](https://linear.app/psols/issue/DEV-86) | marksharc | Todo | `.comp` specs for `marksharc`, `launch-session`, `launch-repo`, and `cwf-new`; native zsh/Bash/Fish parity |
 | 4 | L8.3 | [DEV-87](https://linear.app/psols/issue/DEV-87) | marksharc | Todo | Carapace managed symlinks, cache invalidation, precedence, `doctor`/`uninstall`, and docs |
-| 5 | Bug | [DEV-70](https://linear.app/psols/issue/DEV-70) | marksharc | Backlog | Fix `pager` module overwriting `MANPATH` and hiding Homebrew / PATH-derived man pages |
+| 5 | L9 | [DEV-65](https://linear.app/psols/issue/DEV-65) | marksharc | Backlog | Migrate legacy history import script and specs from `mark-desktop-files` (optional) |
 | 6 | W1 | [DEV-67](https://linear.app/psols/issue/DEV-67) | marksharc | Backlog | Detect blocked `compinit`/newuser prompts in `doctor` and test against a real `compinit` prompt |
-| 7 | W2 | [DEV-66](https://linear.app/psols/issue/DEV-66) | marksharc | Backlog | Eliminate 5 s Linux startup timeout waits across five `doctor_spec.sh` cases (coordinate with [DEV-67](https://linear.app/psols/issue/DEV-67)) |
-| 8 | L9 | [DEV-65](https://linear.app/psols/issue/DEV-65) | marksharc | Backlog | Migrate legacy history import script and specs from `mark-desktop-files` (optional) |
+| 7 | W2 | [DEV-66](https://linear.app/psols/issue/DEV-66) | marksharc | Backlog | Eliminate 5 s Linux startup timeout waits across five `doctor_spec.sh` cases (coordinate with | 8 | W3 Bug | [DEV-70](https://linear.app/psols/issue/DEV-70) | marksharc | Backlog | Fix `pager` module overwriting `MANPATH` and hiding Homebrew / PATH-derived man pages |
+[DEV-67](https://linear.app/psols/issue/DEV-67)) |
 | 9 | P2.7 | [DEV-47](https://linear.app/psols/issue/DEV-47) | marksharc | Backlog | Final user documentation, generated module reference CI check, and bug/gap doc closeout |
 | 10 | L5 | [DEV-64](https://linear.app/psols/issue/DEV-64) | marksharc | Backlog | Public provider-neutral `AGENTS.md` (cwf-swappable) without tracking personal agent config |
-| 11 | W3 | [DEV-73](https://linear.app/psols/issue/DEV-73) | marksharc | Backlog | 1–2 week daily-use UX retrospective (including Carapace default UI / bridges / excludes evaluation) |
-| 12 | P6.1 | [DEV-59](https://linear.app/psols/issue/DEV-59) | mark-desktop-files | Backlog | Remove retired shell startup code from `mark-desktop-files`, leaving only the overlay |
+| 11 | WX | [DEV-73](https://linear.app/psols/issue/DEV-73) | marksharc | Backlog | 1–2 week daily-use UX retrospective (including Carapace default UI / bridges / excludes evaluation) |
+| 12 | WY | [DEV-59](https://linear.app/psols/issue/DEV-59) | mark-desktop-files | Backlog | Remove retired shell startup code from `mark-desktop-files`, leaving only the overlay |
+| 13 | WZ | [DEV-88](https://linear.app/psols/issue/DEV-88) | mark-desktop-files | Backlog | Spec Closeout |
 
 ## Dependencies
 
@@ -97,7 +98,7 @@ flowchart LR
   P3_9_4["P3.9.4 DEV-76"]
   P4_1["P4.1 DEV-57"]
   P4_2["P4.2 DEV-58"]
-  P6_1["P6.1 DEV-59"]
+  WY["WY DEV-59"]
   L1["L1 DEV-60"]
   L2["L2 design DEV-61"]
   L2_1["L2.1 DEV-80"]
@@ -149,9 +150,9 @@ flowchart LR
   P3_1 --> P4_1
   P4_1 --> P4_2
   P3_3 --> P4_2
-  P2_6 --> P6_1
-  P3_2 --> P6_1
-  P4_2 --> P6_1
+  P2_6 --> WY
+  P3_2 --> WY
+  P4_2 --> WY
   P3_1 --> L1
   P3_2 --> L2
   L2 --> L2_1
@@ -194,7 +195,7 @@ flowchart LR
 | Before P2.6 | CI is green on macOS and Ubuntu; `marksharc doctor` is clean on the Mac from a dev checkout. |
 | After P2.6 | One week on the Mac and sol from the new repo without a rollback. Then Modernization starts. |
 | After P3.1 | PATH and env are byte-identical before and after rendering on both hosts. |
-| Before P6.1 | Every host that is still in use has been cut over. |
+| Before WY | Every host that is still in use has been cut over. |
 
 ## Host rollout order
 
@@ -203,7 +204,7 @@ flowchart LR
 3. The other regular hosts, by `marksharc sync` once P2.5 exists.
 4. Occasional hosts, when next visited; P3.8 removes the need to visit.
 
-Rollback at any point before P6.1: `marksharc uninstall` restores the previous stubs, and `mark-desktop-files/config/zsh` is still present.
+Rollback at any point before WY: `marksharc uninstall` restores the previous stubs, and `mark-desktop-files/config/zsh` is still present.
 
 ## Pull requests
 
@@ -1054,7 +1055,7 @@ on the Mac and sol is a manual acceptance step after merge.
 
 ### Phase 6: Cleanup and Wrapup
 
-#### P6.1 — Remove shell support from mark-desktop-files ([DEV-59](https://linear.app/psols/issue/DEV-59)) — Backlog
+#### WY — Remove shell support from mark-desktop-files ([DEV-59](https://linear.app/psols/issue/DEV-59)) — Backlog
 
 - **Repo:** mark-desktop-files
 - **Estimate:** 3
@@ -1127,7 +1128,7 @@ on the Mac and sol is a manual acceptance step after merge.
 
 - Retrospective review and interview are complete and `docs/marksharc-evaluation.md` records per-shell recommendations.
 
-#### Bug — pager module overwrites MANPATH ([DEV-70](https://linear.app/psols/issue/DEV-70)) — Backlog
+#### W3 Bug — pager module overwrites MANPATH ([DEV-70](https://linear.app/psols/issue/DEV-70)) — Backlog
 
 - **Repo:** marksharc
 - **Found in:** P4.2 ([DEV-58](https://linear.app/psols/issue/DEV-58))
