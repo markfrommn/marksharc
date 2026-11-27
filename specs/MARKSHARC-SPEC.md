@@ -9,6 +9,7 @@
 | Companion | [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) |
 | Interactive Bash | [BASH-SPEC.md](BASH-SPEC.md) covers the runtime, public modules, line editor and completion. [DEV-83](DEV-83-PLAN.md) records final acceptance evidence. |
 | Related | [LAUNCH-SPEC.md](LAUNCH-SPEC.md) specifies the launch commands and extends sections 6.11, 6.13, and 7.1 |
+| Declarative Completions | [COMPLETION-SPEC.md](COMPLETION-SPEC.md) specifies the `.comp` format, `core/cli/complete`, four-target rendering, and Carapace spec wiring (L8: DEV-84 design, DEV-85–DEV-87 implementation) |
 
 MarkSharc is a public, modular shell configuration framework for zsh and fish, with environment parity for bash. It replaces the shell support in `mark-desktop-files`. This document records what exists today, what the history says is used, what is in and out of scope, and the design of the replacement as if built in a fresh repo.
 
@@ -153,9 +154,9 @@ Counts are Mac / sol.
 
 ### 4.3 Maybe later
 
-- A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm).
-- A coexist install mode that does not take over `ZDOTDIR`.
-- A generic `AGENTS.md` / `CLAUDE.md` for the public repo.
+- A cloud and Kubernetes module (kubectl, krew, kubectx, gcloud, aws, helm) (deferred, DEV-60).
+- A coexist install mode that does not take over `ZDOTDIR` (implemented in DEV-63; see section 6.15).
+- A generic `AGENTS.md` / `CLAUDE.md` for the public repo (DEV-64).
 - A Go helper binary for hot-path work.
 
 ### 4.4 Planned abandonment
@@ -250,7 +251,7 @@ modules/<name>/
   init.zsh  init.fish  # interactive-only setup: hooks, keybindings, options, cached tool init
   functions/zsh/<fn>   functions/fish/<fn>.fish   # native autoloaded functions
   bin/<command>        # write-once executables (6.11)
-  completions/zsh/_<cmd>   completions/fish/<cmd>.fish
+  completions/zsh/_<cmd>   completions/fish/<cmd>.fish   completions/<cmd>.comp   # static or declarative completions
   tests/               # specs for this module
 ```
 
@@ -397,6 +398,7 @@ Planned plugins: fzf-tab (MVP); zsh-autosuggestions and zsh-syntax-highlighting 
 - Generated completions (`herdr completion zsh`, `cwf shell zsh`, `kubectl completion zsh`) are written to cache files by `render` and `update`, not evaluated at startup.
 - `completion-fzf-tab` and `completion-carapace` are alternative UI modules. Enabling Carapace disables fzf-tab unless the overlay forces both.
 - fish keeps native completions; modules add files to its completion path.
+- Declarative `.comp` specs (`core/completions/*.comp` and module `completions/*.comp`) render through `marksharc render` into native zsh, Bash 4.4+, Fish, and Carapace YAML artifacts under `~/.cache/marksharc/<host>/completions/`, backed by one offline dynamic candidate helper (`core/cli/complete`). When `completion-carapace` is enabled, `marksharc render` wires manifest-tracked symlinks from Carapace's platform specs directory to the rendered YAML files without overwriting user-authored specs; `doctor` checks those links and `uninstall` removes them. Full contract in [COMPLETION-SPEC.md](COMPLETION-SPEC.md) (approved in DEV-84; runtime delivery in DEV-85–DEV-87).
 
 ### 6.10 Caching, reload, and verbosity
 
@@ -677,3 +679,4 @@ These extend `docs/fish-zsh-design-rules.md` and move to the new repo's docs in 
 | Version managers (revisited) | mise as an opt-in module that owns tools per host; shims for agent and batch shells, activation for interactive ones; nvm, gvm, and pyenv remain the default and the fallback | Operator, DEV-62 |
 | Version-manager PATH order | gvm, nvm and pyenv paths in a `manager` tier ahead of Homebrew in every session class; correct manager behaviour wins over today's order | Operator, DEV-38 |
 | Launch commands | `launch-session` and `launch-repo`; `cwf-new` runs inside the launched terminal; a foundation issue precedes the command. Full log in [LAUNCH-SPEC.md](LAUNCH-SPEC.md) section 13 | Operator, DEV-78 |
+| Declarative completions | Common `.comp` line-directive specs rendered by `marksharc render` to zsh, Bash 4.4+, Fish, and Carapace YAML for `marksharc`, `launch-session`, `launch-repo`, and `cwf-new`, backed by offline `core/cli/complete` and manifest-tracked Carapace symlinks. Full log in [COMPLETION-SPEC.md](COMPLETION-SPEC.md) section 9 | Operator, DEV-84 |
