@@ -85,6 +85,60 @@ if (( carapace_wanted && ! carapace_available )) && [[ ${_ms_cfg_enabled[complet
     print -r -- 'doctor: missing command: carapace (completion-carapace)'
     (( ++issues ))
 fi
+if (( carapace_active )) && [[ -r $MARKSHARC_HOME/core/zsh/lib/carapace.zsh ]]; then
+    source "$MARKSHARC_HOME/core/zsh/lib/carapace.zsh"
+    carapace_cache_dir=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
+    carapace_yaml_dir=$carapace_cache_dir/completions/carapace
+    carapace_manifest=$carapace_cache_dir/carapace-specs-manifest
+    _ms_carapace_specs_dir
+    carapace_specs_dir=$REPLY
+    typeset -A carapace_mf_link=() carapace_mf_target=() carapace_checked_links=()
+    if [[ -r $carapace_manifest ]]; then
+        while IFS=$'\t' read -r c_cmd c_link c_target || [[ -n $c_cmd ]]; do
+            [[ -n $c_cmd && -n $c_link && -n $c_target ]] || continue
+            carapace_mf_link[$c_cmd]=$c_link
+            carapace_mf_target[$c_cmd]=$c_target
+        done < "$carapace_manifest"
+    fi
+    for c_spec in "$carapace_yaml_dir"/*.yaml(N-.); do
+        c_cmd=${c_spec:t:r}
+        c_link=$carapace_specs_dir/$c_cmd.yaml
+        c_target=$carapace_yaml_dir/$c_cmd.yaml
+        carapace_checked_links[$c_link]=1
+        if [[ ! -e $c_link && ! -L $c_link ]]; then
+            print -r -- "doctor: missing Carapace spec symlink: $c_link (run marksharc render)"
+            (( ++issues ))
+        elif [[ -L $c_link ]]; then
+            _ms_carapace_readlink "$c_link" || REPLY=
+            c_cur=$REPLY
+            if [[ $c_cur == "$c_target" ]]; then
+                if [[ ! -e $c_link ]]; then
+                    print -r -- "doctor: broken Carapace spec symlink: $c_link -> $c_cur (run marksharc render)"
+                    (( ++issues ))
+                fi
+            elif [[ $c_cur == "$carapace_yaml_dir/"* ]] ||
+                 [[ -n ${carapace_mf_target[$c_cmd]-} && $c_cur == "${carapace_mf_target[$c_cmd]}" ]]; then
+                print -r -- "doctor: broken Carapace spec symlink: $c_link -> $c_cur (run marksharc render)"
+                (( ++issues ))
+            else
+                print -r -- "doctor: conflicting non-MarkSharc Carapace spec: $c_link -> $c_cur (move or rename it, then run marksharc render)"
+                (( ++issues ))
+            fi
+        else
+            print -r -- "doctor: conflicting non-MarkSharc Carapace spec: $c_link (move or rename it, then run marksharc render)"
+            (( ++issues ))
+        fi
+    done
+    for c_cmd in ${(ok)carapace_mf_link}; do
+        c_link=${carapace_mf_link[$c_cmd]}
+        c_target=${carapace_mf_target[$c_cmd]}
+        [[ -n ${carapace_checked_links[$c_link]-} ]] && continue
+        if [[ -L $c_link && ! -e $c_link ]] && _ms_carapace_readlink "$c_link" && [[ $REPLY == "$c_target" ]]; then
+            print -r -- "doctor: broken Carapace spec symlink: $c_link -> $c_target (run marksharc render)"
+            (( ++issues ))
+        fi
+    done
+fi
 config=${MARKSHARC_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/marksharc}
 manifest=${XDG_STATE_HOME:-$HOME/.local/state}/marksharc/install.manifest
 install_mode=takeover expected_sum= fish_stub= fish_sum= bash_sum=

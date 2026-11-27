@@ -27,17 +27,37 @@ _ms_carapace_cleanup() {
     fi
 }
 
+_ms_carapace_manifest_fingerprint() {
+    emulate -L zsh
+    local cache=${XDG_CACHE_HOME:-$HOME/.cache}/marksharc/${MARKSHARC_HOST:-${HOST%%.*}}
+    local manifest=$cache/carapace-specs-manifest
+    local render_id= cmd link target
+    local -a cmds=()
+    if [[ -r $cache/render-id ]]; then
+        IFS= read -r render_id < "$cache/render-id" || render_id=
+    fi
+    if [[ -r $manifest ]]; then
+        while IFS=$'\t' read -r cmd link target || [[ -n $cmd ]]; do
+            [[ -n $cmd ]] && cmds+=( "$cmd" )
+        done < "$manifest"
+    fi
+    (( $#cmds )) && cmds=( ${(ou)cmds} )
+    REPLY="${(j:,:)cmds}@${render_id}"
+}
+
 typeset -ga _ms_carapace_vars
 typeset -gaU _ms_init_cleanups
 _ms_carapace_cleanup
 _ms_init_cleanups+=( _ms_carapace_cleanup )
 
 if (( $+functions[_ms_completion_carapace_active] )) && _ms_completion_carapace_active; then
-    typeset -g _ms_carapace_bridges= _ms_carapace_excludes=
+    typeset -g _ms_carapace_bridges= _ms_carapace_excludes= _ms_carapace_specs_fp=
     _ms_carapace_join_list "${_ms_opt_completion_carapace_bridges-zsh,fish,bash}"
     _ms_carapace_bridges=$REPLY
     _ms_carapace_join_list "${_ms_opt_completion_carapace_excludes-}"
     _ms_carapace_excludes=$REPLY
+    _ms_carapace_manifest_fingerprint
+    _ms_carapace_specs_fp=$REPLY
 
     if [[ -n $_ms_carapace_bridges ]]; then
         export CARAPACE_BRIDGES="$_ms_carapace_bridges"
@@ -55,13 +75,13 @@ if (( $+functions[_ms_completion_carapace_active] )) && _ms_completion_carapace_
     _ms_carapace_vars+=( MARKSHARC_CARAPACE_ACTIVE )
 
     if (( ! ${_ms_reloading:-0} )); then
-        if _ms_init_cached -k "${CARAPACE_BRIDGES-}|${CARAPACE_EXCLUDES-}" carapace carapace _carapace zsh; then
+        if _ms_init_cached -k "${CARAPACE_BRIDGES-}|${CARAPACE_EXCLUDES-}|${_ms_carapace_specs_fp-}" carapace carapace _carapace zsh; then
             typeset -gi _ms_completion_ui_carapace=1
         fi
     fi
-    unset _ms_carapace_bridges _ms_carapace_excludes
+    unset _ms_carapace_bridges _ms_carapace_excludes _ms_carapace_specs_fp
 else
     _ms_trace "module completion-carapace: inactive (opt-in off or overridden by MARKSHARC_COMPLETION_UI)"
 fi
-unfunction _ms_carapace_join_list 2>/dev/null
+unfunction _ms_carapace_join_list _ms_carapace_manifest_fingerprint 2>/dev/null
 true

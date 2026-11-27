@@ -325,6 +325,10 @@ _ms_render() {
             command rm -f -- "$cache/completion-id.tmp.$$"
             return 1
         }
+        if [[ -r $MARKSHARC_HOME/core/zsh/lib/carapace.zsh ]]; then
+            source "$MARKSHARC_HOME/core/zsh/lib/carapace.zsh"
+            _ms_carapace_reconcile_symlinks "$cache" || return 1
+        fi
     fi
     return 0
 }

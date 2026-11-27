@@ -66,6 +66,9 @@ _ms_bash_load_completions() {
     for _ms_file in "${_ms_bash_completion_files[@]}"; do
         _ms_name=${_ms_file##*/}
         _ms_name=${_ms_name%.bash}
+        if _ms_bash_carapace_owns_command "$_ms_name"; then
+            continue
+        fi
         _ms_before=$(_ms_bash_effect complete "$_ms_name")
         _ms_bash_load_file "$_ms_file"
         _ms_bash_record_effect complete "$_ms_name" "$_ms_before" "$(_ms_bash_effect complete "$_ms_name")"

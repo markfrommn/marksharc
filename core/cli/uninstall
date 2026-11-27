@@ -349,6 +349,32 @@ else
     fi
     [[ ${state:t} != marksharc ]] || command rm -rf -- "$state/zdot"
 fi
+
+# Remove manifest-tracked Carapace spec symlinks before any --purge cache deletion.
+typeset -a carapace_cache_roots=()
+[[ -n ${mf[cache]-} ]] && carapace_cache_roots+=( "${mf[cache]}" )
+carapace_cache_roots+=( "${XDG_CACHE_HOME:-$HOME/.cache}/marksharc" )
+typeset -A carapace_seen_manifests=()
+for croot in "${carapace_cache_roots[@]}"; do
+    [[ -d $croot ]] || continue
+    for cmf in "$croot"/*/carapace-specs-manifest(N-.); do
+        cmf_real=${cmf:A}
+        [[ -n ${carapace_seen_manifests[$cmf_real]-} ]] && continue
+        carapace_seen_manifests[$cmf_real]=1
+        while IFS=$'\t' read -r c_cmd c_link c_target || [[ -n $c_cmd ]]; do
+            [[ -n $c_link && -n $c_target && -L $c_link ]] || continue
+            c_cur=
+            if zmodload -F zsh/stat b:zstat 2>/dev/null; then
+                typeset -a c_res=()
+                zstat -L -A c_res +link -- "$c_link" 2>/dev/null && c_cur=${c_res[1]-}
+            fi
+            [[ -n $c_cur ]] || c_cur=$(command readlink "$c_link" 2>/dev/null) || c_cur=
+            [[ $c_cur == "$c_target" ]] && command rm -f -- "$c_link"
+        done < "$cmf"
+        command rm -f -- "$cmf" 2>/dev/null || :
+    done
+done
+
 if (( purge )); then
     for dir in $purge_targets; do command rm -rf -- "$dir" || die "could not purge $dir"; done
 else

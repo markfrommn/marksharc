@@ -10,6 +10,7 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Wired rendered Carapace YAML completion specs into Carapace's platform specs directory via manifest-tracked managed symlinks with conflict preservation, disable/uninstall cleanup, init-cache invalidation, zsh/Bash precedence and `CARAPACE_EXCLUDES` fallback, `marksharc doctor` diagnostics, and completion authoring docs. (DEV-87)
 Fixed the `pager` module replacing `MANPATH` with a fixed list, which hid Homebrew and PATH-derived man pages; it now keeps what earlier modules set and ends with one empty entry, identically in zsh, fish and Bash. (DEV-70)
 Made doctor identify and quote blocked compinit and new-user startup prompts promptly, with deterministic insecure-directory coverage and cleanup of blocked shells. (DEV-67)
 

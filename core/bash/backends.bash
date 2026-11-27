@@ -57,8 +57,57 @@ _ms_bash_completion_list() {
     REPLY=${words[*]}
 }
 
+_ms_bash_carapace_manifest_fingerprint() {
+    local cache=${_ms_bash_cache_dir:-$(_ms_bash_cache_path)}
+    local manifest=$cache/carapace-specs-manifest
+    local render_id='' cmd='' key=''
+    local -a cmds=()
+    local -A seen=()
+    local i j
+    if [[ -r $cache/render-id ]]; then
+        IFS= read -r render_id < "$cache/render-id" || render_id=''
+    fi
+    if [[ -r $manifest ]]; then
+        while IFS=$'\t' read -r cmd _ || [[ -n $cmd ]]; do
+            if [[ -n $cmd && ! ${seen[$cmd]+yes} ]]; then
+                seen[$cmd]=1
+                cmds+=("$cmd")
+            fi
+        done < "$manifest"
+    fi
+    for ((i = 1; i < ${#cmds[@]}; i++)); do
+        key=${cmds[i]}
+        j=$((i - 1))
+        while (( j >= 0 )) && [[ ${cmds[j]} > "$key" ]]; do
+            cmds[j + 1]=${cmds[j]}
+            ((j -= 1))
+        done
+        cmds[j + 1]=$key
+    done
+    local IFS=,
+    REPLY="${cmds[*]}@${render_id}"
+}
+
+_ms_bash_carapace_owns_command() {
+    local target_cmd=$1
+    [[ ${_ms_bash_active_completion-} == carapace ]] || return 1
+    if [[ -n ${CARAPACE_EXCLUDES-} && ",${CARAPACE_EXCLUDES}," == *",$target_cmd,"* ]]; then
+        return 1
+    fi
+    local cache=${_ms_bash_cache_dir:-$(_ms_bash_cache_path)}
+    local manifest=$cache/carapace-specs-manifest
+    [[ -r $manifest ]] || return 1
+    local cmd='' link=''
+    while IFS=$'\t' read -r cmd link _ || [[ -n $cmd ]]; do
+        if [[ $cmd == "$target_cmd" && -n $link && -L $link && -e $link ]]; then
+            return 0
+        fi
+    done < "$manifest"
+    return 1
+}
+
 _ms_bash_load_carapace() {
-    local REPLY prior definition status=0
+    local REPLY prior definition specs_fp='' status=0
     local prior_bridges=${CARAPACE_BRIDGES-} prior_excludes=${CARAPACE_EXCLUDES-}
     local had_bridges=${CARAPACE_BRIDGES+x} had_excludes=${CARAPACE_EXCLUDES+x}
     # A provider's broad registration must not take over an already installed
@@ -68,7 +117,9 @@ _ms_bash_load_carapace() {
     if [[ $REPLY ]]; then export CARAPACE_BRIDGES=$REPLY; else unset CARAPACE_BRIDGES; fi
     _ms_bash_completion_list "$2"
     if [[ $REPLY ]]; then export CARAPACE_EXCLUDES=$REPLY; else unset CARAPACE_EXCLUDES; fi
-    _ms_bash_init_cached -k "${CARAPACE_BRIDGES-}|${CARAPACE_EXCLUDES-}" carapace carapace _carapace bash \
+    _ms_bash_carapace_manifest_fingerprint
+    specs_fp=$REPLY
+    _ms_bash_init_cached -k "${CARAPACE_BRIDGES-}|${CARAPACE_EXCLUDES-}|${specs_fp}" carapace carapace _carapace bash \
         >/dev/null 2>&1 || status=$?
     while IFS= read -r definition; do
         [[ $definition == 'complete '* ]] || continue
