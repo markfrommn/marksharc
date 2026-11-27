@@ -337,23 +337,50 @@ budget=${_ms_cfg_set[doctor.startup_ms]-500}
 [[ $budget == <-> ]] || budget=500
 timeout_ms=${_ms_cfg_set[doctor.startup_timeout_ms]-5000}
 [[ $timeout_ms == <1-> ]] || timeout_ms=5000
-if zmodload zsh/datetime 2>/dev/null && zmodload zsh/zpty 2>/dev/null && zmodload zsh/zselect 2>/dev/null; then
+if zmodload zsh/datetime 2>/dev/null && zmodload zsh/zpty 2>/dev/null && zmodload zsh/zselect 2>/dev/null && zmodload zsh/system 2>/dev/null; then
     started=$EPOCHREALTIME
-    output=
+    last_output=$started
+    output= blocked_prompt=
     # A PTY makes the child an eligible interactive session. The marker also
     # verifies its session class and exit status; never launch notify from timing.
-    if zpty -b msdoctor "unset CLAUDECODE AI_AGENT CODEX_SESSION_ID CODEX_SANDBOX OPENCODE GEMINI_CLI CURSOR_AGENT COPILOT_CLI KILO_CLI_MODE VSCODE_INJECTION VSCODE_NONCE; MARKSHARC_NOTIFY=0 zsh -ic '[[ \$MARKSHARC_SESSION == interactive ]] && print -r -- __MS_INTERACTIVE_OK__'; print -r -- __MS_CHILD_STATUS__\$?"; then
+    if zpty -b msdoctor "print -r -- __MS_CHILD_PID__\$sysparams[pid]; unset CLAUDECODE AI_AGENT CODEX_SESSION_ID CODEX_SANDBOX OPENCODE GEMINI_CLI CURSOR_AGENT COPILOT_CLI KILO_CLI_MODE VSCODE_INJECTION VSCODE_NONCE; export MARKSHARC_NOTIFY=0; exec zsh -ic '[[ \$MARKSHARC_SESSION == interactive ]] && print -r -- __MS_INTERACTIVE_OK__; print -r -- __MS_CHILD_STATUS__\$?'"; then
         while (( (EPOCHREALTIME - started) * 1000 < timeout_ms )); do
-            while zpty -r -t msdoctor chunk 2>/dev/null; do output+=$chunk; done
+            while (( (EPOCHREALTIME - started) * 1000 < timeout_ms )) && zpty -r -t msdoctor chunk 2>/dev/null; do
+                output+=$chunk
+                last_output=$EPOCHREALTIME
+            done
             [[ $output == *__MS_CHILD_STATUS__* ]] && break
             zpty -t msdoctor || break
+            # Only a known prompt at the current output tail can indicate a
+            # blocked read. Give startup 250 ms without output to progress;
+            # never answer prompts or weaken completion's security checks.
+            if (( (EPOCHREALTIME - last_output) * 1000 >= 250 )); then
+                prompt_line=${output//$'\r'/}
+                prompt_line=${prompt_line##*$'\n'}
+                case $prompt_line in
+                    'Ignore insecure '*' and continue [y] or abort compinit [n]? '* | \
+                    '--- Type one of the keys in parentheses --- ')
+                        blocked_prompt=$prompt_line
+                        break ;;
+                esac
+            fi
             zselect -t 5 2>/dev/null
         done
+        # A menu may trap HUP (zpty -d's signal) and loop on a closed TTY.
+        # Stop only our measured shell, whose PID was emitted before exec/startup.
+        if [[ $output != *__MS_CHILD_STATUS__* ]] && zpty -t msdoctor; then
+            child_pid=${${output#*__MS_CHILD_PID__}%%$'\r'*}
+            child_pid=${child_pid%%$'\n'*}
+            [[ $child_pid == <1-> ]] && kill -KILL -- "$child_pid" 2>/dev/null
+        fi
         while zpty -r -t msdoctor chunk 2>/dev/null; do output+=$chunk; done
         zpty -d msdoctor 2>/dev/null
     fi
     elapsed=$(( (EPOCHREALTIME - started) * 1000 ))
-    if [[ $output != *__MS_CHILD_STATUS__* ]] && (( elapsed >= timeout_ms )); then
+    if [[ -n $blocked_prompt && $output != *__MS_CHILD_STATUS__* ]]; then
+        print -r -- "doctor: interactive startup blocked waiting for input: $blocked_prompt"
+        (( ++issues ))
+    elif [[ $output != *__MS_CHILD_STATUS__* ]] && (( elapsed >= timeout_ms )); then
         print -r -- "doctor: interactive startup timed out after $timeout_ms ms"
         (( ++issues ))
     elif [[ $output != *__MS_INTERACTIVE_OK__* || $output != *__MS_CHILD_STATUS__0* ]]; then
