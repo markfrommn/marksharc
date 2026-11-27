@@ -50,13 +50,17 @@ init_pager >"$TEST_ROOT/out" 2>&1
 @test "PAGER is exported" "$(set -qx PAGER; and echo yes)" = yes
 @test "LESS is -FRX" "$LESS" = -FRX
 @test "LESS is exported" "$(set -qx LESS; and echo yes)" = yes
-@test "MANPATH starts with /usr/share/man" "$MANPATH[1]" = /usr/share/man
+# MANPATH is extended, not replaced: the system directories follow what earlier modules set,
+# each entry appears once, and one empty entry ends the list so man keeps its default and
+# PATH-derived search.
+set -g SYSTEM_MANPATH /usr/share/man
+test -d /usr/local/man; and set -ga SYSTEM_MANPATH /usr/local/man
+@test "MANPATH holds the system directories and ends in an empty entry" "$MANPATH" = (string join : -- $SYSTEM_MANPATH):
 @test "MANPATH is exported" "$(set -qx MANPATH; and echo yes)" = yes
-if test -d /usr/local/man
-    @test "an existing /usr/local/man is added" "$MANPATH[2]" = /usr/local/man
-else
-    @test "a missing /usr/local/man is not added" (count $MANPATH) -eq 1
-end
+@test "a MANPATH set by an earlier module stays in front" (set -gx MANPATH /opt/brew/share/man; init_pager; echo "$MANPATH") = "/opt/brew/share/man:"(string join : -- $SYSTEM_MANPATH):
+@test "an entry with spaces stays whole and appears once" (set -gx MANPATH '/opt/My Tools/share/man:/opt/My Tools/share/man::/usr/share/man:'; init_pager; echo "$MANPATH") = "/opt/My Tools/share/man:"(string join : -- $SYSTEM_MANPATH):
+@test "a leading empty entry (Homebrew's form) moves to the end" (set -gx MANPATH ":$SYSTEM_MANPATH"; init_pager; echo "$MANPATH") = (string join : -- $SYSTEM_MANPATH):
+@test "a second run changes nothing" (init_pager; echo "$MANPATH") = (string join : -- $SYSTEM_MANPATH):
 
 # man: fish's own man function still runs; only its call sees the coloured environment.
 set -l lcall_before "$(set -q LC_ALL; and echo set:$LC_ALL)"
