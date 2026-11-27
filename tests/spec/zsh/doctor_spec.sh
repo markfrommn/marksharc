@@ -41,11 +41,13 @@ Describe 'marksharc doctor'
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
     print -r -- '# marksharc: managed stub' > "$HOME/.zshenv"
-    mkdir -p "$XDG_STATE_HOME/marksharc" "$TEST_ROOT/empty-zdot"
+    mkdir -p "$XDG_STATE_HOME/marksharc"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     print -r -- 'stub_sum=1 1' > "$XDG_STATE_HOME/marksharc/install.manifest"
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
-    [[ $(<"$TEST_ROOT/out") == *'modified stub'* ]]
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *'modified stub'* && $out == *'doctor: interactive startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
   }
   It 'detects changes to the installer stub using its recorded checksum'
     When run altered_stub_case
@@ -279,9 +281,9 @@ Describe 'marksharc doctor'
   duplicate_path_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    mkdir -p "$TEST_ROOT/empty-zdot"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" PATH="$TEST_ROOT/bin:/usr/bin:/bin:/usr/bin" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" PATH="$TEST_ROOT/bin:/usr/bin:/bin:/usr/bin" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
     [[ $(<"$TEST_ROOT/out") == *'duplicate PATH'*'/usr/bin'* ]]
   }
   It 'reports duplicate PATH entries'
@@ -301,9 +303,9 @@ Describe 'marksharc doctor'
   env_id_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    mkdir -p "$TEST_ROOT/empty-zdot"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_ENV=stale "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" MARKSHARC_ENV=stale "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
     [[ $(<"$TEST_ROOT/out") == *'stale environment'* ]]
   }
   It 'reports an inherited environment ID that no longer matches its inputs'
@@ -326,11 +328,12 @@ Describe 'marksharc doctor'
   zdot_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    mkdir -p "$XDG_STATE_HOME/marksharc/zdot" "$TEST_ROOT/empty-zdot"
+    mkdir -p "$XDG_STATE_HOME/marksharc/zdot"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     print -r -- 2 > "$XDG_STATE_HOME/marksharc/zdot/.version"
     print -r -- bad > "$XDG_STATE_HOME/marksharc/zdot/.zshrc"
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
     [[ $(<"$TEST_ROOT/out") == *'stale generated stub'* ]]
   }
   It 'reports missing or altered generated ZDOTDIR stubs'
@@ -354,15 +357,9 @@ Describe 'marksharc doctor'
   timing_failure_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    # The child starts without marksharc, so this .zshenv does marksharc's two startup
-    # guards itself. Its presence stops Debian's blocking zsh-newuser-install menu (shown
-    # when no startup files exist); skip_global_compinit stops Ubuntu's /etc/zsh/zshrc
-    # compinit. Keep these guards: this case tests a plain failed startup, while
-    # timing_compinit_case below deliberately exercises the real blocked prompt.
-    mkdir -p "$TEST_ROOT/empty-zdot"
-    print -r -- 'skip_global_compinit=1' > "$TEST_ROOT/empty-zdot/.zshenv"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
     [[ $(<"$TEST_ROOT/out") == *'startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
   }
   It 'reports a failed eligible interactive startup instead of a healthy time'
@@ -372,8 +369,8 @@ Describe 'marksharc doctor'
   timing_prompt_fixture() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    mkdir -p "$TEST_ROOT/prompt-zdot" "$XDG_CONFIG_HOME/marksharc"
-    print -r -- 'skip_global_compinit=1' > "$TEST_ROOT/prompt-zdot/.zshenv"
+    mkdir -p "$XDG_CONFIG_HOME/marksharc"
+    bare_zdot_fixture "$TEST_ROOT/prompt-zdot" || return 1
     ms_env
   }
   timing_prompt_report() {
@@ -387,7 +384,7 @@ Describe 'marksharc doctor'
     (( EPOCHREALTIME - started < 3 ))
   }
   timing_compinit_case() {
-    timing_prompt_fixture
+    timing_prompt_fixture || return 1
     mkdir -p "$TEST_ROOT/insecure" "$TEST_ROOT/trusted"
     chmod 777 "$TEST_ROOT/insecure"
     # Restrict FPATH to known fixture permissions, regardless of the CI image.
@@ -406,7 +403,7 @@ compinit' > "$TEST_ROOT/prompt-zdot/.zshrc"
     The status should be success
   End
   timing_newuser_case() {
-    timing_prompt_fixture
+    timing_prompt_fixture || return 1
     print -r -- 'print -r -- $$ > "$TEST_ROOT/menu.pid"
 LINES=24 COLUMNS=80
 autoload -Uz zsh-newuser-install
@@ -420,7 +417,7 @@ zsh-newuser-install -f' > "$TEST_ROOT/prompt-zdot/.zshrc"
     The status should be success
   End
   timing_finished_prompt_case() {
-    timing_prompt_fixture
+    timing_prompt_fixture || return 1
     print -r -- 'set doctor.startup_ms 2000' > "$XDG_CONFIG_HOME/marksharc/config.conf"
     print -r -- 'print -n -- "Ignore insecure directories and continue [y] or abort compinit [n]? "
 sleep 0.1
@@ -573,12 +570,13 @@ source "$MARKSHARC_HOME/core/zsh/zshrc.zsh"' > "$HOME/.zshrc"
   host_override_case() {
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
-    mkdir -p "$TEST_ROOT/global" "$TEST_ROOT/host" "$TEST_ROOT/empty-zdot" "$XDG_CONFIG_HOME/marksharc/hosts"
+    mkdir -p "$TEST_ROOT/global" "$TEST_ROOT/host" "$XDG_CONFIG_HOME/marksharc/hosts"
+    bare_zdot_fixture "$TEST_ROOT/bare-zdot" || return 1
     print -r -- "set sync.repos '$TEST_ROOT/global'" > "$XDG_CONFIG_HOME/marksharc/config.conf"
     print -r -- "set sync.repos '$TEST_ROOT/host'" > "$XDG_CONFIG_HOME/marksharc/hosts/testhost.conf"
     stub_command git "if [ \"\$2\" = '$TEST_ROOT/global' ]; then printf global >> '$OPLOG'; fi; exec '$REAL_GIT' \"\$@\""
     ms_env
-    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/empty-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/bare-zdot" MARKSHARC_HOST=testhost "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 1
     [[ ! -s $OPLOG ]]
   }
   It 'does not inspect repositories replaced by the host configuration'

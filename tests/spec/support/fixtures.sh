@@ -32,6 +32,11 @@ fixture_setup() {
   unset SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION SSH_TTY TMUX TMUX_PANE NVM_DIR BASH_ENV ENV HERDR_BIN_PATH HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_PANE_ID WEZTERM_PANE HC_TERMINAL_ID
 }
 fixture_teardown() { cd /; rm -rf -- "$TEST_ROOT"; }
+# The .zshenv file prevents Debian's new-user menu. The flag skips Ubuntu's
+# global compinit so a fixture can control which startup code runs.
+bare_zdot_fixture() {
+  mkdir -p "$1" && printf '%s\n' 'skip_global_compinit=1' > "$1/.zshenv"
+}
 iecho() { :; }
 ierr() { printf '%s\n' "$*" >&2; }
 have_command() { command -v "$1" >/dev/null 2>&1; }
