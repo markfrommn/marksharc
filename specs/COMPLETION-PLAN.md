@@ -12,12 +12,12 @@
 
 ## Boundaries
 
-| Entry | Issue | Title | Estimate | Depends on |
-|---|---|---|---|---|
-| L8.0 | [DEV-84](https://linear.app/psols/issue/DEV-84) | Spec and plan declarative completion rendering and Carapace parity | 3 (design) | P2.4 ([DEV-44](https://linear.app/psols/issue/DEV-44)) |
-| L8.1 | [DEV-85](https://linear.app/psols/issue/DEV-85) | Completion spec renderer and dynamic candidate helper | 3 | L8.0 ([DEV-84](https://linear.app/psols/issue/DEV-84)) |
-| L8.2 | [DEV-86](https://linear.app/psols/issue/DEV-86) | Declarative completion specs for `marksharc`, `launch`, and `cwf-new` | 3 | L8.1 ([DEV-85](https://linear.app/psols/issue/DEV-85)) |
-| L8.3 | [DEV-87](https://linear.app/psols/issue/DEV-87) | Carapace managed spec wiring, lifecycle, and end-to-end parity | 3 | L8.2 ([DEV-86](https://linear.app/psols/issue/DEV-86)) |
+| Entry | Issue                                           | Title                                                                 | Estimate   | Depends on                                             |
+| ----- | ----------------------------------------------- | --------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
+| L8.0  | [DEV-84](https://linear.app/psols/issue/DEV-84) | Spec and plan declarative completion rendering and Carapace parity    | 3 (design) | P2.4 ([DEV-44](https://linear.app/psols/issue/DEV-44)) |
+| L8.1  | [DEV-85](https://linear.app/psols/issue/DEV-85) | Completion spec renderer and dynamic candidate helper                 | 3          | L8.0 ([DEV-84](https://linear.app/psols/issue/DEV-84)) |
+| L8.2  | [DEV-86](https://linear.app/psols/issue/DEV-86) | Declarative completion specs for `marksharc`, `launch`, and `cwf-new` | 3          | L8.1 ([DEV-85](https://linear.app/psols/issue/DEV-85)) |
+| L8.3  | [DEV-87](https://linear.app/psols/issue/DEV-87) | Carapace managed spec wiring, lifecycle, and end-to-end parity        | 3          | L8.2 ([DEV-86](https://linear.app/psols/issue/DEV-86)) |
 
 ```mermaid
 flowchart LR

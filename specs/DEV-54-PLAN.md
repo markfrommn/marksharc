@@ -28,22 +28,27 @@
 ## Tasks
 
 ### Task 1: Plugin modules and load order
+
 - [x] Specs: the plugin load-order spec (orders, last-module rule, sourced order with stub clones, missing clone silent, reload does not re-source); autosuggestion strategy filtering and atuin widget clearing; highlighters option.
 - [x] Implement `_ms_plugins_load`, refactor `completion-fzf-tab/init.zsh`, add `modules/zsh-autosuggestions` and `modules/zsh-syntax-highlighting`.
 
 ### Task 2: procs-backed ps helpers (zsh and fish)
+
 - [x] Specs: procs missing means native output and args; procs present receives the selected PIDs; job columns; no pattern; `ps.procs off`; bare `ps` untouched.
 - [x] Implement in `_ms_ps` (zsh) and `_ms_ps` (fish); add the option and package.
 
 ### Task 3: theme module and cached value init
+
 - [x] Specs: `-x` caching (hit forks nothing); vivid present/missing/off; MANPAGER with bat, batcat, none; delta off by default, on with and without delta, append and reload removal; fzf command preference and previews; reload and double source.
 - [x] Implement zsh and fish `init`, `delta.gitconfig`, the fzf-tab `FZF_DEFAULT_COMMAND` precedence change. The fish cache writes `true` after a cached `set -gx`, because fish's `set` keeps the previous status and a hit would otherwise report failure.
 
 ### Task 4: starship config selection
+
 - [x] Specs: empty option leaves `STARSHIP_CONFIG`; preset name; file path; missing file ignored; fish parity.
 - [x] Implement options and the `rich` preset.
 
 ### Task 5: Docs and gates
+
 - [x] Update README module list, `templates/overlay/config.conf`, `tests/README.md` inventory, `CHANGELOG.md`, spec 7.1 rows and the plan outcome.
 - [x] `tests/check`; live check on sol: plugins cloned, interactive startup measured against the 500 ms doctor budget.
 

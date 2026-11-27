@@ -1,13 +1,13 @@
 # MarkSharc Declarative Completion Specification
 
-| | |
-|---|---|
-| Status | Design and three-PR decomposition approved 2026-11-27 |
-| Source issue | [DEV-84](https://linear.app/psols/issue/DEV-84) (L8.0 design/docs PR) |
-| Implementation issues | [DEV-85](https://linear.app/psols/issue/DEV-85) (L8.1), [DEV-86](https://linear.app/psols/issue/DEV-86) (L8.2), [DEV-87](https://linear.app/psols/issue/DEV-87) (L8.3) |
-| Authority | [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md) (especially sections 6.1, 6.4, 6.5, 6.9, 6.15, 6.16, 10); [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [BASH-SPEC.md](BASH-SPEC.md) for command and Bash backend contracts |
-| Delivery plan | [COMPLETION-PLAN.md](COMPLETION-PLAN.md) and [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) (L8) |
-| Evidence date | 2026-11-27, checkout `6fb1a49`, Carapace `1.8.5` |
+|                       |                                                                                                                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status                | Design and three-PR decomposition approved 2026-11-27                                                                                                                                                     |
+| Source issue          | [DEV-84](https://linear.app/psols/issue/DEV-84) (L8.0 design/docs PR)                                                                                                                                     |
+| Implementation issues | [DEV-85](https://linear.app/psols/issue/DEV-85) (L8.1), [DEV-86](https://linear.app/psols/issue/DEV-86) (L8.2), [DEV-87](https://linear.app/psols/issue/DEV-87) (L8.3)                                    |
+| Authority             | [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md) (especially sections 6.1, 6.4, 6.5, 6.9, 6.15, 6.16, 10); [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [BASH-SPEC.md](BASH-SPEC.md) for command and Bash backend contracts |
+| Delivery plan         | [COMPLETION-PLAN.md](COMPLETION-PLAN.md) and [MARKSHARC-PLAN.md](MARKSHARC-PLAN.md) (L8)                                                                                                                  |
+| Evidence date         | 2026-11-27, checkout `6fb1a49`, Carapace `1.8.5`                                                                                                                                                          |
 
 This specification defines a single declarative completion format (`*.comp`), a shared offline dynamic candidate helper (`core/cli/complete`), a multi-target renderer integrated into `marksharc render` for zsh, Bash 4.4+, Fish, and Carapace, and managed Carapace spec registration. Its initial command scope covers `marksharc`, `launch-session`, `launch-repo`, and `cwf-new`.
 
@@ -15,12 +15,12 @@ This specification defines a single declarative completion format (`*.comp`), a 
 
 Before L8, completions for MarkSharc's own commands are fragmented and incomplete:
 
-| Command | Zsh | Bash 4.4+ | Fish | Carapace |
-|---|---|---|---|---|
-| `marksharc` | Missing | Missing | Hand-written (`core/fish/completions/marksharc.fish`); lacks dynamic `install <name>` and `update --only <label>` | Missing |
-| `launch-session` | Hand-written (`_launch-session`) | Hand-written (`workflow.bash`) | Hand-written (`launch-session.fish`) | Missing |
-| `launch-repo` | Hand-written (`_launch-repo`); missing `--host` completer, `--base-only`, positional `host:`, repo-filtered `--worktree`, branch matches | Hand-written (`workflow.bash`) | Hand-written (`launch-repo.fish`); missing `--host` completer, `--base-only`, positional `host:`, repo-filtered `--worktree` | Missing |
-| `cwf-new` | Hand-written (`_cwf-new`); missing `--host` completer | Hand-written (`workflow.bash`) | Hand-written (`cwf-new.fish`); missing `--host` completer | Missing |
+| Command          | Zsh                                                                                                                                      | Bash 4.4+                      | Fish                                                                                                                         | Carapace |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `marksharc`      | Missing                                                                                                                                  | Missing                        | Hand-written (`core/fish/completions/marksharc.fish`); lacks dynamic `install <name>` and `update --only <label>`            | Missing  |
+| `launch-session` | Hand-written (`_launch-session`)                                                                                                         | Hand-written (`workflow.bash`) | Hand-written (`launch-session.fish`)                                                                                         | Missing  |
+| `launch-repo`    | Hand-written (`_launch-repo`); missing `--host` completer, `--base-only`, positional `host:`, repo-filtered `--worktree`, branch matches | Hand-written (`workflow.bash`) | Hand-written (`launch-repo.fish`); missing `--host` completer, `--base-only`, positional `host:`, repo-filtered `--worktree` | Missing  |
+| `cwf-new`        | Hand-written (`_cwf-new`); missing `--host` completer                                                                                    | Hand-written (`workflow.bash`) | Hand-written (`cwf-new.fish`); missing `--host` completer                                                                    | Missing  |
 
 Maintaining 16 independent completion files across four targets causes flags, subcommands, and dynamic lookup logic to drift.
 
@@ -41,11 +41,11 @@ Probed locally against `carapace-bin 1.8.5` in isolated temporary `HOME` directo
 
 Three alternatives were evaluated during DEV-84:
 
-| Approach | Summary | Decision |
-|---|---|---|
+| Approach                                                                                                           | Summary                                                                                                                                                                                  | Decision     |
+| ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
 | **A. Common `.comp` line-directive spec rendered to zsh, Bash, Fish, and Carapace YAML + shared candidate helper** | Single declarative source parsed with `_ms_words` (zero host YAML/TOML parser), rendered atomically by `marksharc render`, backed by one offline candidate helper (`core/cli/complete`). | **Selected** |
-| B. Shared candidate helper + hand-maintained zsh/Bash/Fish/Carapace files + parity tests | Avoids a renderer, but duplicates command/flag trees across four formats. | Rejected |
-| C. Carapace YAML as source + dev-time Python generator producing checked-in native files | Avoids a custom spec format, but cannot render overlay/private module specs on a host and introduces generated checked-in drift. | Rejected |
+| B. Shared candidate helper + hand-maintained zsh/Bash/Fish/Carapace files + parity tests                           | Avoids a renderer, but duplicates command/flag trees across four formats.                                                                                                                | Rejected     |
+| C. Carapace YAML as source + dev-time Python generator producing checked-in native files                           | Avoids a custom spec format, but cannot render overlay/private module specs on a host and introduces generated checked-in drift.                                                         | Rejected     |
 
 ### Core design principles
 
@@ -72,39 +72,40 @@ Every discovered `.comp` file is folded into the render input fingerprint (`core
 
 Blank lines and lines whose first non-whitespace character is `#` are ignored. Every line is parsed with `_ms_words`. Unknown directives, malformed arguments, or duplicate conflicting declarations cause the spec to fail validation with a diagnostic on stderr.
 
-| Directive | Syntax | Meaning |
-|---|---|---|
-| `command` | `command <name> [description]` | Required once per file. Declares the root command name (must match `[A-Za-z0-9][A-Za-z0-9_.-]*`) and one-line description. |
-| `subcommand` | `subcommand <path> [description]` | Declares a subcommand node using a `/`-separated path relative to the root (e.g., `sync`, `sync/timer`, `hosts/populate`, `module/enable`). Parent nodes must be declared before children. |
-| `flag` | `flag <scope> <names> [value <kind>] [repeatable] [locks-positional] [description]` | Declares an option on `<scope>` (`_` for the root command, or a subcommand `<path>`). `<names>` is a comma-separated list of short/long forms (e.g. `-v,--verbose`, `--host`, `-y,--yes`). `value <kind>` marks the flag as taking a required argument of `<kind>`. `repeatable` allows the flag multiple times. `locks-positional` marks the flag as entering flag-form mode (disabling the primary positional target when the scope uses `mode flag-form-locks-positional`). |
-| `arg` | `arg <scope> <slot> <kind> [description]` | Declares a positional argument on `<scope>`. `<slot>` is a positive integer (`1`, `2`, ...), `rest` (remaining positionals after numbered slots), `dash1` (first argument after `--`), or `dash-rest` (remaining arguments after `--`). |
-| `mode` | `mode <scope> <mode-name>` | Sets a closed parsing/completion behavior hint on `<scope>`. Allowed values: `flag-form-locks-positional` (if any `locks-positional` flag is already present on the command line, positional slot `1` is suppressed and only flags or `--` / command args apply; if `--command` is present, `dash1` also falls back to `dash-rest` since the command executable is already supplied). |
+| Directive    | Syntax                                                                              | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `command`    | `command <name> [description]`                                                      | Required once per file. Declares the root command name (must match `[A-Za-z0-9][A-Za-z0-9_.-]*`) and one-line description.                                                                                                                                                                                                                                                                                                                                                     |
+| `subcommand` | `subcommand <path> [description]`                                                   | Declares a subcommand node using a `/`-separated path relative to the root (e.g., `sync`, `sync/timer`, `hosts/populate`, `module/enable`). Parent nodes must be declared before children.                                                                                                                                                                                                                                                                                     |
+| `flag`       | `flag <scope> <names> [value <kind>] [repeatable] [locks-positional] [description]` | Declares an option on `<scope>` (`_` for the root command, or a subcommand `<path>`). `<names>` is a comma-separated list of short/long forms (e.g. `-v,--verbose`, `--host`, `-y,--yes`). `value <kind>` marks the flag as taking a required argument of `<kind>`. `repeatable` allows the flag multiple times. `locks-positional` marks the flag as entering flag-form mode (disabling the primary positional target when the scope uses `mode flag-form-locks-positional`). |
+| `arg`        | `arg <scope> <slot> <kind> [description]`                                           | Declares a positional argument on `<scope>`. `<slot>` is a positive integer (`1`, `2`, ...), `rest` (remaining positionals after numbered slots), `dash1` (first argument after `--`), or `dash-rest` (remaining arguments after `--`).                                                                                                                                                                                                                                        |
+| `mode`       | `mode <scope> <mode-name>`                                                          | Sets a closed parsing/completion behavior hint on `<scope>`. Allowed values: `flag-form-locks-positional` (if any `locks-positional` flag is already present on the command line, positional slot `1` is suppressed and only flags or `--` / command args apply; if `--command` is present, `dash1` also falls back to `dash-rest` since the command executable is already supplied).                                                                                          |
 
 Notes on grammar disambiguation:
+
 - On `flag`, optional keyword tokens (`value <kind>`, `repeatable`, `locks-positional`) precede the optional final `<description>` token. Any description containing spaces is quoted per `_ms_words` rules (e.g. `"Show this help"`).
 - Flags declared on `_` apply only to the root command unless also declared on a subcommand scope (no implicit inheritance across subcommands, avoiding leaked root flags like `--version` onto `marksharc doctor`).
 
 ### 3.3 Closed value `<kind>` set
 
-| Kind | Meaning | Dynamic / native source |
-|---|---|---|
-| `choices:<a,b,c>` | Static comma-separated enumerated values | Rendered inline in all four targets |
-| `string` | Arbitrary free-text argument | No completion candidates |
-| `dir` | Local directory path | Native shell dir completion / Carapace `$directories` |
-| `file` | Local file path | Native shell file completion / Carapace `$files` |
-| `command` | Executable command name on `PATH` | Native command completion / Carapace `$carapace.shell.Executables` |
-| `ms:modules` | Discovered public and overlay modules | `core/cli/complete modules` |
-| `ms:hosts` | Configured hosts in overlay `hosts.conf` | `core/cli/complete hosts` |
-| `ms:installers` | Registered `installer` directives | `core/cli/complete installers` |
-| `ms:update-steps` | Built-in and registered `update` step labels | `core/cli/complete update-steps` |
-| `ms:launch-hosts` | Reserved + current + `hosts.conf` launch hosts | `core/cli/complete launch-hosts` |
-| `ms:repos` | Base repos and `base/worktree` entries for target host | `core/cli/complete repos` |
-| `ms:base-repos` | Base repository names for target host | `core/cli/complete base-repos` |
-| `ms:base-repos-or-dir` | Local directory if word starts with `/` or `~` on local host; else `ms:base-repos` | Local dir + `core/cli/complete base-repos` |
-| `ms:worktrees` | Worktree names and branch names for `--repo` (or all worktrees if `--repo` unset) on target host | `core/cli/complete worktrees` |
-| `ms:git-branches` | Local git branch names in current working repository | `core/cli/complete git-branches` |
-| `ms:launch-session-target` | Composite `[host:]dir`: offers `host:` candidates (nospace) and local directories when host is local/unset | Native dirs + `core/cli/complete launch-hosts --colon` |
-| `ms:launch-repo-target` | Composite `[host:]repo[/worktree]` or local dir; honors `--base-only` and `host:` prefix | Native dirs + `core/cli/complete launch-repo-target` |
+| Kind                       | Meaning                                                                                                    | Dynamic / native source                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `choices:<a,b,c>`          | Static comma-separated enumerated values                                                                   | Rendered inline in all four targets                                |
+| `string`                   | Arbitrary free-text argument                                                                               | No completion candidates                                           |
+| `dir`                      | Local directory path                                                                                       | Native shell dir completion / Carapace `$directories`              |
+| `file`                     | Local file path                                                                                            | Native shell file completion / Carapace `$files`                   |
+| `command`                  | Executable command name on `PATH`                                                                          | Native command completion / Carapace `$carapace.shell.Executables` |
+| `ms:modules`               | Discovered public and overlay modules                                                                      | `core/cli/complete modules`                                        |
+| `ms:hosts`                 | Configured hosts in overlay `hosts.conf`                                                                   | `core/cli/complete hosts`                                          |
+| `ms:installers`            | Registered `installer` directives                                                                          | `core/cli/complete installers`                                     |
+| `ms:update-steps`          | Built-in and registered `update` step labels                                                               | `core/cli/complete update-steps`                                   |
+| `ms:launch-hosts`          | Reserved + current + `hosts.conf` launch hosts                                                             | `core/cli/complete launch-hosts`                                   |
+| `ms:repos`                 | Base repos and `base/worktree` entries for target host                                                     | `core/cli/complete repos`                                          |
+| `ms:base-repos`            | Base repository names for target host                                                                      | `core/cli/complete base-repos`                                     |
+| `ms:base-repos-or-dir`     | Local directory if word starts with `/` or `~` on local host; else `ms:base-repos`                         | Local dir + `core/cli/complete base-repos`                         |
+| `ms:worktrees`             | Worktree names and branch names for `--repo` (or all worktrees if `--repo` unset) on target host           | `core/cli/complete worktrees`                                      |
+| `ms:git-branches`          | Local git branch names in current working repository                                                       | `core/cli/complete git-branches`                                   |
+| `ms:launch-session-target` | Composite `[host:]dir`: offers `host:` candidates (nospace) and local directories when host is local/unset | Native dirs + `core/cli/complete launch-hosts --colon`             |
+| `ms:launch-repo-target`    | Composite `[host:]repo[/worktree]` or local dir; honors `--base-only` and `host:` prefix                   | Native dirs + `core/cli/complete launch-repo-target`               |
 
 ## 4. Shared dynamic candidate helper (`core/cli/complete`)
 
@@ -118,18 +119,18 @@ $MARKSHARC_HOME/core/cli/complete <kind> [options]
 
 Supported `<kind>` values and options:
 
-| `<kind>` | Options | Output (`value` or `value<TAB>description` per line) |
-|---|---|---|
-| `modules` | — | Sorted unique module names from `$MARKSHARC_HOME/modules/*/module.conf` and `$MARKSHARC_CONFIG/modules/*/module.conf`, with `describe` text as description |
-| `hosts` | — | Configured host names from `hosts.conf`, with SSH target as description when target differs from name |
-| `installers` | — | Registered `installer <name>` labels collected via `core/cli/day2-lib.zsh` (`_day2_allow_missing=1`) |
-| `update-steps` | — | Built-in labels (`sync`, `pins`, `system`, `render`) plus registered `update <label>` entries from enabled modules and overlay |
-| `launch-hosts` | `[--colon]` | Deduplicated `local`, `localhost`, `remote`, `$MARKSHARC_HOST`, plus `hosts.conf` entries; with `--colon`, omits host names containing `:` and appends `:` |
-| `repos` | `[--host H] [--prefix P] [--base-only]` | Reads local `$XDG_CACHE_HOME/marksharc/<host>/repos/<resolved-host>.tsv`; emits base names and (unless `--base-only`) `base/worktree` and `base/branch` entries prefixed with `P` |
-| `base-repos` | `[--host H]` | Base repository names (`kind == base`) from the resolved host's local TSV cache |
-| `worktrees` | `[--host H] [--repo R]` | Worktree names and non-duplicate branch names from the resolved host's local TSV cache; when `--repo R` is non-empty, filters to rows where `${base:t} == R` |
+| `<kind>`             | Options                                  | Output (`value` or `value<TAB>description` per line)                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modules`            | —                                        | Sorted unique module names from `$MARKSHARC_HOME/modules/*/module.conf` and `$MARKSHARC_CONFIG/modules/*/module.conf`, with `describe` text as description                                                                                    |
+| `hosts`              | —                                        | Configured host names from `hosts.conf`, with SSH target as description when target differs from name                                                                                                                                         |
+| `installers`         | —                                        | Registered `installer <name>` labels collected via `core/cli/day2-lib.zsh` (`_day2_allow_missing=1`)                                                                                                                                          |
+| `update-steps`       | —                                        | Built-in labels (`sync`, `pins`, `system`, `render`) plus registered `update <label>` entries from enabled modules and overlay                                                                                                                |
+| `launch-hosts`       | `[--colon]`                              | Deduplicated `local`, `localhost`, `remote`, `$MARKSHARC_HOST`, plus `hosts.conf` entries; with `--colon`, omits host names containing `:` and appends `:`                                                                                    |
+| `repos`              | `[--host H] [--prefix P] [--base-only]`  | Reads local `$XDG_CACHE_HOME/marksharc/<host>/repos/<resolved-host>.tsv`; emits base names and (unless `--base-only`) `base/worktree` and `base/branch` entries prefixed with `P`                                                             |
+| `base-repos`         | `[--host H]`                             | Base repository names (`kind == base`) from the resolved host's local TSV cache                                                                                                                                                               |
+| `worktrees`          | `[--host H] [--repo R]`                  | Worktree names and non-duplicate branch names from the resolved host's local TSV cache; when `--repo R` is non-empty, filters to rows where `${base:t} == R`                                                                                  |
 | `launch-repo-target` | `[--host H] [--base-only] [--current W]` | Handles `host:rest` splitting: if `W` contains `:` with a valid host prefix, completes repos for that host with `host:` prefix; otherwise completes local repos (plus `host:` candidates when no repo matches or when starting a host prefix) |
-| `git-branches` | — | Output of `git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null` |
+| `git-branches`       | —                                        | Output of `git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null`                                                                                                                                                               |
 
 ### 4.2 Safety and hygiene guarantees
 
@@ -154,22 +155,24 @@ $XDG_CACHE_HOME/marksharc/<host>/completions/
 ```
 
 Staging and promotion rules:
+
 - Existing generated `completion-bash` directives move to their own dedicated staging directory (`$_ms_render_bash_stage`, promoted atomically to `$cache/completions-bash`), eliminating any collision with `$_ms_render_stage/bash` (promoted atomically with `$_ms_render_stage` to `$cache/completions/bash`). Existing `completion` (zsh) directives continue writing into `$_ms_render_stage/zsh` without colliding with `.comp` outputs. Each `.comp` spec is validated before writing any target.
 - `marksharc render --env-only` (used by startup auto-recovery) **never modifies** `$cache/completions/`, `$cache/completions-bash/`, `$cache/bin/`, or Carapace symlinks. This keeps startup recovery fast and offline and guarantees previously generated external completions (`_herdr`, `_cwf`) are never deleted during recovery.
 - Explicit `marksharc render` (as well as `marksharc reload`, `marksharc update`, and `install.sh`) renders all `.comp` specs across all four targets, runs external `completion` and `completion-bash` directives, and reconciles Carapace symlinks atomically.
 
 ### 5.2 Per-target runtime contracts
 
-| Target | Generated artifact | Runtime behavior |
-|---|---|---|
-| **Zsh** | `zsh/_<cmd>` (`#compdef <cmd>`) | Standard zsh `_arguments -S` with subcommand dispatch (`_describe`), flag descriptions, value actions, `flag-form-locks-positional` state check (including `--command` shifting `dash1` to `dash-rest`), and colon-prefix handling (`compadd -r : -S :` / `compadd -P`). Loaded automatically because `_ms_modules_setup_paths` already prepends `$cache/completions/zsh` to `$fpath` before `compinit`. |
-| **Bash 4.4+** | `bash/<cmd>.bash` | Defines `_ms_complete_<cmd>` and registers `complete -o filenames -F ... <cmd>`, sharing `core/bash/complete.bash` (extracted and generalized from `modules/launch/completions/bash/lib/workflow.bash`) for safe Readline unquoting, `:@=` word-break reassembly, and literal candidate quoting. Loaded by `core/bash/interactive.bash` after module loading (respecting Carapace precedence in section 6.4). Bash 3.2 remains env-only and never sources completion files. |
-| **Fish** | `fish/<cmd>.fish` | Emits native `complete -c <cmd>` rules with subcommand predicates (`__fish_seen_subcommand_from` / position helpers), descriptions, and helper functions invoking `core/cli/complete`. `core/fish/marksharc.fish` prepends `$cache/completions/fish` to `fish_complete_path` (tracked in `_ms_fish_completion_paths` for clean reload removal). |
-| **Carapace 1.8.5** | `carapace/<cmd>.yaml` | Schema-valid Carapace YAML with `name`, `description`, `flags`, `commands`, and `completion` blocks. Static choices emit YAML string arrays; `dir`/`file`/`command` emit `$directories` / `$files` / `$carapace.shell.Executables`. Helper invocations embed the render-time resolved `$MARKSHARC_HOME/core/cli/complete` path with POSIX single-quoting (never unquoted `$MARKSHARC_HOME`, so spaces in checkout paths or an unset env var never break completion): simple `ms:*` kinds emit `"$('<helper>' <kind> --from-carapace)"`; `ms:base-repos-or-dir` emits `["$directories", "$('<helper>' base-repos --from-carapace)"]`; `ms:launch-session-target` emits `["$directories", "$('<helper>' launch-hosts --colon --from-carapace)"]` with `$nospace(:)`; `ms:launch-repo-target` emits `["$directories", "$('<helper>' launch-repo-target --from-carapace)"]` with `$nospace(:)`. |
+| Target             | Generated artifact              | Runtime behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zsh**            | `zsh/_<cmd>` (`#compdef <cmd>`) | Standard zsh `_arguments -S` with subcommand dispatch (`_describe`), flag descriptions, value actions, `flag-form-locks-positional` state check (including `--command` shifting `dash1` to `dash-rest`), and colon-prefix handling (`compadd -r : -S :` / `compadd -P`). Loaded automatically because `_ms_modules_setup_paths` already prepends `$cache/completions/zsh` to `$fpath` before `compinit`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **Bash 4.4+**      | `bash/<cmd>.bash`               | Defines `_ms_complete_<cmd>` and registers `complete -o filenames -F ... <cmd>`, sharing `core/bash/complete.bash` (extracted and generalized from `modules/launch/completions/bash/lib/workflow.bash`) for safe Readline unquoting, `:@=` word-break reassembly, and literal candidate quoting. Loaded by `core/bash/interactive.bash` after module loading (respecting Carapace precedence in section 6.4). Bash 3.2 remains env-only and never sources completion files.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Fish**           | `fish/<cmd>.fish`               | Emits native `complete -c <cmd>` rules with subcommand predicates (`__fish_seen_subcommand_from` / position helpers), descriptions, and helper functions invoking `core/cli/complete`. `core/fish/marksharc.fish` prepends `$cache/completions/fish` to `fish_complete_path` (tracked in `_ms_fish_completion_paths` for clean reload removal).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Carapace 1.8.5** | `carapace/<cmd>.yaml`           | Schema-valid Carapace YAML with `name`, `description`, `flags`, `commands`, and `completion` blocks. Static choices emit YAML string arrays; `dir`/`file`/`command` emit `$directories` / `$files` / `$carapace.shell.Executables`. Helper invocations embed the render-time resolved `$MARKSHARC_HOME/core/cli/complete` path with POSIX single-quoting (never unquoted `$MARKSHARC_HOME`, so spaces in checkout paths or an unset env var never break completion): simple `ms:*` kinds emit `"$('<helper>' <kind> --from-carapace)"`; `ms:base-repos-or-dir` emits `["$directories", "$('<helper>' base-repos --from-carapace)"]`; `ms:launch-session-target` emits `["$directories", "$('<helper>' launch-hosts --colon --from-carapace)"]` with `$nospace(:)`; `ms:launch-repo-target` emits `["$directories", "$('<helper>' launch-repo-target --from-carapace)"]` with `$nospace(:)`. |
 
 ### 5.3 Retirement of replaced hand-written files
 
 In L8.2 (`DEV-86`), once the four `.comp` specs are active and verified across all native shells, the replaced hand-written completion files are deleted:
+
 - `core/fish/completions/marksharc.fish` (and empty `core/fish/completions/` registration if no other files remain)
 - `modules/launch/completions/zsh/_launch-session`, `_launch-repo`
 - `modules/launch/completions/fish/launch-session.fish`, `launch-repo.fish`
@@ -183,6 +186,7 @@ Unrelated static and generated completions (`modules/cwf/completions/bash/cwf.ba
 ### 6.1 Specs directory resolution
 
 MarkSharc resolves Carapace's specs directory identically to `carapace-bin 1.8.5`:
+
 1. If `XDG_CONFIG_HOME` is non-empty: `$XDG_CONFIG_HOME/carapace/specs`.
 2. Else on macOS (`MARKSHARC_OS == darwin`): `$HOME/Library/Application Support/carapace/specs`.
 3. Else (Linux): `$HOME/.config/carapace/specs`.
@@ -212,6 +216,7 @@ Carapace's cached init snippet (`carapace _carapace zsh` in `modules/completion-
 ### 6.5 `marksharc doctor` diagnostics
 
 When `completion-carapace` is enabled and `carapace` is installed, `marksharc doctor` verifies:
+
 1. Every rendered Carapace spec has its expected managed symlink in Carapace's specs directory (reports missing or broken links and suggests `marksharc render`).
 2. No non-MarkSharc file conflicts at a managed spec path (reports the conflicting path cleanly so the user can move or rename it).
 
@@ -265,20 +270,20 @@ When `completion-carapace` is enabled and `carapace` is installed, `marksharc do
 
 All tests run in temporary `HOME` / XDG directories with command stubs and disposable git repos — never touching real user configs, real SSH hosts, or real Carapace directories.
 
-| Layer | Suite | Proves |
-|---|---|---|
-| Candidate helper | `tests/spec/zsh/complete_helper_spec.sh` | Every `ms:*` kind, spaces/apostrophes/colons, missing caches, path-traversal rejection, offline guarantee (stub `ssh`/`hc` never invoked), `--from-carapace` env handling |
-| Spec parser & renderer | `tests/spec/zsh/render_completions_spec.sh` | Directive validation, malformed spec rejection, golden outputs for zsh/Bash/Fish/Carapace, `zsh -n` / `bash -n` / `fish --no-execute` syntax checks, atomic staging, `envid` invalidation |
-| Zsh native & PTY | `tests/spec/zsh/launch_completions_spec.sh` + `marksharc_completions_spec.sh` | Interactive Tab completion for `marksharc`, `launch-session`, `launch-repo` (including `--host`, `--base-only`, repo-filtered `--worktree`, `host:`), and `cwf-new` (including `--host`) |
-| Bash 4.4+ native & PTY | `tests/spec/contract/bash_static_completion_spec.sh` | Readline unquoting, `:@=` reassembly, `marksharc` hierarchy, all launch/cwf flags and dynamic values, Bash 3.2 env-only untouched |
-| Fish native | `tests/fish/completions_test.fish` | All four commands loaded from rendered `$cache/completions/fish`, reload path cleanup, parity for `launch-repo --host`/`--base-only`, `cwf-new --host`, `marksharc install`/`update --only` |
-| Carapace end-to-end & lifecycle | `tests/spec/contract/carapace_completions_spec.sh` | Real `carapace <cmd> export ...` for all four commands (skipped if `carapace` absent), managed symlink creation, non-MarkSharc conflict preservation, disable pruning, `uninstall` cleanup, `doctor` diagnostics, cache key invalidation, zsh/Bash precedence and `CARAPACE_EXCLUDES` fallback |
+| Layer                           | Suite                                                                         | Proves                                                                                                                                                                                                                                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Candidate helper                | `tests/spec/zsh/complete_helper_spec.sh`                                      | Every `ms:*` kind, spaces/apostrophes/colons, missing caches, path-traversal rejection, offline guarantee (stub `ssh`/`hc` never invoked), `--from-carapace` env handling                                                                                                                      |
+| Spec parser & renderer          | `tests/spec/zsh/render_completions_spec.sh`                                   | Directive validation, malformed spec rejection, golden outputs for zsh/Bash/Fish/Carapace, `zsh -n` / `bash -n` / `fish --no-execute` syntax checks, atomic staging, `envid` invalidation                                                                                                      |
+| Zsh native & PTY                | `tests/spec/zsh/launch_completions_spec.sh` + `marksharc_completions_spec.sh` | Interactive Tab completion for `marksharc`, `launch-session`, `launch-repo` (including `--host`, `--base-only`, repo-filtered `--worktree`, `host:`), and `cwf-new` (including `--host`)                                                                                                       |
+| Bash 4.4+ native & PTY          | `tests/spec/contract/bash_static_completion_spec.sh`                          | Readline unquoting, `:@=` reassembly, `marksharc` hierarchy, all launch/cwf flags and dynamic values, Bash 3.2 env-only untouched                                                                                                                                                              |
+| Fish native                     | `tests/fish/completions_test.fish`                                            | All four commands loaded from rendered `$cache/completions/fish`, reload path cleanup, parity for `launch-repo --host`/`--base-only`, `cwf-new --host`, `marksharc install`/`update --only`                                                                                                    |
+| Carapace end-to-end & lifecycle | `tests/spec/contract/carapace_completions_spec.sh`                            | Real `carapace <cmd> export ...` for all four commands (skipped if `carapace` absent), managed symlink creation, non-MarkSharc conflict preservation, disable pruning, `uninstall` cleanup, `doctor` diagnostics, cache key invalidation, zsh/Bash precedence and `CARAPACE_EXCLUDES` fallback |
 
 ## 9. Decision log (DEV-84)
 
-| Decision | Choice | Source |
-|---|---|---|
-| Command and shell scope | `marksharc`, `launch-session`, `launch-repo`, and `cwf-new` across zsh, Bash 4.4+, Fish, and Carapace | Operator, DEV-84 |
-| Specification architecture | Common declarative `.comp` line-directive format rendered by `marksharc render` to all four targets, backed by shared offline helper `core/cli/complete` | Operator, DEV-84 |
-| Carapace spec wiring | Manifest-tracked managed symlinks from Carapace's platform specs directory to `$cache/completions/carapace/*.yaml`; never overwrite user files; cleaned up on disable/uninstall; checked by `doctor` | Operator, DEV-84 |
-| Delivery structure | Multi-PR: DEV-84 (L8.0 spec/plan PR) followed by DEV-85 (L8.1), DEV-86 (L8.2), and DEV-87 (L8.3) | Operator, DEV-84 |
+| Decision                   | Choice                                                                                                                                                                                               | Source           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Command and shell scope    | `marksharc`, `launch-session`, `launch-repo`, and `cwf-new` across zsh, Bash 4.4+, Fish, and Carapace                                                                                                | Operator, DEV-84 |
+| Specification architecture | Common declarative `.comp` line-directive format rendered by `marksharc render` to all four targets, backed by shared offline helper `core/cli/complete`                                             | Operator, DEV-84 |
+| Carapace spec wiring       | Manifest-tracked managed symlinks from Carapace's platform specs directory to `$cache/completions/carapace/*.yaml`; never overwrite user files; cleaned up on disable/uninstall; checked by `doctor` | Operator, DEV-84 |
+| Delivery structure         | Multi-PR: DEV-84 (L8.0 spec/plan PR) followed by DEV-85 (L8.1), DEV-86 (L8.2), and DEV-87 (L8.3)                                                                                                     | Operator, DEV-84 |

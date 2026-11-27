@@ -10,9 +10,9 @@ Implement [LAUNCH-SPEC.md](LAUNCH-SPEC.md) sections 5.5, 6, 7, and 10 under [MAR
 
 ## Live acceptance
 
-| Target | Evidence |
-| --- | --- |
-| tmux 3.5a on sol | A disposable detached session opened in a directory containing a space with the caller's display and SSH socket values. A launch from an agent environment started with the agent marker unset. |
-| Herdr TUI 0.9.5 on sol | The installed command opened a pane in a disposable headless server. Its login shell ran the supplied argv after init, preserved metacharacters, and cleared the run metadata before executing the command. |
-| Herdr Core 0.1.22 on sol | A disposable named core opened a terminal in the requested directory and set the workspace label that the app uses to make it visible. |
-| Herdr app on macOS | The Mac-to-sol and sol-local visibility checks in P3.9.2 remain pending with the operator present. The multi-day hands-on gate remains pending. |
+| Target                   | Evidence                                                                                                                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| tmux 3.5a on sol         | A disposable detached session opened in a directory containing a space with the caller's display and SSH socket values. A launch from an agent environment started with the agent marker unset.             |
+| Herdr TUI 0.9.5 on sol   | The installed command opened a pane in a disposable headless server. Its login shell ran the supplied argv after init, preserved metacharacters, and cleared the run metadata before executing the command. |
+| Herdr Core 0.1.22 on sol | A disposable named core opened a terminal in the requested directory and set the workspace label that the app uses to make it visible.                                                                      |
+| Herdr app on macOS       | The Mac-to-sol and sol-local visibility checks in P3.9.2 remain pending with the operator present. The multi-day hands-on gate remains pending.                                                             |

@@ -15,18 +15,18 @@ branch staged in a scratch checkout on sol. A real SSH transport wrapper selects
 the staged remote `repo-list`; neither installed checkout was changed. Each
 launched shell printed a unique marker and its working directory after init.
 
-| Check | Observed result |
-| --- | --- |
-| Mac repository name, Herdr Core | `t28` opened in the fixture base repository and appeared as a space in the Mac app. |
-| Mac repository name, Herdr TUI | `w2:p1` printed the fixture base directory after interactive init. |
-| sol repository name, Herdr Core | `t2c` printed the fixture base directory; the Mac app listed it under `sol-ts`. |
-| sol repository name, Herdr TUI | `w2C:p1` printed the fixture base directory after interactive init. |
+| Check                              | Observed result                                                                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Mac repository name, Herdr Core    | `t28` opened in the fixture base repository and appeared as a space in the Mac app.                                                                                                              |
+| Mac repository name, Herdr TUI     | `w2:p1` printed the fixture base directory after interactive init.                                                                                                                               |
+| sol repository name, Herdr Core    | `t2c` printed the fixture base directory; the Mac app listed it under `sol-ts`.                                                                                                                  |
+| sol repository name, Herdr TUI     | `w2C:p1` printed the fixture base directory after interactive init.                                                                                                                              |
 | Mac to sol existing worktree, Core | `sol:dev75-live-repo/feature/dev75` resolved by exact branch and opened `sol-ts/t2d` in the worktree. The app frame was visually inspected and showed the directory, branch, and command marker. |
-| Mac to sol existing worktree, TUI | `sol-ts:dev75-live-repo/dev75-live-wt` resolved by directory and opened `w2D:p1` in the worktree. |
-| Interactive picker | Real `gum` under a PTY listed base and worktree with branch/path, accepted a selection, and produced the correct Core launch preview. |
-| No terminal | An omitted repository exited 3 with the explicit-selection hint. |
-| New repository after cached scan | A newly created fixture repository was found without `--rescan` on the Mac and sol. The multi-repository scan exposed and fixed an unwanted zsh declaration printed before the TSV rows. |
-| Remote freshness | After a worktree was cached and removed on sol, its branch request exited 1 without launching. A change to sol's scratch roots appeared on the next ordinary remote inventory read. |
+| Mac to sol existing worktree, TUI  | `sol-ts:dev75-live-repo/dev75-live-wt` resolved by directory and opened `w2D:p1` in the worktree.                                                                                                |
+| Interactive picker                 | Real `gum` under a PTY listed base and worktree with branch/path, accepted a selection, and produced the correct Core launch preview.                                                            |
+| No terminal                        | An omitted repository exited 3 with the explicit-selection hint.                                                                                                                                 |
+| New repository after cached scan   | A newly created fixture repository was found without `--rescan` on the Mac and sol. The multi-repository scan exposed and fixed an unwanted zsh declaration printed before the TSV rows.         |
+| Remote freshness                   | After a worktree was cached and removed on sol, its branch request exited 1 without launching. A change to sol's scratch roots appeared on the next ordinary remote inventory read.              |
 
 The default app socket on sol had no listening window during these checks; sol
 Core visibility was verified through the Mac app, as the operator confirmed.

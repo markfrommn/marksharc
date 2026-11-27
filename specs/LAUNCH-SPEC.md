@@ -1,11 +1,11 @@
 # MarkSharc Launch Specification
 
-| | |
-|---|---|
-| Status | Design approved 2026-11-25. DEV-79 implements the launch foundation. |
-| Source issues | DEV-78 (this design), DEV-79, DEV-74, DEV-75, DEV-76 (Linear, project MarkSharc) |
-| Extends | [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md) sections 6.11, 6.13, and 7.1. That document wins where the two disagree. |
-| Companion | [LAUNCH-PLAN.md](LAUNCH-PLAN.md) |
+|               |                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| Status        | Design approved 2026-11-25. DEV-79 implements the launch foundation.                                            |
+| Source issues | DEV-78 (this design), DEV-79, DEV-74, DEV-75, DEV-76 (Linear, project MarkSharc)                                |
+| Extends       | [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md) sections 6.11, 6.13, and 7.1. That document wins where the two disagree. |
+| Companion     | [LAUNCH-PLAN.md](LAUNCH-PLAN.md)                                                                                |
 
 The launch commands open a fresh terminal session under a multiplexer, on this host or another one, in a directory, a repository, or a new `cwf` worktree. This document records how each multiplexer behaves, what the commands do, and how the pieces fit together.
 
@@ -19,14 +19,14 @@ The launch commands open a fresh terminal session under a multiplexer, on this h
 
 ## 2. Use cases
 
-| # | Caller | Command | Result |
-|---|---|---|---|
-| U1 | A shell inside a multiplexer | `launch-session ~/src` | A new terminal in the same multiplexer and instance, in `~/src`, running the login shell. |
-| U2 | A script or agent with no terminal | `launch-session --host build1 --pwd ~/src --command htop` | The same on host `build1`. Selection never prompts; it exits 3 when it would have to. |
-| U3 | A shell | `launch-repo` | A picker over the repositories and worktrees under the configured roots, then a terminal in the chosen one. |
-| U4 | A shell | `launch-repo build1:api/fix-login` | A terminal on `build1` in the `fix-login` worktree of `api`. |
-| U5 | A shell | `cwf-new --repo api --host build1 fix-login` | A terminal on `build1` in the base repository of `api`. It creates the `fix-login` session there, with its hooks, and ends in the new worktree. |
-| U6 | The session from U5 | `gwt-clean` | The worktree and branch are removed after the usual checks, and the terminal closes. |
+| #   | Caller                             | Command                                                   | Result                                                                                                                                          |
+| --- | ---------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| U1  | A shell inside a multiplexer       | `launch-session ~/src`                                    | A new terminal in the same multiplexer and instance, in `~/src`, running the login shell.                                                       |
+| U2  | A script or agent with no terminal | `launch-session --host build1 --pwd ~/src --command htop` | The same on host `build1`. Selection never prompts; it exits 3 when it would have to.                                                           |
+| U3  | A shell                            | `launch-repo`                                             | A picker over the repositories and worktrees under the configured roots, then a terminal in the chosen one.                                     |
+| U4  | A shell                            | `launch-repo build1:api/fix-login`                        | A terminal on `build1` in the `fix-login` worktree of `api`.                                                                                    |
+| U5  | A shell                            | `cwf-new --repo api --host build1 fix-login`              | A terminal on `build1` in the base repository of `api`. It creates the `fix-login` session there, with its hooks, and ends in the new worktree. |
+| U6  | The session from U5                | `gwt-clean`                                               | The worktree and branch are removed after the usual checks, and the terminal closes.                                                            |
 
 U5 and U6 are the final use case. Sections 5 to 9 are sized by what they need.
 
@@ -61,12 +61,12 @@ Reviewed on 2026-11-25 on Linux with `hc` 0.1.22, `herdr-app` 0.1.12, `herdr` 0.
 
 ### 4.1 Terms
 
-| Term | Meaning |
-|---|---|
-| Kind | A multiplexer product: `hc` (Herdr Core, shown by the Herdr app), `herdr` (the Herdr TUI), or `tmux`. |
-| Instance | One running server of a kind for this user on a host: a Herdr Core session, a Herdr TUI session, or a tmux session. |
-| Machine | Another host as one multiplexer names it. Each kind keeps its own list. |
-| Placement | Where a new terminal appears: a new workspace, a new tab, or hidden. |
+| Term      | Meaning                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| Kind      | A multiplexer product: `hc` (Herdr Core, shown by the Herdr app), `herdr` (the Herdr TUI), or `tmux`.               |
+| Instance  | One running server of a kind for this user on a host: a Herdr Core session, a Herdr TUI session, or a tmux session. |
+| Machine   | Another host as one multiplexer names it. Each kind keeps its own list.                                             |
+| Placement | Where a new terminal appears: a new workspace, a new tab, or hidden.                                                |
 
 ### 4.2 Herdr Core and the Herdr app
 
@@ -114,50 +114,50 @@ Herdr Core runs terminals and keeps them alive. The Herdr app shows them and arr
 
 ### 4.5 Comparison
 
-| | Herdr Core (`hc`) | Herdr TUI | tmux |
-|---|---|---|---|
-| Caller's environment inherited | No | No | No |
-| Sets variables | `env` in front of the program | `--env` | `-e` |
-| Starts in a directory | `--cwd` | `--cwd` | `-c` |
-| Runs a program instead of a shell | Yes, an argv | No | Yes, an argv |
-| Remote host | `--on <machine>` | `--machine <label>` | No |
-| Several instances per user | Yes, sessions | Yes, sessions | Yes, sessions and sockets |
-| Starts without a running server | Yes, on any command | No | Yes, `new-session -d` |
-| Visible on creation | Only with a `herdr.space` label | Yes | Yes, when a client is attached |
-| Focus control | None in `hc`; the app's own CLI on the app's host | `--focus`, `--no-focus` | `-d` |
-| Expands `~` in the directory | No | Yes for remote paths, by its help | Local only; the caller expands it |
+|                                   | Herdr Core (`hc`)                                 | Herdr TUI                         | tmux                              |
+| --------------------------------- | ------------------------------------------------- | --------------------------------- | --------------------------------- |
+| Caller's environment inherited    | No                                                | No                                | No                                |
+| Sets variables                    | `env` in front of the program                     | `--env`                           | `-e`                              |
+| Starts in a directory             | `--cwd`                                           | `--cwd`                           | `-c`                              |
+| Runs a program instead of a shell | Yes, an argv                                      | No                                | Yes, an argv                      |
+| Remote host                       | `--on <machine>`                                  | `--machine <label>`               | No                                |
+| Several instances per user        | Yes, sessions                                     | Yes, sessions                     | Yes, sessions and sockets         |
+| Starts without a running server   | Yes, on any command                               | No                                | Yes, `new-session -d`             |
+| Visible on creation               | Only with a `herdr.space` label                   | Yes                               | Yes, when a client is attached    |
+| Focus control                     | None in `hc`; the app's own CLI on the app's host | `--focus`, `--no-focus`           | `-d`                              |
+| Expands `~` in the directory      | No                                                | Yes for remote paths, by its help | Local only; the caller expands it |
 
 ### 4.6 Live checks
 
 DEV-78 ran these on 2026-11-25 with the operator at the app window. The terminals, the probe core, and the tmux server they used were removed afterwards. DEV-79 runs the open ones and records the results here. A result that contradicts section 5 amends that section in the same pull request.
 
-| # | Check | Result |
-|---|---|---|
-| V1 | From a shell on a remote core, `hc run --label herdr.space=<caller's space>` shows a new tab in that space. | Pass. The tab appears, the app adds `where`, and the focus does not move. |
-| V2 | An unused `herdr.space` id creates a space. | Pass, for a local terminal and for terminals started with `--on` on two other machines. The space is named after the terminal's directory and goes when the terminal ends. |
-| V3 | `hc run --cwd '~/dir'` expands `~` on the target. | Fail, locally and with `--on`: `spawn_failed`. Section 5.4 changes directory inside the wrapper instead; that form is verified on a remote machine. |
-| V4 | `herdr-app do space.new` with a wrapped argv. | Not run. Placement no longer needs it. |
-| V5 | `hc run` with no core running starts one. | Pass. Every `hc` command does, including `hc server status`. |
-| V6 | `HC_SESSION=<name>` reaches a separate core. | Pass. The probe core had its own identity and terminal list, and stopping it left the default core untouched. Socket paths are in 4.2. |
-| V7 | `herdr --machine <label> workspace create --cwd --env` against a running remote server, including an empty `--env` value. | Pass through SSH to a disposable Herdr TUI 0.9.5 server on sol. An absolute cwd, an empty value, and a value containing spaces, a semicolon, a dollar sign, and quotes reached the pane. `~/work` fell back to the remote home. The adapter requires an absolute remote cwd. |
-| V8 | A shell's `exit` closes its terminal's view. | Pass in the app and in Herdr TUI 0.9.5. On sol, `marksharc-mux launch herdr` created a pane in a disposable server, which returned an empty pane list after the shell exited. tmux closes the window by its manual. |
-| V9 | `tmux new-session -e` on the macOS Homebrew tmux. | Pass with tmux 3.8, including an empty value. |
-| V10 | A `--no-parent` terminal outlives the terminal that started it. | Pass. A child started without it was killed with its parent. |
-| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Pass with Herdr app 0.1.12 and Core 0.1.22 on macOS. The app kept the original focus on label placement and switched to the new terminal's space after `agent.focus`. The operator confirmed the switch. The original view was restored and the probe terminal removed. |
+| #   | Check                                                                                                                                  | Result                                                                                                                                                                                                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1  | From a shell on a remote core, `hc run --label herdr.space=<caller's space>` shows a new tab in that space.                            | Pass. The tab appears, the app adds `where`, and the focus does not move.                                                                                                                                                                                                    |
+| V2  | An unused `herdr.space` id creates a space.                                                                                            | Pass, for a local terminal and for terminals started with `--on` on two other machines. The space is named after the terminal's directory and goes when the terminal ends.                                                                                                   |
+| V3  | `hc run --cwd '~/dir'` expands `~` on the target.                                                                                      | Fail, locally and with `--on`: `spawn_failed`. Section 5.4 changes directory inside the wrapper instead; that form is verified on a remote machine.                                                                                                                          |
+| V4  | `herdr-app do space.new` with a wrapped argv.                                                                                          | Not run. Placement no longer needs it.                                                                                                                                                                                                                                       |
+| V5  | `hc run` with no core running starts one.                                                                                              | Pass. Every `hc` command does, including `hc server status`.                                                                                                                                                                                                                 |
+| V6  | `HC_SESSION=<name>` reaches a separate core.                                                                                           | Pass. The probe core had its own identity and terminal list, and stopping it left the default core untouched. Socket paths are in 4.2.                                                                                                                                       |
+| V7  | `herdr --machine <label> workspace create --cwd --env` against a running remote server, including an empty `--env` value.              | Pass through SSH to a disposable Herdr TUI 0.9.5 server on sol. An absolute cwd, an empty value, and a value containing spaces, a semicolon, a dollar sign, and quotes reached the pane. `~/work` fell back to the remote home. The adapter requires an absolute remote cwd. |
+| V8  | A shell's `exit` closes its terminal's view.                                                                                           | Pass in the app and in Herdr TUI 0.9.5. On sol, `marksharc-mux launch herdr` created a pane in a disposable server, which returned an empty pane list after the shell exited. tmux closes the window by its manual.                                                          |
+| V9  | `tmux new-session -e` on the macOS Homebrew tmux.                                                                                      | Pass with tmux 3.8, including an empty value.                                                                                                                                                                                                                                |
+| V10 | A `--no-parent` terminal outlives the terminal that started it.                                                                        | Pass. A child started without it was killed with its parent.                                                                                                                                                                                                                 |
+| V11 | With an app window on the calling host, `herdr-app do agent.focus --terminal <address>` moves the focus to a terminal placed by label. | Pass with Herdr app 0.1.12 and Core 0.1.22 on macOS. The app kept the original focus on label placement and switched to the new terminal's space after `agent.focus`. The operator confirmed the switch. The original view was restored and the probe terminal removed.      |
 
 ## 5. Architecture
 
 ### 5.1 Parts
 
-| Part | Location | Role |
-|---|---|---|
-| Picker | `core/zsh/lib/pick.zsh` | One interactive selection helper for hosts, repositories, and instances (5.3). |
-| JSON helpers | `core/zsh/lib/json.zsh` | The pure-zsh reader extracted from the `hc machine ls` scanner, extended to the other replies the adapters read. No parser dependency on a host. |
-| Host resolution | `core/cli/hosts-lib.zsh` | Reserved names, ssh targets, and host-to-machine matching (5.2). |
-| Launch adapters | `modules/mux/adapters/<kind>.zsh` | New operations beside `detect`, `set_titles`, `refresh_env`, and `sessions` (5.4). |
-| `launch` module | `modules/launch/` | `bin/launch-session`, `bin/launch-repo`, the run-after-init hook in `init.zsh` and `init.fish`, completions, and options (section 10). It needs the `mux` module. |
-| Repository inventory | `modules/git-worktree/bin/repo-list` | Scan, worktree chain, and cache (8.2). `launch-repo` needs the `git-worktree` module. |
-| `cwf-new`, `gwt-clean` | their existing modules | Launch options and launched mode (section 9). |
+| Part                   | Location                             | Role                                                                                                                                                              |
+| ---------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Picker                 | `core/zsh/lib/pick.zsh`              | One interactive selection helper for hosts, repositories, and instances (5.3).                                                                                    |
+| JSON helpers           | `core/zsh/lib/json.zsh`              | The pure-zsh reader extracted from the `hc machine ls` scanner, extended to the other replies the adapters read. No parser dependency on a host.                  |
+| Host resolution        | `core/cli/hosts-lib.zsh`             | Reserved names, ssh targets, and host-to-machine matching (5.2).                                                                                                  |
+| Launch adapters        | `modules/mux/adapters/<kind>.zsh`    | New operations beside `detect`, `set_titles`, `refresh_env`, and `sessions` (5.4).                                                                                |
+| `launch` module        | `modules/launch/`                    | `bin/launch-session`, `bin/launch-repo`, the run-after-init hook in `init.zsh` and `init.fish`, completions, and options (section 10). It needs the `mux` module. |
+| Repository inventory   | `modules/git-worktree/bin/repo-list` | Scan, worktree chain, and cache (8.2). `launch-repo` needs the `git-worktree` module.                                                                             |
+| `cwf-new`, `gwt-clean` | their existing modules               | Launch options and launched mode (section 9).                                                                                                                     |
 
 The commands are write-once executables (MARKSHARC-SPEC 6.11). Neither launch command changes the caller's shell, so neither has a wrapper function.
 
@@ -165,11 +165,11 @@ The commands are write-once executables (MARKSHARC-SPEC 6.11). Neither launch co
 
 A host is named as in `hosts.conf` (MARKSHARC-SPEC 6.14). Names follow the existing `hosts.conf` name rule.
 
-| Name | Meaning |
-|---|---|
-| absent, `local`, `localhost`, or the value of `MARKSHARC_HOST` | This host. |
-| `remote` | Ask with the picker. Without a terminal this exits 3. |
-| anything else | A remote host. |
+| Name                                                           | Meaning                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------- |
+| absent, `local`, `localhost`, or the value of `MARKSHARC_HOST` | This host.                                            |
+| `remote`                                                       | Ask with the picker. Without a terminal this exits 3. |
+| anything else                                                  | A remote host.                                        |
 
 `local`, `localhost`, and `remote` are reserved. A `hosts.conf` entry with one of those names cannot be addressed by a launch command.
 
@@ -194,36 +194,36 @@ More than one machine matching at rule 2 or 3 is an error that lists them. Machi
 
 Each adapter gains these operations. An adapter that cannot launch (`wezterm`, `plain`) answers `supports` with failure and omits the rest.
 
-| Operation | Contract |
-|---|---|
-| `supports <feature>` | Succeed when the kind has the feature: `launch`, `remote`, `autostart`, `argv`, `place-workspace`, `place-tab`, `place-hidden`. |
-| `current` | When the caller is inside a live instance of this kind, print its instance id. A marker whose server does not answer does not count. |
-| `instances` | Print the running local instances, one per line as `<id><TAB><description>`. Neither this nor `current` may start a server. |
-| `machines [<instance>]` | Print that instance's machines as `<name><TAB><target><TAB><hostname>`, with an empty hostname when the kind reports none. |
-| `launch` | Open one terminal from the request and print `<instance><TAB><address>`. |
+| Operation               | Contract                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `supports <feature>`    | Succeed when the kind has the feature: `launch`, `remote`, `autostart`, `argv`, `place-workspace`, `place-tab`, `place-hidden`.      |
+| `current`               | When the caller is inside a live instance of this kind, print its instance id. A marker whose server does not answer does not count. |
+| `instances`             | Print the running local instances, one per line as `<id><TAB><description>`. Neither this nor `current` may start a server.          |
+| `machines [<instance>]` | Print that instance's machines as `<name><TAB><target><TAB><hostname>`, with an empty hostname when the kind reports none.           |
+| `launch`                | Open one terminal from the request and print `<instance><TAB><address>`.                                                             |
 
 The request is data in the caller's scope, like `client_env` for `refresh_env`: the associative array `launch_req` with the keys `instance`, `machine`, `cwd`, `name`, `place`, `focus`, and `dry_run`, the array `launch_env` of `NAME=VALUE` words, and the array `launch_argv`. With `dry_run` set the adapter prints each command it would run, one per line with every word quoted, and runs none of them. An adapter passes every value as one argument and never builds a shell line from request data.
 
 How each kind carries the request:
 
-| | Herdr Core (`hc`) | Herdr TUI | tmux |
-|---|---|---|---|
-| Instance | `HC_SOCKET` from `HC_TERMINAL_SOCKET` inside a terminal; `HC_SESSION=<id>` otherwise | The inherited context inside a pane; `--session <id>` otherwise | `-S <socket>` from `TMUX` inside a pane, else the default socket; `-t <id>:` |
-| Machine | `--on <machine>` | `--machine <label>` | Not supported |
-| Directory | `--cwd` for an absolute path. A path under the remote home gets no `--cwd`; the wrapper changes into it. | `--cwd`, with an absolute path when a machine is selected. | `-c` |
-| Variables | `env NAME=VALUE …` in front of the program | `--env NAME=VALUE` | `-e NAME=VALUE` |
-| Program | The argv. With environment and no argv: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`. For a path under the remote home: `sh -c 'CDPATH= cd -- "$HOME/$1" && shift && exec "$@"' sh <home-relative-dir> <argv…>`. | None; a command travels in `LAUNCH_RUN` (6.4) | The argv. With none: the default shell |
-| Name | The label `marksharc.name`. The app names a space after its first terminal's directory | `--label` | `-n` |
-| Always | `--bg --no-parent --no-notify` | | `-P -F` to read the address |
-| Address | `address` in the JSON reply, as `machine/address` when remote | `pane_id` | `<session>:<window id>.<pane id>` |
+|           | Herdr Core (`hc`)                                                                                                                                                                                         | Herdr TUI                                                       | tmux                                                                         |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Instance  | `HC_SOCKET` from `HC_TERMINAL_SOCKET` inside a terminal; `HC_SESSION=<id>` otherwise                                                                                                                      | The inherited context inside a pane; `--session <id>` otherwise | `-S <socket>` from `TMUX` inside a pane, else the default socket; `-t <id>:` |
+| Machine   | `--on <machine>`                                                                                                                                                                                          | `--machine <label>`                                             | Not supported                                                                |
+| Directory | `--cwd` for an absolute path. A path under the remote home gets no `--cwd`; the wrapper changes into it.                                                                                                  | `--cwd`, with an absolute path when a machine is selected.      | `-c`                                                                         |
+| Variables | `env NAME=VALUE …` in front of the program                                                                                                                                                                | `--env NAME=VALUE`                                              | `-e NAME=VALUE`                                                              |
+| Program   | The argv. With environment and no argv: `sh -c 'exec "${SHELL:-/bin/sh}" -l'`. For a path under the remote home: `sh -c 'CDPATH= cd -- "$HOME/$1" && shift && exec "$@"' sh <home-relative-dir> <argv…>`. | None; a command travels in `LAUNCH_RUN` (6.4)                   | The argv. With none: the default shell                                       |
+| Name      | The label `marksharc.name`. The app names a space after its first terminal's directory                                                                                                                    | `--label`                                                       | `-n`                                                                         |
+| Always    | `--bg --no-parent --no-notify`                                                                                                                                                                            |                                                                 | `-P -F` to read the address                                                  |
+| Address   | `address` in the JSON reply, as `machine/address` when remote                                                                                                                                             | `pane_id`                                                       | `<session>:<window id>.<pane id>`                                            |
 
 Placement:
 
-| `--place` | Herdr Core (`hc`) | Herdr TUI | tmux |
-|---|---|---|---|
-| `workspace` | `hc run --label herdr.space=<new id>`, the id being `sp` and 32 random hexadecimal digits. | `workspace create` | As `tab`: a session is the instance, so a window is the top level. |
-| `tab` | When the caller's terminal carries `herdr.space` and the launch is on the caller's machine: `hc run --label herdr.space=<that id>`. Otherwise as `workspace`. | `tab create --workspace <caller's>`; with no caller workspace, as `workspace`. | `new-window` |
-| `hidden` | `hc run` with no `herdr.*` label | `workspace create --no-focus` | `new-window -d` |
+| `--place`   | Herdr Core (`hc`)                                                                                                                                             | Herdr TUI                                                                      | tmux                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `workspace` | `hc run --label herdr.space=<new id>`, the id being `sp` and 32 random hexadecimal digits.                                                                    | `workspace create`                                                             | As `tab`: a session is the instance, so a window is the top level. |
+| `tab`       | When the caller's terminal carries `herdr.space` and the launch is on the caller's machine: `hc run --label herdr.space=<that id>`. Otherwise as `workspace`. | `tab create --workspace <caller's>`; with no caller workspace, as `workspace`. | `new-window`                                                       |
+| `hidden`    | `hc run` with no `herdr.*` label                                                                                                                              | `workspace create --no-focus`                                                  | `new-window -d`                                                    |
 
 Running Herdr Core instances are found without waking one: the adapter lists the sessions that have a `core.lock` and counts a session as running when the socket named in it exists (4.2).
 
@@ -256,42 +256,42 @@ The first two lines are the positional form. The first positional word is the ta
 
 The third line is the flag form, selected by any of `--host`, `--pwd`, or `--command`. It takes no positional target. Words after `--` are the arguments of `--command`, or the whole command when `--command` is absent.
 
-| Option | Meaning |
-|---|---|
-| `--host <name>` | The host (5.2). Default: this host. |
-| `--pwd <dir>` | The starting directory. Default: the home directory. For a remote host it must be `~`, start with `~/`, or be absolute. A local path, relative or under `~`, is made absolute before the launch. |
-| `--command <program>` | The program to run. Default: the login shell. |
-| `--mux hc\|herdr\|tmux` | The kind (5.5). |
-| `--mux-id <instance>` | The instance: a Herdr Core session, a Herdr TUI session, or a tmux session name or id. |
-| `--place workspace\|tab\|hidden` | The placement (5.4). Default: `launch.place`. |
-| `--name <text>` | A display name. Default: the last component of the directory. |
-| `--env NAME=VALUE` | Set a variable in the new session. Repeatable. The name must be a shell identifier that does not start with `LAUNCH_`. |
-| `--in-shell` | Run the command inside the session's interactive login shell and stay at its prompt (6.4). |
-| `--no-focus` | Leave the caller's view where it is. Default: `launch.focus`. |
-| `--dry-run` | Print the multiplexer commands, one per line with every word quoted, and run nothing. |
-| `--quiet` | Print no result line. |
-| `-h`, `--help` | Usage. |
+| Option                           | Meaning                                                                                                                                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--host <name>`                  | The host (5.2). Default: this host.                                                                                                                                                              |
+| `--pwd <dir>`                    | The starting directory. Default: the home directory. For a remote host it must be `~`, start with `~/`, or be absolute. A local path, relative or under `~`, is made absolute before the launch. |
+| `--command <program>`            | The program to run. Default: the login shell.                                                                                                                                                    |
+| `--mux hc\|herdr\|tmux`          | The kind (5.5).                                                                                                                                                                                  |
+| `--mux-id <instance>`            | The instance: a Herdr Core session, a Herdr TUI session, or a tmux session name or id.                                                                                                           |
+| `--place workspace\|tab\|hidden` | The placement (5.4). Default: `launch.place`.                                                                                                                                                    |
+| `--name <text>`                  | A display name. Default: the last component of the directory.                                                                                                                                    |
+| `--env NAME=VALUE`               | Set a variable in the new session. Repeatable. The name must be a shell identifier that does not start with `LAUNCH_`.                                                                           |
+| `--in-shell`                     | Run the command inside the session's interactive login shell and stay at its prompt (6.4).                                                                                                       |
+| `--no-focus`                     | Leave the caller's view where it is. Default: `launch.focus`.                                                                                                                                    |
+| `--dry-run`                      | Print the multiplexer commands, one per line with every word quoted, and run nothing.                                                                                                            |
+| `--quiet`                        | Print no result line.                                                                                                                                                                            |
+| `-h`, `--help`                   | Usage.                                                                                                                                                                                           |
 
 ### 6.2 Result
 
 On success the command prints one line, `<kind><TAB><instance><TAB><machine><TAB><address>`, with an empty machine field for this host. Notices go to standard error.
 
-| Status | Meaning |
-|---|---|
-| 0 | The terminal was created. |
-| 1 | The launch failed: no usable multiplexer, an unreachable host, or a multiplexer error. |
-| 2 | A usage or validation error. Nothing was started. |
-| 3 | A choice was needed (host, instance, or repository) and there was no terminal to ask in, or no picker tool. Nothing was started. |
+| Status | Meaning                                                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | The terminal was created.                                                                                                        |
+| 1      | The launch failed: no usable multiplexer, an unreachable host, or a multiplexer error.                                           |
+| 2      | A usage or validation error. Nothing was started.                                                                                |
+| 3      | A choice was needed (host, instance, or repository) and there was no terminal to ask in, or no picker tool. Nothing was started. |
 
 A zero status means the multiplexer accepted the terminal. It does not mean the program started correctly.
 
 ### 6.3 Command modes
 
-| Request | The terminal runs | It ends when |
-|---|---|---|
-| No command | The login shell | The shell exits |
-| A command | The command, as an argv with no shell in between | The command exits |
-| A command with `--in-shell` | The login shell, which runs the command after its init and then prompts | The shell exits |
+| Request                     | The terminal runs                                                       | It ends when      |
+| --------------------------- | ----------------------------------------------------------------------- | ----------------- |
+| No command                  | The login shell                                                         | The shell exits   |
+| A command                   | The command, as an argv with no shell in between                        | The command exits |
+| A command with `--in-shell` | The login shell, which runs the command after its init and then prompts | The shell exits   |
 
 On the Herdr TUI a pane always starts its shell, so a plain command also travels through 6.4, with the shell replacing itself by the command.
 
@@ -309,14 +309,14 @@ The target shell requires MarkSharc interactive init and the `launch` module ena
 
 `launch-session` sets these in every session it creates. An empty value means absent. Every variable is always passed, so a value inherited from the multiplexer server's own environment never applies.
 
-| Variable | Value |
-|---|---|
-| `LAUNCH_PARENT_PID` | The process that ran the launch command: the caller's shell. `launch-repo` and `cwf-new` replace themselves with `launch-session`, so the value is the same through them. |
-| `LAUNCH_PARENT_HOST` | The caller's `MARKSHARC_HOST`. |
-| `LAUNCH_PARENT_SSH_AUTH_SOCK` | The caller's `SSH_AUTH_SOCK`, or empty. |
-| `LAUNCH_PARENT_DISPLAY` | The caller's `DISPLAY`, or empty. |
-| `LAUNCH_RUN`, `LAUNCH_RUN_EXEC` | Section 6.4, or empty. |
-| `LAUNCH_WORKTREE` | Empty. `cwf-new --launched` sets it inside the session (9.1). |
+| Variable                        | Value                                                                                                                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LAUNCH_PARENT_PID`             | The process that ran the launch command: the caller's shell. `launch-repo` and `cwf-new` replace themselves with `launch-session`, so the value is the same through them. |
+| `LAUNCH_PARENT_HOST`            | The caller's `MARKSHARC_HOST`.                                                                                                                                            |
+| `LAUNCH_PARENT_SSH_AUTH_SOCK`   | The caller's `SSH_AUTH_SOCK`, or empty.                                                                                                                                   |
+| `LAUNCH_PARENT_DISPLAY`         | The caller's `DISPLAY`, or empty.                                                                                                                                         |
+| `LAUNCH_RUN`, `LAUNCH_RUN_EXEC` | Section 6.4, or empty.                                                                                                                                                    |
+| `LAUNCH_WORKTREE`               | Empty. `cwf-new --launched` sets it inside the session (9.1).                                                                                                             |
 
 For a launch on this host the session also receives the caller's `DISPLAY`, `XAUTHORITY`, and `SSH_AUTH_SOCK` when the caller has them. A remote session receives none of the three; it relies on its own startup. The session class markers of the caller (MARKSHARC-SPEC 6.6) are never passed, so a terminal launched by an agent is an ordinary interactive session.
 
@@ -397,8 +397,8 @@ It does not exit when a step failed, when `LAUNCH_WORKTREE` is empty, or when it
 
 The caller-state protocol (MARKSHARC-SPEC 6.11) gains one line:
 
-| Directive line | Effect in the calling shell |
-|---|---|
+| Directive line    | Effect in the calling shell                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `exit [<status>]` | After the remaining directives are applied and the directive file is removed, exit the shell with the status, 0 by default. |
 
 The status must be a number from 0 to 255; any other value is ignored with a message.
@@ -407,14 +407,14 @@ leaves the caller's state alone.
 
 ## 10. Configuration
 
-| Option | Default | Meaning |
-|---|---|---|
-| `launch.prefer` | `hc herdr tmux` | The order of kinds when the caller is not inside a multiplexer, and the order tried when one must be started. |
-| `launch.place` | `workspace` | The default placement. |
-| `launch.focus` | `on` | Whether a new terminal takes focus where the multiplexer allows a choice. |
-| `launch.repo_cache_minutes` | `60` | The age at which a repository inventory is rebuilt. |
-| `launch.ssh_timeout` | `10` | The connect timeout in seconds for a remote inventory. |
-| `git-worktree.roots` | empty | The directories whose immediate subdirectories are repositories (existing option). |
+| Option                      | Default         | Meaning                                                                                                       |
+| --------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------- |
+| `launch.prefer`             | `hc herdr tmux` | The order of kinds when the caller is not inside a multiplexer, and the order tried when one must be started. |
+| `launch.place`              | `workspace`     | The default placement.                                                                                        |
+| `launch.focus`              | `on`            | Whether a new terminal takes focus where the multiplexer allows a choice.                                     |
+| `launch.repo_cache_minutes` | `60`            | The age at which a repository inventory is rebuilt.                                                           |
+| `launch.ssh_timeout`        | `10`            | The connect timeout in seconds for a remote inventory.                                                        |
+| `git-worktree.roots`        | empty           | The directories whose immediate subdirectories are repositories (existing option).                            |
 
 The module is enabled by default. It adds two executables to PATH and does nothing at startup unless `LAUNCH_RUN` is set.
 
@@ -422,56 +422,56 @@ The module is enabled by default. It adds two executables to PATH and does nothi
 
 The rules of MARKSHARC-SPEC section 8 apply: a temporary HOME, command stubs, and no real service.
 
-| Area | What the specs prove |
-|---|---|
-| Adapters | The contract in 5.4 for every adapter against stub `hc`, `herdr`, `herdr-app`, and `tmux` that record their argv. Each placement, local and remote, and each directory form. Values with spaces, semicolons, dollar signs, quotes, and newlines arrive as single arguments. |
-| Selection | Every branch of 5.5: `--mux`, nesting, a stale marker, preference order, autostart, several instances with and without a terminal. |
-| Hosts | Reserved names, both matching rules, the ambiguous and missing cases, and the picker's union. |
-| Picker | `gum`, `fzf`, neither, no terminal, cancel. `marksharc hosts populate` behaves as before. |
-| `launch-session` | Both syntax forms and their conflicts, every status in 6.2, `--dry-run` goldens, the metadata in 7.1, and no agent marker in the new session. |
-| Run after init | zsh, Fish and Bash: the command runs once after init, the variables are gone before it runs, `exec` mode, an encoded argv with tab and newline, and no action in batch and agent sessions. |
-| Startup | `setup-ssh-agent` and `setup-x11-display` with a usable, a dead, and an other-host parent value. |
-| Inventory | Disposable repositories: scan, worktree chain, cache header, every freshness rule, and a stub `ssh` for the remote case. |
-| `launch-repo` | Each rule in 8.3, the path form, the reserved creation form, and the `launch-session` argv it produces. |
-| `cwf-new`, `gwt-clean` | The unchanged in-place path, the launch-mode argv, `LAUNCH_WORKTREE`, and each case in 9.2. |
-| `exit` directive | zsh and fish appliers: order, status validation, and file removal before the exit. |
+| Area                   | What the specs prove                                                                                                                                                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Adapters               | The contract in 5.4 for every adapter against stub `hc`, `herdr`, `herdr-app`, and `tmux` that record their argv. Each placement, local and remote, and each directory form. Values with spaces, semicolons, dollar signs, quotes, and newlines arrive as single arguments. |
+| Selection              | Every branch of 5.5: `--mux`, nesting, a stale marker, preference order, autostart, several instances with and without a terminal.                                                                                                                                          |
+| Hosts                  | Reserved names, both matching rules, the ambiguous and missing cases, and the picker's union.                                                                                                                                                                               |
+| Picker                 | `gum`, `fzf`, neither, no terminal, cancel. `marksharc hosts populate` behaves as before.                                                                                                                                                                                   |
+| `launch-session`       | Both syntax forms and their conflicts, every status in 6.2, `--dry-run` goldens, the metadata in 7.1, and no agent marker in the new session.                                                                                                                               |
+| Run after init         | zsh, Fish and Bash: the command runs once after init, the variables are gone before it runs, `exec` mode, an encoded argv with tab and newline, and no action in batch and agent sessions.                                                                                  |
+| Startup                | `setup-ssh-agent` and `setup-x11-display` with a usable, a dead, and an other-host parent value.                                                                                                                                                                            |
+| Inventory              | Disposable repositories: scan, worktree chain, cache header, every freshness rule, and a stub `ssh` for the remote case.                                                                                                                                                    |
+| `launch-repo`          | Each rule in 8.3, the path form, the reserved creation form, and the `launch-session` argv it produces.                                                                                                                                                                     |
+| `cwf-new`, `gwt-clean` | The unchanged in-place path, the launch-mode argv, `LAUNCH_WORKTREE`, and each case in 9.2.                                                                                                                                                                                 |
+| `exit` directive       | zsh and fish appliers: order, status validation, and file removal before the exit.                                                                                                                                                                                          |
 
 Each behaviour gets a row in the contract inventory in `tests/README.md`. Live acceptance is in [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 
 ## 12. Risks and open questions
 
-| Risk or question | Handling |
-|---|---|
-| Creating a space through an unused `herdr.space` id is observed behaviour, not a documented interface. | The label logic sits in one adapter. If the app stops honouring it, the terminal still exists and is reachable by the address in the result line. |
-| A launch cannot tell whether any app window shows the core. | The result line always carries the address, and the documentation gives `hc attach`. |
-| `hc server status` starts a core, so a careless probe leaves one running. | Adapters read `core.lock` and test the socket it names (4.2, 5.4). |
-| `hc` and `herdr-app` are young and change quickly. | All tool syntax lives in the adapters. `--dry-run` shows the exact commands. Section 4 records the reviewed versions. |
-| `LAUNCH_RUN` runs a command named by the environment. | Interactive sessions only, once, cleared before it runs, and never evaluated as text. Whoever controls a shell's environment already controls the shell. |
-| A shell without the `launch` module ignores `LAUNCH_RUN`, so `--in-shell`, launched `cwf-new`, and any command on the Herdr TUI silently open a plain shell there. | `marksharc push` keeps hosts current. The user documentation states the requirement. |
-| Three machine lists drift apart. | Resolution by name, then by target (5.2). Each error names the command that fixes it. |
-| A host named `local`, `localhost`, or `remote`. | Reserved and documented. |
-| A multiplexer server inherits launch variables from the shell that started it. | Every variable is passed on every launch, empty when unused (7.1). `gwt-clean` compares paths, not presence (9.2). |
-| `hc`'s own `shell` setting is bypassed when variables must be set. | The session runs `$SHELL` as a login shell. Revisit if `hc run` gains an environment option. |
-| tmux older than 3.2 lacks `new-session -e`. | Homebrew tmux on macOS is 3.8 (V9). The tmux adapter reports the version when a launch fails for that reason. |
+| Risk or question                                                                                                                                                   | Handling                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creating a space through an unused `herdr.space` id is observed behaviour, not a documented interface.                                                             | The label logic sits in one adapter. If the app stops honouring it, the terminal still exists and is reachable by the address in the result line.        |
+| A launch cannot tell whether any app window shows the core.                                                                                                        | The result line always carries the address, and the documentation gives `hc attach`.                                                                     |
+| `hc server status` starts a core, so a careless probe leaves one running.                                                                                          | Adapters read `core.lock` and test the socket it names (4.2, 5.4).                                                                                       |
+| `hc` and `herdr-app` are young and change quickly.                                                                                                                 | All tool syntax lives in the adapters. `--dry-run` shows the exact commands. Section 4 records the reviewed versions.                                    |
+| `LAUNCH_RUN` runs a command named by the environment.                                                                                                              | Interactive sessions only, once, cleared before it runs, and never evaluated as text. Whoever controls a shell's environment already controls the shell. |
+| A shell without the `launch` module ignores `LAUNCH_RUN`, so `--in-shell`, launched `cwf-new`, and any command on the Herdr TUI silently open a plain shell there. | `marksharc push` keeps hosts current. The user documentation states the requirement.                                                                     |
+| Three machine lists drift apart.                                                                                                                                   | Resolution by name, then by target (5.2). Each error names the command that fixes it.                                                                    |
+| A host named `local`, `localhost`, or `remote`.                                                                                                                    | Reserved and documented.                                                                                                                                 |
+| A multiplexer server inherits launch variables from the shell that started it.                                                                                     | Every variable is passed on every launch, empty when unused (7.1). `gwt-clean` compares paths, not presence (9.2).                                       |
+| `hc`'s own `shell` setting is bypassed when variables must be set.                                                                                                 | The session runs `$SHELL` as a login shell. Revisit if `hc run` gains an environment option.                                                             |
+| tmux older than 3.2 lacks `new-session -e`.                                                                                                                        | Homebrew tmux on macOS is 3.8 (V9). The tmux adapter reports the version when a launch fails for that reason.                                            |
 
 ## 13. Decision log
 
-| Decision | Choice | Source |
-|---|---|---|
-| Command names | `launch-session` and `launch-repo`. Bare `repo` collides with the Android `repo` tool. | Operator, DEV-78 |
-| `cwf-new` in a launched terminal | Launch, then create: the new terminal runs `cwf-new` in its own interactive shell, the same way locally and remotely. | Operator, DEV-78 |
-| Work boundaries | A foundation issue (DEV-79) ahead of DEV-74. | Operator, DEV-78 |
-| Syntax | Both forms on one parser: positional for people, flags for automation. | DEV-78 |
-| Picker alias | The reserved host name `remote`; an omitted repository. No option takes an optional value. | DEV-78 |
-| Variable names | `LAUNCH_PARENT_*` as proposed in DEV-74, with `LAUNCH_RUN`, `LAUNCH_RUN_EXEC`, and `LAUNCH_WORKTREE` beside them. | DEV-74, DEV-78 |
-| Environment on `hc` | An `env` wrapper, because `hc run` has no environment option. | Review, DEV-78 |
-| Placement on `hc` | `herdr.space` labels alone: the caller's id for a tab, a new id for a space. `herdr-app` is used only for focus. | Live checks, DEV-78 |
-| Remote home paths on `hc` | The wrapper changes directory, because `--cwd` does not expand `~`. | Live checks, DEV-78 |
-| Detecting a running `hc` core | The session's `core.lock` names the socket, and the socket's presence is the test. No `hc` command is used, because each one starts the core. | Operator, DEV-78 |
-| Independence on `hc` | Always `--no-parent --no-notify`; `LAUNCH_PARENT_PID` carries the relationship. | Review, DEV-78 |
-| Several `hc` cores per user | Supported through `--mux-id`. The DEV-74 assumption of one core per user does not hold. | Review, DEV-78 |
-| Remote tmux | Later. | DEV-74 |
-| Worktree creation in `launch-repo` | Not now; the `repo/worktree:branch` form is reserved. | DEV-75, DEV-78 |
-| Closing a launched terminal | A new `exit` directive, emitted only when `LAUNCH_WORKTREE` names the removed worktree. | DEV-78 |
-| Remote code | The remote host runs its own marksharc. Nothing is shipped to it. | DEV-78 |
-| Containers | No separate design; an `hc` machine added with `--via` covers the case. | DEV-78 |
+| Decision                           | Choice                                                                                                                                        | Source              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Command names                      | `launch-session` and `launch-repo`. Bare `repo` collides with the Android `repo` tool.                                                        | Operator, DEV-78    |
+| `cwf-new` in a launched terminal   | Launch, then create: the new terminal runs `cwf-new` in its own interactive shell, the same way locally and remotely.                         | Operator, DEV-78    |
+| Work boundaries                    | A foundation issue (DEV-79) ahead of DEV-74.                                                                                                  | Operator, DEV-78    |
+| Syntax                             | Both forms on one parser: positional for people, flags for automation.                                                                        | DEV-78              |
+| Picker alias                       | The reserved host name `remote`; an omitted repository. No option takes an optional value.                                                    | DEV-78              |
+| Variable names                     | `LAUNCH_PARENT_*` as proposed in DEV-74, with `LAUNCH_RUN`, `LAUNCH_RUN_EXEC`, and `LAUNCH_WORKTREE` beside them.                             | DEV-74, DEV-78      |
+| Environment on `hc`                | An `env` wrapper, because `hc run` has no environment option.                                                                                 | Review, DEV-78      |
+| Placement on `hc`                  | `herdr.space` labels alone: the caller's id for a tab, a new id for a space. `herdr-app` is used only for focus.                              | Live checks, DEV-78 |
+| Remote home paths on `hc`          | The wrapper changes directory, because `--cwd` does not expand `~`.                                                                           | Live checks, DEV-78 |
+| Detecting a running `hc` core      | The session's `core.lock` names the socket, and the socket's presence is the test. No `hc` command is used, because each one starts the core. | Operator, DEV-78    |
+| Independence on `hc`               | Always `--no-parent --no-notify`; `LAUNCH_PARENT_PID` carries the relationship.                                                               | Review, DEV-78      |
+| Several `hc` cores per user        | Supported through `--mux-id`. The DEV-74 assumption of one core per user does not hold.                                                       | Review, DEV-78      |
+| Remote tmux                        | Later.                                                                                                                                        | DEV-74              |
+| Worktree creation in `launch-repo` | Not now; the `repo/worktree:branch` form is reserved.                                                                                         | DEV-75, DEV-78      |
+| Closing a launched terminal        | A new `exit` directive, emitted only when `LAUNCH_WORKTREE` names the removed worktree.                                                       | DEV-78              |
+| Remote code                        | The remote host runs its own marksharc. Nothing is shipped to it.                                                                             | DEV-78              |
+| Containers                         | No separate design; an `hc` machine added with `--via` covers the case.                                                                       | DEV-78              |

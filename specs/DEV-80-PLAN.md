@@ -35,11 +35,11 @@ The approved [Bash specification](BASH-SPEC.md) and [MarkSharc specification](MA
 Five warm non-login starts per interpreter in an installed temporary HOME with
 sync disabled. Time runs from process start to the first visible prompt.
 
-| Bash | Cold | Warm median | Warm max |
-| --- | ---: | ---: | ---: |
-| 4.4.0(1) | 1,072 ms | 230 ms | 248 ms |
-| 5.2.37(1) | 1,042 ms | 208 ms | 219 ms |
-| 5.3.0(1) | 1,086 ms | 218 ms | 229 ms |
+| Bash      |     Cold | Warm median | Warm max |
+| --------- | -------: | ----------: | -------: |
+| 4.4.0(1)  | 1,072 ms |      230 ms |   248 ms |
+| 5.2.37(1) | 1,042 ms |      208 ms |   219 ms |
+| 5.3.0(1)  | 1,086 ms |      218 ms |   229 ms |
 
 Bash 3.2.57(2) exercised the environment-only contract on Linux. macOS verification
 runs through the existing hosted checks and installer jobs.

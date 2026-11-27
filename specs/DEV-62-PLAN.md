@@ -18,16 +18,16 @@ at scratch, so the real cache was not touched.
 
 ## Cost of nvm and gvm today
 
-| Case | Time |
-|---|---|
-| `zsh -f -c exit` | 3 ms |
-| Batch or agent shell (`zsh -c exit`) | 64–69 ms |
-| Interactive shell (`zsh -i -c exit`) | 263 ms |
-| node-nvm, go-gvm and python env + init, from the verbose trace | about 3.5 ms in total |
-| First `nvm` call (sources `nvm.sh`) | +118 ms |
-| First `gvm` call (sources gvm) | +730 ms |
+| Case                                                                     | Time                       |
+| ------------------------------------------------------------------------ | -------------------------- |
+| `zsh -f -c exit`                                                         | 3 ms                       |
+| Batch or agent shell (`zsh -c exit`)                                     | 64–69 ms                   |
+| Interactive shell (`zsh -i -c exit`)                                     | 263 ms                     |
+| node-nvm, go-gvm and python env + init, from the verbose trace           | about 3.5 ms in total      |
+| First `nvm` call (sources `nvm.sh`)                                      | +118 ms                    |
+| First `gvm` call (sources gvm)                                           | +730 ms                    |
 | `cd` into a directory with `.nvmrc` (nvm load, `nvm version`, `nvm use`) | +1.9 s, in every new shell |
-| `cd` into a directory with `go.mod` (gvm load, `gvm use`) | +720 ms |
+| `cd` into a directory with `go.mod` (gvm load, `gvm use`)                | +720 ms                    |
 
 DEV-38 made both managers nearly free at startup. The cost is in use: the `.nvmrc` hook costs
 about two seconds in each new pane or worktree, and the first `gvm` costs most of a second.
@@ -65,29 +65,29 @@ From the documentation (2026-11) and the trial:
 
 ## Trial results
 
-| Measurement | Time |
-|---|---|
-| `mise --version` (process floor) | 22 ms |
-| `mise activate zsh` (generating the init text; cacheable) | 23 ms |
-| `mise hook-env` in a plain, `.nvmrc` or `go.mod` directory | 29–30 ms |
-| `precmd` hook with nothing changed | 18–23 ms per prompt |
-| `precmd` hook with `MISE_HOOK_ENV_CHPWD_ONLY=1` | about 27 ms per prompt: the hook still runs `mise` |
-| `chpwd` hook, interactive, legacy modules off | about 30 ms per `cd` (61 ms for a pair) |
-| `node --version`: direct / through the shim | 5 ms / 33 ms |
-| `go version`: direct / through the shim | 8 ms / 32 ms |
-| `npx --version`: direct / through the shim | 97 ms / 126 ms |
+| Measurement                                                | Time                                               |
+| ---------------------------------------------------------- | -------------------------------------------------- |
+| `mise --version` (process floor)                           | 22 ms                                              |
+| `mise activate zsh` (generating the init text; cacheable)  | 23 ms                                              |
+| `mise hook-env` in a plain, `.nvmrc` or `go.mod` directory | 29–30 ms                                           |
+| `precmd` hook with nothing changed                         | 18–23 ms per prompt                                |
+| `precmd` hook with `MISE_HOOK_ENV_CHPWD_ONLY=1`            | about 27 ms per prompt: the hook still runs `mise` |
+| `chpwd` hook, interactive, legacy modules off              | about 30 ms per `cd` (61 ms for a pair)            |
+| `node --version`: direct / through the shim                | 5 ms / 33 ms                                       |
+| `go version`: direct / through the shim                    | 8 ms / 32 ms                                       |
+| `npx --version`: direct / through the shim                 | 97 ms / 126 ms                                     |
 
 A shim adds about 27 ms to each call. A `cd` into a `.nvmrc` directory drops from about 1.9 s
 to about 30 ms.
 
 Correctness through shims (no activation, as an agent shell would run):
 
-| Directory | node | go |
-|---|---|---|
-| plain | v24.19.0 (global `node = "24"`) | go1.27.2 |
-| `.nvmrc` = `22` | v22.22.3 | go1.27.2 |
-| `go.mod` with `go 1.25` | v24.19.0 | go1.27.2 (a floor, as documented) |
-| `go.mod` with `toolchain go1.25.5` | v24.19.0 | go1.25.5, `GOROOT` to match |
+| Directory                          | node                            | go                                |
+| ---------------------------------- | ------------------------------- | --------------------------------- |
+| plain                              | v24.19.0 (global `node = "24"`) | go1.27.2                          |
+| `.nvmrc` = `22`                    | v22.22.3                        | go1.27.2                          |
+| `go.mod` with `go 1.25`            | v24.19.0                        | go1.27.2 (a floor, as documented) |
+| `go.mod` with `toolchain go1.25.5` | v24.19.0                        | go1.25.5, `GOROOT` to match       |
 
 Interplay with the framework:
 

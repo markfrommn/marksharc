@@ -38,15 +38,18 @@
 ## Tasks
 
 ### Task 1: Core mutual-exclusion predicates and completion-carapace module
+
 - [x] Add `_ms_completion_carapace_wanted`, `_ms_completion_carapace_active`, and `_ms_completion_fzf_tab_active` in `core/zsh/lib/modules.zsh`.
 - [x] Add `modules/completion-carapace/{module.conf,init.zsh}`, update `modules/completion-fzf-tab/init.zsh` and `modules/completion/init.zsh`, and add `modules/completion/functions/zsh/completion-ui`.
 - [x] Update `core/cli/doctor` and `templates/overlay/config.conf`.
 
 ### Task 2: Specs for mutual exclusion, missing binary, options, switching, doctor, and Day 2
+
 - [x] Add `modules/completion-carapace/tests/carapace_spec.sh` and link it from `tests/spec/zsh/modules/completion-carapace`.
 - [x] Update `tests/spec/zsh/modules_spec.sh` (band 70–79), `tests/spec/zsh/doctor_spec.sh`, and `tests/spec/zsh/day2_spec.sh`.
 
 ### Task 3: Documentation, tracker handoff, and verification
+
 - [x] Update `README.md`, `CHANGELOG.md`, `tests/README.md`, `specs/MARKSHARC-SPEC.md`, `specs/MARKSHARC-PLAN.md`, and Linear `DEV-73` with Carapace focus areas and user choices.
 - [x] Run repository checks (`tests/lint`, zsh, contract, install, and repo suites).
 - [x] Run local CodeRabbit review (`local-review-coderabbit`) and self-review.
@@ -70,4 +73,3 @@ Implemented as planned:
 - `tests/run-tests --shell sh spec/repo`: 35 examples, 0 failures
 - `tests/run-fish-units`: skipped locally (`fishtape 3.0.1` not installed on this host; no fish files modified; runs in CI)
 - Local CodeRabbit review: `provider_result: skipped:wrong-organization` (`coderabbit auth status` reported `Organization: convoyai`, expected `markfrommn`; remediation: `coderabbit auth org` and select `markfrommn`)
-

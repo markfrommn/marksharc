@@ -52,21 +52,25 @@
 ## Tasks
 
 ### Task 1: `marksharc update` (`-y`, `--system`) and `marksharc sync` (`--auto`, `--update`, `timer`)
+
 - [x] Update `core/cli/day2-lib.zsh` to preserve a pre-set `MARKSHARC_OS` seam for cross-platform tests.
 - [x] Update `core/cli/update` with `-y`/`--yes` and `--system` (macOS no-op, Linux `apt`/`dnf`/`yum` via `sudo`, `--list`/`--dry-run`/`--only system`).
 - [x] Update `core/cli/sync` with `--auto`, `--update [--system] [-y]`, and `timer on|off|status` (launchd plist and systemd user service/timer).
 
 ### Task 2: `hosts.conf`, `marksharc hosts`, and `marksharc push`
+
 - [x] Add `templates/overlay/hosts.conf` and document it in `templates/overlay/README.md`.
 - [x] Add `core/cli/hosts-lib.zsh`, `core/cli/hosts`, and `core/cli/push`.
 - [x] Update `bin/marksharc` usage and `core/fish/completions/marksharc.fish`.
 
 ### Task 3: Specs, golden fixtures, and documentation
+
 - [x] Add golden fixtures under `tests/fixtures/sync/` for launchd plist and systemd service/timer units.
 - [x] Add ShellSpec suites for `update` (`-y`, `--system`), `sync` (`--auto` lock/log/dirty-skip, `--update`, `timer` golden tests), `hosts` (`.ssh/config`, `hc machine ls --json`, `gum`/`fzf`/`--all`), and `push` (stub `ssh`, parallel fan-out, timeout, regex matching, `--update`/`--system`/`-y`, result table).
 - [x] Update `tests/fish/completions_test.fish`, `tests/spec/zsh/template_overlay_spec.sh`, `tests/README.md`, `README.md`, `CHANGELOG.md`, and `specs/MARKSHARC-PLAN.md` outcome.
 
 ### Task 4: Verification and review
+
 - [x] Run `tests/check` and `tests/e2e/install-e2e.sh`.
 - [x] Run local CodeRabbit review (`local-review-coderabbit`) and self-review.
 - [x] Commit and open PR.
@@ -74,6 +78,7 @@
 ## Outcome
 
 Implemented all DEV-56 scope items with full local verification:
+
 - `tests/lint`: ok (207 files).
 - `spec/zsh`: 515 examples, 0 failures, 1 platform skip (Apple Terminal).
 - `spec/contract`: 68 examples, 0 failures.
