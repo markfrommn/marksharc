@@ -1,12 +1,13 @@
 #!/bin/sh
 # End-to-end install check (spec 6.15, plans P2.4 and DEV-71): install MarkSharc,
 # start shells through their normal startup files, then uninstall.
-# Three passes, each in its own temporary HOME:
+# Four passes, each in its own temporary HOME:
 #   1. "checkout": sh <checkout>/install.sh                    (the clone-first README path)
 #   2. "clone":    sh < <checkout>/install.sh with MARKSHARC_REPO=<checkout>, run from a directory
 #                  that is not a checkout (the curl | sh README path: the installer clones),
 #                  ending in uninstall --purge --yes, which must delete that clone.
 #   3. "legacy":   install --clobber over existing zsh, Bash and Fish files, then restore them.
+#   4. "coexist":  install --coexist over existing ~/.zshenv and ~/.zshrc without redirecting ZDOTDIR.
 # Needs sh, zsh, bash and git; runs Fish and terminal checks when fish and python3 are available.
 #
 # Usage: tests/e2e/install-e2e.sh <checkout>
@@ -215,8 +216,52 @@ EOF
   [ "$(cat "$out")" = 0 ] || fail "marksharc is still active after uninstall"
 }
 
+exercise_coexist() {
+  pass=coexist
+  home=$work/$pass/home
+  mkdir -p "$home"
+  fw=$checkout
+  printf 'export USER_COEXIST_ENV=kept\n' > "$home/.zshenv"
+  printf 'USER_COEXIST_RC=kept\nuser_coexist_fn() { print -r -- "still-working"; }\n' > "$home/.zshrc"
+  printf 'user bash\n' > "$home/.bashrc"
+
+  step "install into an existing HOME with --coexist"
+  clean_env sh "$checkout/install.sh" --home "$checkout" --coexist --no-plugins > "$work/install.log" 2>&1 || { cat "$work/install.log" >&2; fail "install.sh --coexist failed"; }
+  grep -Fq '# marksharc: coexist' "$home/.zshenv" || fail "coexist line missing from .zshenv"
+  grep -Fq '# marksharc: coexist' "$home/.zshrc" || fail "coexist line missing from .zshrc"
+  [ "$(cat "$home/.bashrc")" = 'user bash' ] || fail "--coexist modified .bashrc"
+  [ ! -e "$home/.local/state/marksharc/backup" ] || fail "--coexist created a backup directory"
+
+  step "coexist batch shell keeps user .zshenv and skips ZDOTDIR"
+  # shellcheck disable=SC2016
+  silent "coexist batch shell" zsh -c 'print -r -- "$USER_COEXIST_ENV|$MARKSHARC_SESSION|${ZDOTDIR:-unset}"; command -v marksharc'
+  [ "$(sed -n 1p "$out")" = 'kept|batch|unset' ] || fail "coexist batch shell got '$(sed -n 1p "$out")'"
+  [ "$(sed -n 2p "$out")" = "$fw/bin/marksharc" ] || fail "coexist batch shell: marksharc not on PATH"
+  [ ! -e "$home/.local/state/marksharc/zdot" ] || fail "coexist shell generated ZDOTDIR"
+
+  if command -v python3 > /dev/null 2>&1; then
+    step "coexist interactive shell keeps user .zshrc working"
+    # shellcheck disable=SC2016
+    clean_env TERM=xterm-256color python3 "$checkout/tests/support/pty_socket.py" pty zsh -i -c 'print -r -- "C=$USER_COEXIST_RC|$(user_coexist_fn)|$MARKSHARC_SESSION|${ZDOTDIR:-unset}|$+functions[marksharc]"; exit' > "$out" 2>&1 < /dev/null || { cat "$out" >&2; fail "coexist terminal shell failed"; }
+    grep -Fq 'C=kept|still-working|interactive|unset|1' "$out" || { cat "$out" >&2; fail "coexist terminal shell missing expected markers"; }
+    ! grep -Ei 'marksharc:|command not found|no such file|error' "$out" > /dev/null || { cat "$out" >&2; fail "coexist terminal shell reported a problem"; }
+  fi
+
+  step "uninstall"
+  silent "coexist uninstall" zsh -c 'marksharc uninstall'
+  [ ! -e "$home/.local/state/marksharc/coexist" ] || fail "coexist stubs remain after uninstall"
+  ! grep -Fq '# marksharc: coexist' "$home/.zshenv" || fail "coexist line remains in .zshenv"
+  ! grep -Fq '# marksharc: coexist' "$home/.zshrc" || fail "coexist line remains in .zshrc"
+  [ "$(cat "$home/.zshenv")" = 'export USER_COEXIST_ENV=kept' ] || fail ".zshenv content not preserved"
+  grep -Fq 'user_coexist_fn' "$home/.zshrc" || fail ".zshrc content not preserved"
+  # shellcheck disable=SC2016
+  silent "plain shell after coexist uninstall" zsh -c 'print -r -- "$USER_COEXIST_ENV|$+MARKSHARC_HOME"'
+  [ "$(cat "$out")" = 'kept|0' ] || fail "marksharc still active after coexist uninstall"
+}
+
 pass=start
 exercise checkout
 exercise clone
 exercise legacy
+exercise_coexist
 echo "e2e: ok"

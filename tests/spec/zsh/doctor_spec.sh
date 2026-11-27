@@ -491,4 +491,32 @@ Describe 'marksharc doctor'
     When run host_override_case
     The status should be success
   End
+
+  coexist_doctor_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    cp -R "$MARKSHARC_ROOT/templates" "$MS_HOME/templates"
+    rm -f "$HOME/.zshenv"
+    print -r -- 'export USER_ENV=1' > "$HOME/.zshenv"
+    print -r -- 'alias user_alias="echo ok"' > "$HOME/.zshrc"
+    print -r -- 'user bash' > "$HOME/.bashrc"
+    ms_env
+    env -i "${MS_ENV[@]}" PATH="$PATH:${REAL_GIT:h}" sh "$MARKSHARC_ROOT/install.sh" --home "$MS_HOME" --coexist --no-plugins > "$TEST_ROOT/install-out" 2> "$TEST_ROOT/install-err" || { cat "$TEST_ROOT/install-err"; return 1; }
+    # Healthy coexist install: no stub/zdot/foreign-dotfile complaints, 0 issues.
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 2
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *'doctor: 0 issue(s)'* && $out != *'stale generated stub'* && $out != *'foreign dotfile'* && $out != *'missing coexist'* && $out != *'modified coexist'* ]] || { print -r -- "$out"; return 3; }
+    # Modifying a coexist stub is detected.
+    print -r -- '# edited' >> "$XDG_STATE_HOME/marksharc/coexist/zshrc.zsh"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 4
+    [[ $(<"$TEST_ROOT/out") == *'modified coexist stub'* ]] || { cat "$TEST_ROOT/out"; return 5; }
+    # Removing the coexist source line from ~/.zshrc is detected.
+    print -r -- 'alias user_alias="echo ok"' > "$HOME/.zshrc"
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err" || return 6
+    [[ $(<"$TEST_ROOT/out") == *"missing coexist source line: $HOME/.zshrc"* ]] || { cat "$TEST_ROOT/out"; return 7; }
+  }
+  It 'accepts a healthy coexist install and diagnoses modified coexist stubs or missing source lines'
+    When run coexist_doctor_case
+    The status should be success
+  End
 End

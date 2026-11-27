@@ -461,7 +461,7 @@ A host has two checkouts: the framework and the overlay (plus any private module
 
 | Command | Purpose |
 |---|---|
-| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up startup files and write the stubs, fetch the plugin pins (`--no-plugins` skips and a failed fetch warns), then render. `--clobber` answers yes to optional cleanup and `--dry-run` previews changes without prompting. |
+| `install.sh` | Check for zsh and git, clone the framework (or accept `--home <checkout>`), create or link the overlay (`--overlay <path\|url>`), back up startup files and write the stubs, fetch the plugin pins (`--no-plugins` skips and a failed fetch warns), then render. `--coexist` adds one marked source line to `~/.zshenv` and `~/.zshrc` instead of redirecting `ZDOTDIR` or replacing dotfiles. `--clobber` answers yes to optional cleanup and `--dry-run` previews changes without prompting. |
 | `marksharc bootstrap` | Install packages declared by enabled modules for the current OS and by overlay bundles. Generate a temporary Brewfile for Homebrew on macOS and Linux. Print apt or dnf commands and require confirmation before invoking sudo. |
 | `marksharc update` | Sync repositories, refresh plugin pins, run module and overlay steps, and render. Continue after individual failures and report each step's result. `--list` lists the steps, `--only <label>` selects one, and `--dry-run` prints commands without running them. Replaces `bin/do_updates.sh` and all startup-time pulls. |
 | `marksharc install <name>` | Run an explicit installer declared by a module (krew, gvm, WezTerm terminfo, pyenv, nvm). |

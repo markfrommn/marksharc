@@ -34,7 +34,7 @@ _ms_session_classify
 zdir=$MARKSHARC_HOME
 _ms_trace "session=$MARKSHARC_SESSION os=$MARKSHARC_OS arch=$MARKSHARC_ARCH host=$MARKSHARC_HOST distro=$MARKSHARC_DISTRO"
 _ms_umask
-if [[ -o login || -o interactive ]]; then _ms_zdot_ensure; fi
+if [[ ${MARKSHARC_COEXIST:-0} != 1 ]] && [[ -o login || -o interactive ]]; then _ms_zdot_ensure; fi
 
 # Inherit-skip: a child shell whose MARKSHARC_ENV matches the current inputs only
 # recomputes shell-local facts. Login shells and reloads always rebuild.
