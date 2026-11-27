@@ -1,0 +1,313 @@
+#!/bin/zsh -f
+# -*- mode: shell-script; indent-tabs-mode: nil; sh-basic-offset: 4; sh-indentation: 4; sh-shell: zsh -*-
+
+#
+# import-legacy-history - one-shot import of legacy zsh history into atuin.
+#
+# Reads zsh extended-history files and per-directory history trees, merges and
+# de-duplicates them on (timestamp, command), and loads the result into atuin.
+# Route "histdb" builds a throw-away zsh-histdb database so each entry keeps its
+# directory and host label (needs sqlite3); route "plain" writes one extended
+# history file and loses directories. Re-running on the same route adds no rows
+# (atuin skips entries it already holds from that import). Switching routes
+# (histdb vs plain) after an import can add duplicate rows, so pick one route
+# and stay on it. Imported rows are separate rows from atuin's own live
+# recording: nothing is de-duplicated against the rows atuin already holds.
+# Real history is only read, never modified.
+#
+# Exit status: 0 ok, 1 import failed, 2 usage error, 3 atuin (or sqlite3 for an
+# explicit --route histdb) is not on PATH.
+#
+
+emulate -R zsh
+setopt extendedglob
+zmodload zsh/parameter || exit 1
+
+typeset -g PROG=${0:t}
+
+usage() {
+    print -u2 -r -- "usage: $PROG [--dry-run] [--route auto|histdb|plain] [--no-dirs]
+                          [--source FILE[=LABEL]]... [--tree DIR[=LABEL]]...
+
+Imports legacy zsh history into atuin. Defaults: sources ~/.zsh_history,
+~/.zhistory, \$ZDOTDIR/.zsh_history and tree ~/.cache/zsh-directory-history
+(missing ones are skipped). Giving any --source or --tree replaces the defaults;
+pass additional files or copied host histories (such as ~/.zsh_history-<host>)
+explicitly with --source or --tree. The label is the host recorded with each
+entry: the host name, the suffix of a -NAME copy, or an explicit =LABEL.
+--dry-run prints what would be imported and writes nothing."
+}
+
+die_usage() { print -u2 -r -- "$PROG: $*"; usage; exit 2; }
+
+# ---- arguments ---------------------------------------------------------------
+
+typeset -i dry_run=0 no_dirs=0
+typeset route=auto
+typeset -a source_specs tree_specs
+
+parse_args() {
+    while (( $# )); do
+        case $1 in
+            --dry-run) dry_run=1;;
+            --no-dirs) no_dirs=1;;
+            --route) (( $# > 1 )) || die_usage "--route needs a value"; shift; route=$1;;
+            --route=*) route=${1#--route=};;
+            --source) (( $# > 1 )) || die_usage "--source needs a value"; shift; source_specs+=("$1");;
+            --source=*) source_specs+=("${1#--source=}");;
+            --tree) (( $# > 1 )) || die_usage "--tree needs a value"; shift; tree_specs+=("$1");;
+            --tree=*) tree_specs+=("${1#--tree=}");;
+            -h|--help) usage; exit 0;;
+            *) die_usage "unknown argument: $1";;
+        esac
+        shift
+    done
+    case $route in
+        auto|histdb|plain) ;;
+        *) die_usage "bad --route value: $route";;
+    esac
+}
+
+# Splits PATH[=LABEL] on the last "=" into REPLY_PATH and REPLY_LABEL; text after
+# the last "=" is a label only when it holds no "/" (so /a=b/history is a path).
+# The label defaults to the host name, or to NAME for a conventional <base>-NAME copy.
+split_spec() {
+    local spec=$1
+    if [[ $spec == *=?* && ${spec##*=} != */* ]]; then
+        REPLY_PATH=${spec%=*}
+        REPLY_LABEL=${spec##*=}
+    else
+        REPLY_PATH=${spec%=}
+        local base=${REPLY_PATH%/}
+        base=${base:t}
+        if [[ $base == (#b)(.zsh_history|.zhistory|zsh-directory-history)-(?*) ]]; then
+            REPLY_LABEL=$match[2]
+        else
+            REPLY_LABEL=$HOST
+        fi
+    fi
+}
+
+# ---- reading -----------------------------------------------------------------
+
+typeset -a e_ts e_dur e_cmd e_dir e_lab
+typeset -i read_count=0
+
+# Appends every event of one history file to the e_* arrays; zsh itself decodes
+# multi-line and metafied entries. fc -l prints one line per event, so only its
+# timestamp and duration columns are parsed; the text comes from $history.
+read_history_file() {
+    local file=$1 label=$2 dir=$3 listing line
+    local -i k dur
+    local ts
+    local -i now skipped=0
+    read_count=0
+    [[ -f $file ]] || return 1
+    if [[ ! -r $file ]]; then print -u2 -r -- "$PROG: cannot read $file; skipped"; return 1; fi
+    # An event without a timestamp is stamped with the time it was read; those
+    # would re-import as new rows on every run, so they are skipped.
+    print -Pv now '%D{%s}'
+    fc -p /dev/null 2000000 0 2>/dev/null || return 1
+    fc -R -- "$file" 2>/dev/null
+    listing=$(fc -l -t %s -D 1 999999999 2>/dev/null)
+    while IFS= read -r line; do
+        [[ $line =~ '^ *([0-9]+)\*? +([0-9]+) +([0-9]+):([0-9]+) ' ]] || continue
+        k=$match[1]; ts=$match[2]; dur=$(( match[3] * 60 + match[4] ))
+        if (( ts >= now )); then skipped+=1; continue; fi
+        e_ts+=("$ts"); e_dur+=("$dur"); e_cmd+=("${history[$k]}")
+        e_dir+=("$dir"); e_lab+=("$label")
+        read_count+=1
+    done <<< "$listing"
+    fc -P
+    (( skipped == 0 )) || print -u2 -r -- "note: $file: skipped $skipped entries without a timestamp"
+    return 0
+}
+
+read_sources() {
+    local spec f
+    for spec in "$@"; do
+        split_spec "$spec"; f=$REPLY_PATH
+        read_history_file "$f" "$REPLY_LABEL" "" || continue
+        print -r -- "source $f label=$REPLY_LABEL entries=$read_count"
+    done
+}
+
+read_trees() {
+    local spec tree rel dir label f
+    local -a files
+    local -i entries nfiles
+    for spec in "$@"; do
+        split_spec "$spec"; tree=${REPLY_PATH%/}; label=$REPLY_LABEL
+        [[ -d $tree ]] || continue
+        files=( "$tree"/**/history(.NDon) )
+        entries=0 nfiles=0
+        for f in "${files[@]}"; do
+            rel=${f#"$tree"/}
+            if [[ $rel == history || $rel == no_active_project/history ]]; then dir=''; else dir=/${rel%/history}; fi
+            read_history_file "$f" "$label" "$dir" || continue
+            nfiles+=1; entries+=read_count
+        done
+        print -r -- "tree $tree label=$label files=$nfiles entries=$entries"
+    done
+}
+
+# ---- merging -----------------------------------------------------------------
+
+typeset -a u_ts u_dur u_cmd u_dir u_lab order
+
+# De-duplicates on (timestamp, command), preferring the copy that has a
+# directory, then orders by timestamp (ties by first appearance).
+merge() {
+    typeset -A seen
+    local key
+    local -i i j n=$#e_ts
+    for (( i = 1; i <= n; i++ )); do
+        key="${e_ts[i]} ${e_cmd[i]}"
+        j=${seen[$key]:-0}
+        if (( j == 0 )); then
+            u_ts+=("${e_ts[i]}"); u_dur+=("${e_dur[i]}"); u_cmd+=("${e_cmd[i]}")
+            u_dir+=("${e_dir[i]}"); u_lab+=("${e_lab[i]}")
+            seen[$key]=$#u_ts
+        elif [[ -z ${u_dir[j]} && -n ${e_dir[i]} ]]; then
+            u_dur[j]=${e_dur[i]}; u_dir[j]=${e_dir[i]}; u_lab[j]=${e_lab[i]}
+        fi
+    done
+    n=$#u_ts
+    for (( i = 1; i <= n; i++ )); do
+        order+=("${(l:12::0:)u_ts[i]}${(l:9::0:)i}")
+    done
+    order=( ${(o)order} )
+}
+
+# ---- loading -----------------------------------------------------------------
+
+typeset tmp=''
+cleanup() { [[ -z $tmp ]] || command rm -rf -- "$tmp"; }
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
+
+# Sets REPLY to the history-file form of $1: zsh stores bytes 0x83-0xa2 and NUL
+# as 0x83 followed by the byte xor 32.
+metafy() {
+    setopt localoptions nomultibyte
+    local LC_ALL=C s=$1 c o=''
+    local -i n
+    if [[ $s != *[^[:ascii:]]* ]]; then REPLY=$s; return; fi
+    for c in "${(@s::)s}"; do
+        n=$(( #c ))
+        if (( n == 0 || (n >= 131 && n <= 162) )); then
+            o+=$'\x83'${(#)$(( n ^ 32 ))}
+        else
+            o+=$c
+        fi
+    done
+    REPLY=$o
+}
+
+run_atuin() {  # run_atuin ENVVAR VALUE subcommand
+    local out
+    out=$( export "$1=$2"; command atuin import "$3" 2>&1 )
+    local -i rc=$?
+    if (( rc != 0 )); then
+        print -u2 -r -- "$PROG: atuin import $3 failed (exit $rc)"
+        print -u2 -r -- "$out"
+        exit 1
+    fi
+}
+
+emit_plain() {
+    local file=$tmp/history key text
+    local -i i
+    {
+        for key in "${order[@]}"; do
+            i=$(( 10#${key[13,-1]} ))
+            metafy "${u_cmd[i]}"; text=${REPLY//$'\n'/\\$'\n'}
+            print -r -- ": ${u_ts[i]}:${u_dur[i]};$text"
+        done
+    } > "$file" || { print -u2 -r -- "$PROG: cannot write $file"; exit 1; }
+    run_atuin HISTFILE "$file" zsh
+}
+
+emit_histdb() {
+    local db=$tmp/zsh-history.db sql=$tmp/load.sql key cmd host dir pkey
+    local -i i nc=0 np=0
+    typeset -A cid pid
+    local sq="'"
+    sqlquote() { REPLY="'${1//$sq/$sq$sq}'"; }
+    {
+        print -r -- 'CREATE TABLE commands (id integer primary key autoincrement, argv text, unique(argv) on conflict ignore);'
+        print -r -- 'CREATE TABLE places (id integer primary key autoincrement, host text, dir text, unique(host, dir) on conflict ignore);'
+        print -r -- 'CREATE TABLE history (id integer primary key autoincrement, session int, command_id int references commands (id), place_id int references places (id), exit_status int, start_time int, duration int);'
+        print -r -- 'BEGIN;'
+        for key in "${order[@]}"; do
+            i=$(( 10#${key[13,-1]} ))
+            cmd=${u_cmd[i]}; host=${u_lab[i]}; dir=${u_dir[i]}
+            (( no_dirs )) && dir=''
+            [[ -n $dir ]] || dir=unknown
+            if (( ! ${+cid[$cmd]} )); then
+                cid[$cmd]=$(( ++nc )); sqlquote "$cmd"
+                print -r -- "INSERT INTO commands(id, argv) VALUES ($nc, $REPLY);"
+            fi
+            pkey="$host"$'\x01'"$dir"
+            if (( ! ${+pid[$pkey]} )); then
+                pid[$pkey]=$(( ++np )); sqlquote "$host"; local qh=$REPLY; sqlquote "$dir"
+                print -r -- "INSERT INTO places(id, host, dir) VALUES ($np, $qh, $REPLY);"
+            fi
+            print -r -- "INSERT INTO history(session, command_id, place_id, exit_status, start_time, duration) VALUES (1, ${cid[$cmd]}, ${pid[$pkey]}, -1, ${u_ts[i]}, ${u_dur[i]});"
+        done
+        print -r -- 'COMMIT;'
+    } > "$sql" || { print -u2 -r -- "$PROG: cannot write $sql"; exit 1; }
+    command sqlite3 -bail "$db" < "$sql" || { print -u2 -r -- "$PROG: sqlite3 failed building the import database"; exit 1; }
+    run_atuin HISTDB_FILE "$db" zsh-hist-db
+}
+
+# ---- main --------------------------------------------------------------------
+
+main() {
+    parse_args "$@"
+
+    if (( ! dry_run && ! ${+commands[atuin]} )); then
+        print -u2 -r -- "$PROG: atuin not found on PATH; install it first (--dry-run needs no atuin)"
+        exit 3
+    fi
+
+    local eff=$route
+    if [[ $route != plain ]] && (( ! ${+commands[sqlite3]} )); then
+        if [[ $route == histdb ]]; then
+            print -u2 -r -- "$PROG: sqlite3 not found on PATH (needed for --route histdb)"
+            exit 3
+        fi
+        print -u2 -r -- 'note: sqlite3 not found; importing without directories'
+        eff=plain
+    elif [[ $route == auto ]]; then
+        eff=histdb
+    fi
+
+    if (( ${#source_specs} == 0 && ${#tree_specs} == 0 )); then
+        typeset -aU defaults
+        defaults=( "$HOME/.zsh_history" "$HOME/.zhistory" "${ZDOTDIR:-$HOME}/.zsh_history" )
+        source_specs=( "${defaults[@]}" )
+        tree_specs=( "$HOME/.cache/zsh-directory-history" )
+    fi
+
+    read_sources "${source_specs[@]}"
+    read_trees "${tree_specs[@]}"
+    merge
+
+    local -i with_dir=0 i
+    if [[ $eff == histdb ]] && (( ! no_dirs )); then
+        for (( i = 1; i <= ${#u_dir}; i++ )); do [[ -z ${u_dir[i]} ]] || with_dir+=1; done
+    fi
+    print -r -- "total=${#e_ts} unique=${#u_ts} with_dir=$with_dir route=$eff"
+
+    if (( dry_run )); then
+        print -r -- 'dry-run: nothing written'
+        return 0
+    fi
+
+    tmp=$(command mktemp -d "${TMPDIR:-/tmp}/legacy-history.XXXXXX") || { print -u2 -r -- "$PROG: cannot create a temporary directory"; exit 1; }
+    if [[ $eff == histdb ]]; then emit_histdb; else emit_plain; fi
+    print -r -- "imported ${#u_ts} entries via $eff"
+}
+
+main "$@"
