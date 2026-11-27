@@ -357,8 +357,8 @@ Describe 'marksharc doctor'
     # The child starts without marksharc, so this .zshenv does marksharc's two startup
     # guards itself. Its presence stops Debian's blocking zsh-newuser-install menu (shown
     # when no startup files exist); skip_global_compinit stops Ubuntu's /etc/zsh/zshrc
-    # compinit, which prompts on the CI image's insecure directory. Either blocks the
-    # child until doctor reports a timeout.
+    # compinit. Keep these guards: this case tests a plain failed startup, while
+    # timing_compinit_case below deliberately exercises the real blocked prompt.
     mkdir -p "$TEST_ROOT/empty-zdot"
     print -r -- 'skip_global_compinit=1' > "$TEST_ROOT/empty-zdot/.zshenv"
     ms_env
@@ -367,6 +367,98 @@ Describe 'marksharc doctor'
   }
   It 'reports a failed eligible interactive startup instead of a healthy time'
     When run timing_failure_case
+    The status should be success
+  End
+  timing_prompt_fixture() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    mkdir -p "$TEST_ROOT/prompt-zdot" "$XDG_CONFIG_HOME/marksharc"
+    print -r -- 'skip_global_compinit=1' > "$TEST_ROOT/prompt-zdot/.zshenv"
+    ms_env
+  }
+  timing_prompt_report() {
+    zmodload zsh/datetime
+    local started=$EPOCHREALTIME
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/prompt-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *"doctor: interactive startup blocked waiting for input: $1"* &&
+       $out != *'startup timed out'* && $out != *'startup failed'* ]] || { cat "$TEST_ROOT/out"; return 1; }
+    # Generous allowance for a busy CI host; still below the default 5 s timeout.
+    (( EPOCHREALTIME - started < 3 ))
+  }
+  timing_compinit_case() {
+    timing_prompt_fixture
+    mkdir -p "$TEST_ROOT/insecure" "$TEST_ROOT/trusted"
+    chmod 777 "$TEST_ROOT/insecure"
+    # Restrict FPATH to known fixture permissions, regardless of the CI image.
+    local fn
+    for fn in compinit compaudit; do
+      local -a sources=( ${^fpath}/$fn(N-.) )
+      cp "$sources[1]" "$TEST_ROOT/trusted/$fn"
+    done
+    print -r -- 'fpath=( "$TEST_ROOT/insecure" "$TEST_ROOT/trusted" )
+autoload -Uz compinit
+compinit' > "$TEST_ROOT/prompt-zdot/.zshrc"
+    timing_prompt_report 'Ignore insecure directories and continue [y] or abort compinit [n]?'
+  }
+  It 'quickly names a real compinit prompt from an insecure fixture directory'
+    When run timing_compinit_case
+    The status should be success
+  End
+  timing_newuser_case() {
+    timing_prompt_fixture
+    print -r -- 'print -r -- $$ > "$TEST_ROOT/menu.pid"
+LINES=24 COLUMNS=80
+autoload -Uz zsh-newuser-install
+zsh-newuser-install -f' > "$TEST_ROOT/prompt-zdot/.zshrc"
+    timing_prompt_report '--- Type one of the keys in parentheses ---' || return 1
+    # The menu traps HUP: deleting the zpty alone can leave it alive forever.
+    ! kill -0 "$(<"$TEST_ROOT/menu.pid")" 2>/dev/null
+  }
+  It 'quickly names the real zsh-newuser-install menu prompt'
+    When run timing_newuser_case
+    The status should be success
+  End
+  timing_finished_prompt_case() {
+    timing_prompt_fixture
+    print -r -- 'set doctor.startup_ms 2000' > "$XDG_CONFIG_HOME/marksharc/config.conf"
+    print -r -- 'print -n -- "Ignore insecure directories and continue [y] or abort compinit [n]? "
+sleep 0.1
+print
+sleep 0.35
+MARKSHARC_SESSION=interactive' > "$TEST_ROOT/prompt-zdot/.zshrc"
+    env -i "${MS_ENV[@]}" ZDOTDIR="$TEST_ROOT/prompt-zdot" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *'doctor: interactive startup '* && $out != *'startup blocked'* &&
+       $out != *'startup failed'* && $out != *'startup timed out'* ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'allows startup to continue when prompt-like output is followed by completion'
+    When run timing_finished_prompt_case
+    The status should be success
+  End
+  managed_global_compinit_case() {
+    ms_fixture
+    cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
+    ms_copy_module completion
+    mkdir -p "$TEST_ROOT/insecure"
+    chmod 777 "$TEST_ROOT/insecure"
+    # Coexist mode lets the fixture emulate Ubuntu's global zshrc before init.
+    print -r -- 'export MARKSHARC_COEXIST=1
+fpath=( "$TEST_ROOT/insecure" $fpath )' >> "$HOME/.zshenv"
+    print -r -- 'if [[ -z $skip_global_compinit ]]; then
+  print -r -- global-compinit-ran >> "$OPLOG"
+  autoload -Uz compinit
+  compinit
+fi
+source "$MARKSHARC_HOME/core/zsh/zshrc.zsh"' > "$HOME/.zshrc"
+    ms_env
+    env -i "${MS_ENV[@]}" "$MS_HOME/bin/marksharc" doctor > "$TEST_ROOT/out" 2> "$TEST_ROOT/err"
+    local out=$(<"$TEST_ROOT/out")
+    [[ $out == *'doctor: interactive startup '* && $out != *'startup blocked'* &&
+       $out != *'startup failed'* && $out != *'startup timed out'* && ! -s $OPLOG ]] || { cat "$TEST_ROOT/out"; return 1; }
+  }
+  It 'skips Ubuntu-style global compinit with an insecure FPATH in managed startup'
+    When run managed_global_compinit_case
     The status should be success
   End
   timing_timeout_case() {
