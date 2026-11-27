@@ -4,9 +4,17 @@ if have_command less; then
     export PAGER='less -R'
 fi
 export LESS=-FRX
-MANPATH=/usr/share/man
-if [[ -d /usr/local/man ]]; then MANPATH+=:/usr/local/man; fi
-export MANPATH
+# Extend MANPATH rather than replace it: what earlier modules set (brew's share/man) stays
+# first, the system directories follow when absent, each entry appears once, and one empty
+# entry goes last so man still searches its defaults and the share/man directory beside
+# each bin on PATH.
+() {
+    emulate -L zsh
+    local -aU dirs
+    dirs=( ${${(s/:/)MANPATH}:#} /usr/share/man )
+    [[ -d /usr/local/man ]] && dirs+=( /usr/local/man )
+    export MANPATH="${(j/:/)dirs}:"
+}
 
 autoload -Uz colors
 colors

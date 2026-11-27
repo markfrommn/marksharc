@@ -1,9 +1,19 @@
 if type -P less >/dev/null; then _ms_bash_set_env PAGER 'less -R'; fi
 _ms_bash_set_env LESS -FRX
-_ms_pager_manpath=/usr/share/man
-[[ ! -d /usr/local/man ]] || _ms_pager_manpath+=:/usr/local/man
-_ms_bash_set_env MANPATH "$_ms_pager_manpath"
-unset _ms_pager_manpath
+# Extend MANPATH rather than replace it: what earlier modules set (brew's share/man) stays
+# first, the system directories follow when absent, each entry appears once, and one empty
+# entry goes last so man still searches its defaults and the share/man directory beside
+# each bin on PATH.
+_ms_pager_manpath=${MANPATH:+$MANPATH:}/usr/share/man:
+[[ ! -d /usr/local/man ]] || _ms_pager_manpath+=/usr/local/man:
+_ms_pager_out='' _ms_pager_rest=$_ms_pager_manpath
+while [[ -n $_ms_pager_rest ]]; do
+    _ms_pager_dir=${_ms_pager_rest%%:*} _ms_pager_rest=${_ms_pager_rest#*:}
+    [[ -n $_ms_pager_dir && :$_ms_pager_out: != *:"$_ms_pager_dir":* ]] || continue
+    _ms_pager_out+=${_ms_pager_out:+:}$_ms_pager_dir
+done
+_ms_bash_set_env MANPATH "${_ms_pager_out}:"
+unset _ms_pager_manpath _ms_pager_out _ms_pager_rest _ms_pager_dir
 
 colored() {
     (( $# )) || return 2
