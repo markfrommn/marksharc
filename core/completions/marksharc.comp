@@ -1,0 +1,86 @@
+# Declarative completion spec for marksharc (COMPLETION-SPEC section 7.1)
+command marksharc "Manage MarkSharc shell configuration"
+
+flag _ -h,--help "Show this help"
+flag _ -V,--version "Print the version"
+
+subcommand reload "Reload the current shell"
+flag reload -v,--verbose "Print the module trace"
+
+subcommand render "Render env and completions to the cache"
+
+subcommand sync "Fast-forward checkouts and refresh pins"
+flag sync --auto "Quiet, locked background sync skipping dirty trees"
+flag sync --update "Run the full marksharc update"
+flag sync --system "With --update, include native OS package updates"
+flag sync -y,--yes "With --update, pass -y to supported commands"
+flag sync -h,--help "Show sync help"
+
+subcommand sync/timer "Manage the automatic sync timer"
+flag sync/timer -h,--help "Show sync timer help"
+arg sync/timer 1 choices:on,off,status "Timer action"
+
+subcommand push "Run sync over SSH across hosts in parallel"
+flag push --update "Run marksharc sync --update on remote hosts"
+flag push --system "Include native OS package updates on remote hosts"
+flag push -y,--yes "Pass -y to supported remote update commands"
+flag push --timeout value string "Per-host timeout in seconds"
+flag push --max-parallel value string "Maximum concurrent SSH jobs"
+flag push --dry-run "Show matched hosts and SSH commands"
+flag push -v,--verbose "Print full per-host output"
+flag push --populate "Populate hosts.conf interactively"
+flag push -h,--help "Show push help"
+arg push rest ms:hosts "Target hosts"
+
+subcommand hosts "Manage the hosts.conf push inventory"
+flag hosts -h,--help "Show hosts help"
+
+subcommand hosts/list "List configured hosts"
+
+subcommand hosts/populate "Discover hosts from ssh config and hc"
+flag hosts/populate --all "Add all discovered hosts without a picker"
+flag hosts/populate --source value choices:ssh,hc,all "Limit discovery to one source"
+flag hosts/populate -h,--help "Show hosts populate help"
+
+subcommand hosts/add "Add a host to hosts.conf"
+arg hosts/add 1 string "Host name"
+arg hosts/add 2 string "SSH target"
+
+subcommand hosts/remove "Remove a host from hosts.conf"
+arg hosts/remove 1 ms:hosts "Host name"
+
+subcommand hosts/help "Show hosts help"
+
+subcommand bootstrap "Install declared packages"
+
+subcommand update "Sync, refresh pins and run module updates"
+flag update --list "List the update steps"
+flag update --dry-run "Show what would run"
+flag update --only value ms:update-steps "Run one labelled step"
+flag update -y,--yes "Pass -y to supported update commands"
+flag update --system "Also run native OS package updates"
+flag update -h,--help "Show update help"
+
+subcommand install "Run a registered installer"
+arg install 1 ms:installers "Installer name"
+
+subcommand doctor "Report installation health"
+
+subcommand module "List, enable or disable modules"
+
+subcommand module/list "List modules with their status"
+
+subcommand module/enable "Enable a module"
+arg module/enable 1 ms:modules "Module name"
+
+subcommand module/disable "Disable a module"
+arg module/disable 1 ms:modules "Module name"
+
+subcommand uninstall "Restore dotfiles and remove the stubs"
+flag uninstall --purge "Also delete cache and state"
+flag uninstall -y,--yes "Answer yes to the purge prompt"
+flag uninstall -h,--help "Show uninstall help"
+
+subcommand version "Print the version"
+
+subcommand help "Print the help"

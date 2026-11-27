@@ -8,6 +8,8 @@ source "$MARKSHARC_HOME/core/bash/directives.bash"
 source "$MARKSHARC_HOME/core/bash/hooks.bash"
 # shellcheck source=core/bash/backends.bash
 source "$MARKSHARC_HOME/core/bash/backends.bash"
+# shellcheck source=core/bash/complete.bash
+source "$MARKSHARC_HOME/core/bash/complete.bash"
 
 declare -ga _ms_bash_cleanup_order=()
 declare -gA _ms_bash_cleanup_definitions=()
@@ -56,7 +58,11 @@ _ms_bash_load_module() {
 }
 
 _ms_bash_load_completions() {
-    local _ms_file _ms_name _ms_before
+    local _ms_file _ms_name _ms_before _ms_rendered_dir
+    _ms_rendered_dir=${_ms_bash_cache_dir:-$(_ms_bash_cache_path)}/completions/bash
+    for _ms_file in "$_ms_rendered_dir"/*.bash; do
+        [[ -f $_ms_file ]] && _ms_bash_completion_files+=("$_ms_file")
+    done
     for _ms_file in "${_ms_bash_completion_files[@]}"; do
         _ms_name=${_ms_file##*/}
         _ms_name=${_ms_name%.bash}
@@ -108,7 +114,7 @@ _ms_bash_notify() {
 }
 
 _ms_bash_activate() {
-    local _ms_bash_loading_init=1
+    local _ms_bash_loading_init=1 _ms_bash_cache_dir=$1
     local -a _ms_bash_completion_files=()
     local -A _ms_bash_defs_before=() _ms_bash_defs_after=()
     unset _ms_bash_history_backend
