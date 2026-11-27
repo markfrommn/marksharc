@@ -440,7 +440,9 @@ MARKSHARC_SESSION=interactive' > "$TEST_ROOT/prompt-zdot/.zshrc"
     ms_fixture
     cp -R "$MARKSHARC_ROOT/bin" "$MS_HOME/bin"
     ms_copy_module completion
-    mkdir -p "$TEST_ROOT/insecure"
+    mkdir -p "$TEST_ROOT/insecure" "$XDG_CONFIG_HOME/marksharc"
+    # This tests guard ownership, not the speed of cold compinit on a CI host.
+    print -r -- 'set doctor.startup_ms 2000' > "$XDG_CONFIG_HOME/marksharc/config.conf"
     chmod 777 "$TEST_ROOT/insecure"
     # Coexist mode lets the fixture emulate Ubuntu's global zshrc before init.
     print -r -- 'export MARKSHARC_COEXIST=1
