@@ -14,7 +14,9 @@ tests/run-tests --shell zsh spec/zsh          # zsh units
 tests/run-tests --shell sh spec/contract      # cross-shell startup contract
 tests/run-tests --shell sh spec/install       # install.sh, uninstall and the end-to-end install
 tests/e2e/install-e2e.sh <checkout>           # install into a fresh HOME and start shells
-tests/run-tests --shell sh spec/repo          # runner, lint, inventory, bench and repository checks
+tests/run-tests --shell sh spec/repo          # runner, lint, inventory, bench, docs and repository checks
+tests/support/gen-module-reference            # regenerate docs/MODULES.md after a module change
+tests/e2e/readme-container.sh                 # README-only install in a clean container (needs Docker)
 tests/run-fish-units                          # fishtape units: modules/*/tests/*_test.fish, tests/fish/
 tests/bench-startup                           # advisory startup-time check (batch and PTY interactive)
 SHELLSPEC_BIN=/path/to/shellspec tests/run-tests --shell zsh spec/zsh
@@ -59,14 +61,17 @@ CI runs it as an advisory step on macOS and Linux.
 | `fish/`, `fish/support/helpers.fish` | Core fish units and the shared fish fixture |
 | `spec/spec_helper.sh`, `spec/support/fixtures.sh` | Per-example sandbox and shared helpers (`stub_command`, `git_fixture`, `run_bounded`, `file_mode`) |
 | `support/check-inventory.py` | Verifies every listed spec file in the contract inventory exists, every public module is listed, and coverage is at least 90%; run by `spec/repo/inventory_spec.sh` |
+| `support/gen-module-reference` | Generates `docs/MODULES.md` from each `module.conf` and module layout; `--check` fails when the page is out of date; run by `spec/repo/docs_spec.sh` |
+| `support/check-doc-links.py` | Verifies that relative Markdown links in `README.md`, `docs/`, `specs/` and the other tracked guides name existing files and headings; run by `spec/repo/docs_spec.sh` |
 | `support/function-safe-check.py` | Static check that file-scope declarations in sourced zsh files say `-g`; run by `spec/zsh/function_safe_spec.sh` |
 | `support/pty_socket.py` | OS fixture support only: a PTY child supervisor and a Unix socket binder |
 | `e2e/install-e2e.sh` | Reusable end-to-end check: install a checkout into a fresh HOME, start login and interactive shells, uninstall; needs only sh, zsh, bash and git (fish and python3 add shell and terminal steps); also run by CI on macOS and Ubuntu |
+| `e2e/readme-container.sh` | Runs the install commands from the README's Install section as a new user in a clean container, then the Day 1, Day 2 and uninstall commands; `--source local` uses this working tree, `github-clone` and `github-curl` run the published commands; needs Docker and is not run by CI |
 | `e2e/bash-live.py` | Real-tool interactive Bash PTY smoke and startup timing check run in CI |
 | `spec/zsh/` | Specs run with `--shell zsh` |
 | `spec/install/` | Specs run with `--shell sh`: `install.sh`, `marksharc uninstall`, the end-to-end script and lint coverage, in a temporary HOME with local bare repositories |
 | `spec/contract/` | Contract suite run with `--shell sh`: launches the zsh, Fish and Bash cores and checks quiet startup, environment availability, cache recovery, inheritance and interactive parity |
-| `spec/repo/` | Specs run with `--shell sh`: the harness, lint, inventory, startup benchmark and repository hygiene rules |
+| `spec/repo/` | Specs run with `--shell sh`: the harness, lint, inventory, startup benchmark, documentation checks and repository hygiene rules |
 
 ## Contract inventory
 
@@ -85,6 +90,7 @@ behaviours are covered.
 | Runner | Missing or wrong-version ShellSpec is refused; environment is scrubbed; throwaway HOME is removed | `spec/repo/runner_spec.sh` |
 | Lint | Files routed by extension and shebang; every failure reported; missing checker named | `spec/repo/lint_spec.sh` |
 | Inventory | Every listed spec file exists, every public module is listed, and coverage meets the 90% floor | `spec/repo/inventory_spec.sh` |
+| Documentation | Generated module reference matches the modules present, escapes table text and never expands references; relative links name existing files and headings | `spec/repo/docs_spec.sh` |
 | Startup benchmark | Advisory startup-time check measures batch and PTY interactive startup in a throwaway HOME with hyperfine or Python fallback | `spec/repo/bench_spec.sh` |
 | Repository | Agent configuration and cwf renders are ignored and untracked; the memory index is tracked | `spec/repo/hygiene_spec.sh` |
 | Core | Session classes; silent batch/agent startup; marker override; PTY interactive | `spec/zsh/core_session_spec.sh` |

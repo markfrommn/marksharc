@@ -1,5 +1,23 @@
 # Developing marksharc
 
+Start here if you want to change marksharc or add a module. The pages below go deeper; read the
+one your task needs.
+
+| Page | Read it when |
+| --- | --- |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | You are changing the core, or need to know what happens at startup, render or reload |
+| [MODULE-AUTHORING.md](MODULE-AUTHORING.md) | You are writing or changing a module |
+| [CONFIGURATION.md](CONFIGURATION.md) | You need the directive format that `module.conf` and the overlay share |
+| [DESIGN-RULES.md](DESIGN-RULES.md) | You want the reasoning behind a rule, or think you need an exception |
+| [tests/README.md](../tests/README.md) | You are writing or running tests |
+| [write-once.md](write-once.md) | Your command must change the shell that calls it |
+| [completions.md](completions.md) | You are adding a completion |
+| [MUX-ADAPTERS.md](MUX-ADAPTERS.md) | You are adding a multiplexer |
+| [fish.md](fish.md) | You are writing fish module code |
+
+The [specification](../specs/MARKSHARC-SPEC.md) is the contract. When a page here disagrees
+with it, the specification is right and the page needs a fix.
+
 ## Tools
 
 | Tool | Version | Used for |
@@ -29,6 +47,32 @@ and the test rules. Run `tests/bench-startup` for an advisory batch and PTY
 interactive startup-time check in a throwaway HOME.
 CI runs on `macos-latest` and `ubuntu-latest` for every pull request and every
 push to `main`; both must be green before a merge.
+
+## Documentation
+
+`docs/MODULES.md` is generated. After adding, removing or changing a module, regenerate it:
+
+```sh
+tests/support/gen-module-reference
+```
+
+`tests/spec/repo/docs_spec.sh` fails when that page is out of date, and when a relative link
+in `README.md`, `docs/` or `specs/` points at a file or heading that does not exist. It runs in
+`tests/check`. The main CI workflow skips Markdown-only changes, so a separate `Docs` workflow
+runs this one spec for them.
+
+To check that the README alone is enough to install on a clean machine:
+
+```sh
+tests/e2e/readme-container.sh                        # this working tree, in a fresh container
+tests/e2e/readme-container.sh --source github-clone  # the README's commands as published
+```
+
+It needs Docker and is not part of CI.
+
+Write user-facing pages for someone who has never seen marksharc. Keep examples free of
+personal values, as in code. The issue tracker is private, so do not link to it from `README.md`
+or `docs/`; cite an issue key as plain text where it helps.
 
 ## Measuring a live shell
 
@@ -79,7 +123,8 @@ inside an agent or a script go wrong:
   `tests/spec/repo/hygiene_spec.sh` checks it. Keep the agent block last in
   `.gitignore`.
 
-The design rules are in section 10 of [the specification](../specs/MARKSHARC-SPEC.md).
+[DESIGN-RULES.md](DESIGN-RULES.md) explains the fourteen design rules; section 10 of
+[the specification](../specs/MARKSHARC-SPEC.md) states them.
 
 ## Branches, commits and pull requests
 

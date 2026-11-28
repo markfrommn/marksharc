@@ -1,0 +1,61 @@
+name: Docs
+
+# The main CI workflow skips Markdown-only changes. This one runs only the documentation
+# checks, so a docs-only pull request still verifies the generated module reference and the
+# relative links.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**.md"
+      - "modules/**"
+      - "tests/support/gen-module-reference"
+      - "tests/support/check-doc-links.py"
+      - "tests/spec/repo/docs_spec.sh"
+      - ".github/workflows/docs.yml"
+
+  push:
+    branches: [main]
+    paths:
+      - "**.md"
+      - "modules/**"
+      - "tests/support/gen-module-reference"
+      - "tests/support/check-doc-links.py"
+      - "tests/spec/repo/docs_spec.sh"
+      - ".github/workflows/docs.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: docs checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install zsh
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q zsh
+
+      - name: Install pinned ShellSpec
+        run: |
+          commit=$(awk '$1 == "commit" { print $2 }' tests/shellspec.pin)
+          source=$(awk '$1 == "source" { print $2 }' tests/shellspec.pin)
+          dir="$RUNNER_TEMP/shellspec"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 "$source" "$commit"
+          git -C "$dir" checkout -q FETCH_HEAD
+          echo "SHELLSPEC_BIN=$dir/shellspec" >> "$GITHUB_ENV"
+
+      - name: Module reference and relative links
+        run: tests/run-tests --shell sh spec/repo/docs_spec.sh

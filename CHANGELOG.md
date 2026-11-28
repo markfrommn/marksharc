@@ -10,6 +10,8 @@ The 0.<PR>.0 versions below are historical backfills, not a versioning rule for 
 
 ## [Unreleased]
 
+Rewrote the documentation for outside adopters: a quickstart README, a user guide, command and configuration references, a module reference generated from each `module.conf`, shell notes, and architecture, module-authoring and design-rule guides, with CI checks that the module reference is current and relative links resolve. The specification is now a compact current-state contract; the original design is in `specs/archive/`. (DEV-47)
+
 Migrated the one-shot legacy zsh history importer (`import-legacy-history`) and its hermetic ShellSpec suite into the `history-atuin` module with portable defaults and explicit multi-host `--source`/`--tree` flags. (DEV-65)
 
 Wired rendered Carapace YAML completion specs into Carapace's platform specs directory via manifest-tracked managed symlinks with conflict preservation, disable/uninstall cleanup, init-cache invalidation, zsh/Bash precedence and `CARAPACE_EXCLUDES` fallback, `marksharc doctor` diagnostics, and completion authoring docs. (DEV-87)
