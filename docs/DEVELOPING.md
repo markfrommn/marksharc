@@ -71,7 +71,8 @@ tests/e2e/readme-container.sh --source github-clone  # the README's commands as 
 It needs Docker and is not part of CI.
 
 Write user-facing pages for someone who has never seen marksharc. Keep examples free of
-personal values, as in code.
+personal values, as in code. The issue tracker is private, so do not link to it from `README.md`
+or `docs/`; cite an issue key as plain text where it helps.
 
 ## Measuring a live shell
 
