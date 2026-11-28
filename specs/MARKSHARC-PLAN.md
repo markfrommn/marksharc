@@ -8,7 +8,7 @@
 
 **Tech stack:** zsh 5.9+, fish 4.x, Bash 4.4+ interactive and Bash 3.2 environment parity (delivered in [DEV-50](https://linear.app/psols/issue/DEV-50), [DEV-61](https://linear.app/psols/issue/DEV-61), [DEV-80](https://linear.app/psols/issue/DEV-80)–[DEV-83](https://linear.app/psols/issue/DEV-83)); ShellSpec 0.28.1; GitHub Actions on macOS and Ubuntu; atuin, starship, fzf, zoxide; git for distribution and sync.
 
-**Spec:** [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md). The plan argues from the spec; read both. The launch commands (P3.9) have their own [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
+**Spec:** [MARKSHARC-SPEC.md](MARKSHARC-SPEC.md). The plan argues from the spec; read both. Since [DEV-47](https://linear.app/psols/issue/DEV-47) that file is the current-state contract; where this plan cites spec sections 2, 3, 4.1–4.4, 5, 9, 11 or 12, it means the original design in [archive/MARKSHARC-SPEC-2026-11-design.md](archive/MARKSHARC-SPEC-2026-11-design.md). The launch commands (P3.9) have their own [LAUNCH-SPEC.md](LAUNCH-SPEC.md) and [LAUNCH-PLAN.md](LAUNCH-PLAN.md).
 Interactive Bash (L2) has its own approved [BASH-SPEC.md](BASH-SPEC.md); [DEV-61](https://linear.app/psols/issue/DEV-61) is the
 design/docs PR, and [DEV-80](https://linear.app/psols/issue/DEV-80)–[DEV-83](https://linear.app/psols/issue/DEV-83) delivered the runtime.
 Declarative completions (L8) have their own approved [COMPLETION-SPEC.md](COMPLETION-SPEC.md)
@@ -56,9 +56,9 @@ Ordered execution sequence for the remaining open work (excluding Deferred [DEV-
 | 4                                                | L8.3  | [DEV-87](https://linear.app/psols/issue/DEV-87) | marksharc          | Todo        | Carapace managed symlinks, cache invalidation, precedence, `doctor`/`uninstall`, and docs                                 |
 | 5                                                | L9    | [DEV-65](https://linear.app/psols/issue/DEV-65) | marksharc          | Done        | Migrate legacy history import script and specs from `mark-desktop-files`                                                  |
 | 6                                                | W1    | [DEV-67](https://linear.app/psols/issue/DEV-67) | marksharc          | Backlog     | Detect blocked `compinit`/newuser prompts in `doctor` and test against a real `compinit` prompt                           |
-| 7                                                | W2    | [DEV-66](https://linear.app/psols/issue/DEV-66) | marksharc          | Backlog     | Eliminate 5 s Linux startup timeout waits across five `doctor_spec.sh` cases (coordinate with                             | 8   | W3 Bug | [DEV-70](https://linear.app/psols/issue/DEV-70) | marksharc | Backlog | Fix `pager` module overwriting `MANPATH` and hiding Homebrew / PATH-derived man pages |
-| [DEV-67](https://linear.app/psols/issue/DEV-67)) |
-| 9                                                | P2.7  | [DEV-47](https://linear.app/psols/issue/DEV-47) | marksharc          | Backlog     | Final user documentation, generated module reference CI check, and bug/gap doc closeout                                   |
+| 7                                                | W2    | [DEV-66](https://linear.app/psols/issue/DEV-66) | marksharc          | Backlog     | Eliminate 5 s Linux startup timeout waits across five `doctor_spec.sh` cases (coordinate with [DEV-67](https://linear.app/psols/issue/DEV-67)) |
+| 8                                                | W3 Bug | [DEV-70](https://linear.app/psols/issue/DEV-70) | marksharc         | Backlog     | Fix `pager` module overwriting `MANPATH` and hiding Homebrew / PATH-derived man pages                                     |
+| 9                                                | P2.7  | [DEV-47](https://linear.app/psols/issue/DEV-47) | marksharc          | In Progress | Final user documentation, generated module reference CI check, and bug/gap doc closeout                                   |
 | 10                                               | L5    | [DEV-64](https://linear.app/psols/issue/DEV-64) | marksharc          | Backlog     | Public provider-neutral `AGENTS.md` (cwf-swappable) without tracking personal agent config                                |
 | 11                                               | WX    | [DEV-73](https://linear.app/psols/issue/DEV-73) | marksharc          | Backlog     | 1–2 week daily-use UX retrospective (including Carapace default UI / bridges / excludes evaluation)                       |
 | 12                                               | WY    | [DEV-59](https://linear.app/psols/issue/DEV-59) | mark-desktop-files | Backlog     | Remove retired shell startup code from `mark-desktop-files`, leaving only the overlay                                     |
@@ -370,7 +370,7 @@ Rollback at any point before WY: `marksharc uninstall` restores the previous stu
 - In the `legacy` module, `build_path` activates gvm and detects Go only when `MARKSHARC_SESSION` is `interactive`, and never passes `--default`. Agent and batch shells get gvm's Go by PATH only: the default environment's `gvm_go_name`, read with builtins, or the newest `~/.gvm/gos/go*`, with no sourcing and no forks. Keep that split in `go-gvm`.
 - Fortune is opt-in through `set legacy.greeting on`; carry that option to the `greeting` module.
 
-**Outcome:** Delivered in [PR #13](https://github.com/markfrommn/mark-desktop-files/pull/13), pending human merge; task plan [2026-11-20-dev-38-zsh-env-tool-modules.md](../docs/superpowers/plans/2026-11-20-dev-38-zsh-env-tool-modules.md). Operator decision: version-manager paths (gvm, nvm, pyenv shims) go in a new `manager` tier ahead of `brew` in every session class, a deviation from the old 6.7 order now written into the spec. One builtin Go selector serves every session class (gvm's default environment, else the newest Go), and `GOROOT` follows the first `go` on PATH. Intended PATH changes on the Mac: nvm's default node first in batch, agent and login shells; `~/.bun/bin` and `~/Library/pnpm` in the `user` tier; interactive shells on the default Go instead of the next-newest. `requires command` is checked at each module's turn against the live PATH plus pending tier directories.
+**Outcome:** Delivered in [PR #13](https://github.com/markfrommn/mark-desktop-files/pull/13), pending human merge; task plan `docs/superpowers/plans/2026-11-20-dev-38-zsh-env-tool-modules.md` in `mark-desktop-files`. Operator decision: version-manager paths (gvm, nvm, pyenv shims) go in a new `manager` tier ahead of `brew` in every session class, a deviation from the old 6.7 order now written into the spec. One builtin Go selector serves every session class (gvm's default environment, else the newest Go), and `GOROOT` follows the first `go` on PATH. Intended PATH changes on the Mac: nvm's default node first in batch, agent and login shells; `~/.bun/bin` and `~/Library/pnpm` in the `user` tier; interactive shells on the default Go instead of the next-newest. `requires command` is checked at each module's turn against the live PATH plus pending tier directories.
 
 **Notes for the implementer (from [DEV-38](https://linear.app/psols/issue/DEV-38)):**
 
@@ -408,7 +408,7 @@ Rollback at any point before WY: `marksharc uninstall` restores the previous stu
 - All specs pass.
 - `cwf-new`, `gwt-clean`, `claudek`, and `collie-default` are checked by hand on the Mac.
 
-**Outcome:** Delivered in [PR #14](https://github.com/markfrommn/mark-desktop-files/pull/14), pending human merge; task plan [2026-11-20-dev-39-system-workflow-modules.md](../docs/superpowers/plans/2026-11-20-dev-39-system-workflow-modules.md). The twelve modules plus `cloud` (`install-krew`) hold the system and workflow code. Three transitional modules, `convoy`, `mdf` and `mark-tools`, hold the personal code that P1.7 moves. The `legacy` module and every old `zsh.*` file are gone, so `config/zsh` holds `core/`, `modules/`, and the `.zshenv.linux` and `.zshenv.mac` stubs. The ssh-agent cache is `$XDG_STATE_HOME/marksharc/ssh-agent/agent.<host>.sh`; the old `~/tmp/private` file moves there once, and a symlinked, foreign or group/world-writable source is refused. `cwf-new` runs `cwf_new_post_create_hooks` and `gwt-clean` runs `gwt_clean_pre_remove_hooks`; a failing or undefined hook stops the command and keeps the session or worktree. Operator decision: the 6.4 band 90–99 is last-running init (`titles` 90, `x11` 91, `ssh-agent` 93), with 95 and above kept for line-editor plugins, so `greeting` moved from 98 to 94. The hand checks on the Mac are an operator step after merge.
+**Outcome:** Delivered in [PR #14](https://github.com/markfrommn/mark-desktop-files/pull/14), pending human merge; task plan `docs/superpowers/plans/2026-11-20-dev-39-system-workflow-modules.md` in `mark-desktop-files`. The twelve modules plus `cloud` (`install-krew`) hold the system and workflow code. Three transitional modules, `convoy`, `mdf` and `mark-tools`, hold the personal code that P1.7 moves. The `legacy` module and every old `zsh.*` file are gone, so `config/zsh` holds `core/`, `modules/`, and the `.zshenv.linux` and `.zshenv.mac` stubs. The ssh-agent cache is `$XDG_STATE_HOME/marksharc/ssh-agent/agent.<host>.sh`; the old `~/tmp/private` file moves there once, and a symlinked, foreign or group/world-writable source is refused. `cwf-new` runs `cwf_new_post_create_hooks` and `gwt-clean` runs `gwt_clean_pre_remove_hooks`; a failing or undefined hook stops the command and keeps the session or worktree. Operator decision: the 6.4 band 90–99 is last-running init (`titles` 90, `x11` 91, `ssh-agent` 93), with 95 and above kept for line-editor plugins, so `greeting` moved from 98 to 94. The hand checks on the Mac are an operator step after merge.
 
 #### P1.7 — Carve out the private overlay ([DEV-40](https://linear.app/psols/issue/DEV-40)) — Done
 
@@ -438,7 +438,7 @@ Rollback at any point before WY: `marksharc uninstall` restores the previous stu
 - The overlay link exists on the Mac and sol.
 - Behaviour is unchanged.
 
-**Repository outcome ([DEV-40](https://linear.app/psols/issue/DEV-40)):** Prepared in [PR #16](https://github.com/markfrommn/mark-desktop-files/pull/16), pending human review and merge. The private overlay and portable-tree lint are implemented. Hermetic zsh tests exercise the loader, private modules and startup; they do not certify behavior on an installed host. The Mac and sol links and their installed checks remain pending after human merge. Linux runtime and real CWF/provider integrations remain unverified by this change. See [the overlay guide](../docs/marksharc-overlay.md).
+**Repository outcome ([DEV-40](https://linear.app/psols/issue/DEV-40)):** Prepared in [PR #16](https://github.com/markfrommn/mark-desktop-files/pull/16), pending human review and merge. The private overlay and portable-tree lint are implemented. Hermetic zsh tests exercise the loader, private modules and startup; they do not certify behavior on an installed host. The Mac and sol links and their installed checks remain pending after human merge. Linux runtime and real CWF/provider integrations remain unverified by this change. See `docs/marksharc-overlay.md` in `mark-desktop-files`.
 
 **Notes for the implementer (from [DEV-37](https://linear.app/psols/issue/DEV-37)):**
 
@@ -633,10 +633,10 @@ The renderer remains P3.1; MVP refreshes the existing caches and environment ID.
 
 **Outcome:** Completed in [PR #6](https://github.com/markfrommn/marksharc/pull/6) and marked Done in Linear. Follow-up doctor test improvements were split into [DEV-66](https://linear.app/psols/issue/DEV-66) (W2) and [DEV-67](https://linear.app/psols/issue/DEV-67) (W1).
 
-#### P2.7 — User documentation and spec migration ([DEV-47](https://linear.app/psols/issue/DEV-47)) — Backlog
+#### P2.7 — User documentation and spec migration ([DEV-47](https://linear.app/psols/issue/DEV-47)) — In Progress
 
 - **Repo:** marksharc
-- **Estimate:** 3
+- **Estimate:** 5
 - **Depends on:** P2.4 ([DEV-44](https://linear.app/psols/issue/DEV-44))
 - **Linear milestone:** `6. Cleanup/Wrapup`
 
@@ -644,18 +644,22 @@ The renderer remains P3.1; MVP refreshes the existing caches and environment ID.
 
 **Scope**
 
-- README: what it is, requirements, Day 0 install, Day 1 use (modules, overlay, reload), Day 2 (sync, update, doctor).
-- `docs/`: filesystem layout, module reference (generated from `describe` lines), writing a module, overlay guide, directive reference, design rules, testing guide.
-- The spec and plan are already authoritative in `marksharc/specs/` (migrated early, with [DEV-42](https://linear.app/psols/issue/DEV-42)); P2.7 updates their layout and structure sections to match what was built, rather than moving them again.
-- Close out `docs/zsh-bugs-and-bogons.md` and the fish gap documents: each item resolved, or carried into an issue.
+- README: a quickstart. What it is, requirements, Day 0 install, Day 1 use (modules, overlay, reload), Day 2 (sync, update, doctor).
+- `docs/`, for users: a user guide, a command reference, a configuration reference, a module reference generated from each `module.conf`, and per-shell notes.
+- `docs/`, for developers: architecture and code flow, writing a module (including the wrapper contract and private modules), design rules, and the testing guide.
+- Rewrite `MARKSHARC-SPEC.md` as a current-state contract that agents can use, with a routing table into `docs/`; the original design moves to `specs/archive/`.
+- This plan stays open for context until the retrospective; its final retirement is [DEV-88](https://linear.app/psols/issue/DEV-88).
+- Close out `docs/zsh-bugs-and-bogons.md` and the fish gap documents in `mark-desktop-files`: each item resolved, or carried into an issue.
 
 **Tests**
 
-- A docs check in CI that the module reference matches the modules present.
+- A docs check in CI that the module reference matches the modules present, and that relative links resolve.
 
 **Done when**
 
 - Someone following only the README installs successfully in a clean container.
+
+**Task plan and closeout record:** [DEV-47-PLAN.md](DEV-47-PLAN.md).
 
 #### P2.8 — Test coverage to 90% of the contract inventory ([DEV-48](https://linear.app/psols/issue/DEV-48)) — Done
 
@@ -1367,6 +1371,6 @@ on the Mac and sol is a manual acceptance step after merge.
 | [LAUNCH-SPEC.md](LAUNCH-SPEC.md)                    | [DEV-78](https://linear.app/psols/issue/DEV-78) (design), [DEV-79](https://linear.app/psols/issue/DEV-79), [DEV-74](https://linear.app/psols/issue/DEV-74), [DEV-75](https://linear.app/psols/issue/DEV-75), [DEV-76](https://linear.app/psols/issue/DEV-76) (Done); per section in [LAUNCH-PLAN.md](LAUNCH-PLAN.md)                                                                                                                                    |
 | [COMPLETION-SPEC.md](COMPLETION-SPEC.md)            | [DEV-84](https://linear.app/psols/issue/DEV-84) (design, In Progress), [DEV-85](https://linear.app/psols/issue/DEV-85), [DEV-86](https://linear.app/psols/issue/DEV-86), [DEV-87](https://linear.app/psols/issue/DEV-87) (Todo); per section in [COMPLETION-PLAN.md](COMPLETION-PLAN.md)                                                                                                                                                                |
 | 9 Migration map                                     | [DEV-42](https://linear.app/psols/issue/DEV-42), [DEV-43](https://linear.app/psols/issue/DEV-43), [DEV-46](https://linear.app/psols/issue/DEV-46) (Done); [DEV-59](https://linear.app/psols/issue/DEV-59) (Backlog)                                                                                                                                                                                                                                     |
-| 10 Design rules                                     | [DEV-47](https://linear.app/psols/issue/DEV-47) (Backlog)                                                                                                                                                                                                                                                                                                                                                                                               |
+| 10 Design rules                                     | [DEV-47](https://linear.app/psols/issue/DEV-47) (In Progress)                                                                                                                                                                                                                                                                                                                                                                                               |
 | 4.2 Interactive Bash extension                      | [DEV-61](https://linear.app/psols/issue/DEV-61) (design), [DEV-80](https://linear.app/psols/issue/DEV-80), [DEV-81](https://linear.app/psols/issue/DEV-81), [DEV-82](https://linear.app/psols/issue/DEV-82), [DEV-83](https://linear.app/psols/issue/DEV-83) (Done)                                                                                                                                                                                     |
 | 4.3 Maybe later                                     | [DEV-62](https://linear.app/psols/issue/DEV-62), [DEV-72](https://linear.app/psols/issue/DEV-72) (L6), [DEV-63](https://linear.app/psols/issue/DEV-63) (Done); [DEV-60](https://linear.app/psols/issue/DEV-60) (Deferred); [DEV-64](https://linear.app/psols/issue/DEV-64) (Backlog); the Go helper has no issue yet                                                                                                                                    |
