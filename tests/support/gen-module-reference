@@ -1,0 +1,210 @@
+#!/usr/bin/env zsh
+# Generate docs/MODULES.md from modules/*/module.conf and each module's file layout.
+#
+#   gen-module-reference [--root <checkout>] [--output <file>] [--stdout] [--check]
+#
+# --check writes nothing: it exits 1 when the file on disk differs from what would be
+# generated. Lines are tokenised with the same shell-word rules as the loader (zsh (z)
+# splitting and (Q) unquoting), but ~ and $NAME references are left as written, so the
+# output does not depend on the host or the user.
+
+emulate -L zsh
+setopt extended_glob no_unset pipe_fail
+LC_ALL=C
+
+root=${${(%):-%x}:A:h:h:h}
+output=
+integer check=0 to_stdout=0
+
+while (( $# )); do
+    case $1 in
+        --root) root=${2:?--root needs a directory}; shift 2 ;;
+        --output) output=${2:?--output needs a file}; shift 2 ;;
+        --stdout) to_stdout=1; shift ;;
+        --check) check=1; shift ;;
+        -h|--help) print -r -- "Usage: gen-module-reference [--root <checkout>] [--output <file>] [--stdout] [--check]"; exit 0 ;;
+        *) print -ru2 -- "gen-module-reference: unknown argument: $1"; exit 2 ;;
+    esac
+done
+[[ -d $root/modules ]] || { print -ru2 -- "gen-module-reference: no modules directory under $root"; exit 2; }
+[[ -n $output ]] || output=$root/docs/MODULES.md
+
+# Tokenise one directive line into `reply` without expanding references.
+words() {
+    local -a raw
+    reply=()
+    raw=( ${(Z:C:)1} ) 2>/dev/null || return 1
+    (( $#raw )) || return 1
+    reply=( "${(@Q)raw}" )
+}
+
+# Escape text for a Markdown table cell.
+cell() { REPLY=${${${${1//\\/\\\\}//\|/\\|}//</\\<}//\*/\\*} }
+
+# `code` spans joined with ", ".
+codes() {
+    local -a out=()
+    local item
+    for item in "$@"; do out+=( "\`$item\`" ); done
+    REPLY=${(j:, :)out}
+}
+
+native_shells() {
+    local dir=$1
+    local -a shells=()
+    [[ -e $dir/env.zsh || -e $dir/init.zsh || -d $dir/functions/zsh || -d $dir/completions/zsh || -e $dir/zsh.plugins ]] && shells+=( zsh )
+    [[ -e $dir/env.bash || -e $dir/init.bash || -d $dir/functions/bash || -d $dir/completions/bash ]] && shells+=( bash )
+    [[ -e $dir/env.fish || -e $dir/init.fish || -d $dir/functions/fish || -d $dir/completions/fish || -e $dir/fish.plugins ]] && shells+=( fish )
+    REPLY=${(j:, :)shells}
+}
+
+typeset -a names=() summary=() body=()
+typeset conf dir name line describe order req_cmd req_os
+typeset -a opt_rows packages installers updates declared plugins bins comps
+typeset -A fn_shells
+typeset -a fn_names fns
+typeset registry shell file fn native requires default help
+
+for dir in $root/modules/*(N-/on); do
+    conf=$dir/module.conf
+    name=${dir:t}
+    [[ -f $conf ]] || continue
+    [[ $name != *[^A-Za-z0-9_-]* ]] || continue
+    describe= order=50 req_cmd= req_os=
+    opt_rows=() packages=() installers=() updates=() declared=() plugins=() bins=() comps=()
+    fn_shells=() fn_names=()
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        words "$line" || continue
+        case ${reply[1]} in
+            describe) describe=${reply[2]-} ;;
+            order) [[ ${reply[2]-} == <0-99> ]] && order=$(( 10#${reply[2]} )) ;;
+            requires)
+                case ${reply[2]-} in
+                    command) codes "${(@)reply[3,-1]}"; req_cmd=$REPLY ;;
+                    os) req_os=${(j: or :)reply[3,-1]} ;;
+                esac
+                ;;
+            option)
+                [[ -n ${reply[2]-} ]] || continue
+                default=${reply[3]-} help=${reply[4]-}
+                cell "$help"; help=$REPLY
+                if [[ -z $default ]]; then default='*(empty)*'; else cell "$default"; default="\`$REPLY\`"; fi
+                opt_rows+=( "| \`$name.${reply[2]}\` | $default | $help |" )
+                ;;
+            package) packages+=( "${reply[2]-} \`${reply[3]-}\`" ) ;;
+            installer) installers+=( "${reply[2]-}" ) ;;
+            update) updates+=( "\`${reply[2]-}\` (\`${(j: :)reply[3,-1]}\`)" ) ;;
+            env|path|alias|completion|completion-bash) declared+=( "${line##[[:space:]]#}" ) ;;
+        esac
+    done < $conf
+
+    for registry in $dir/(zsh|fish).plugins(N-.on); do
+        shell=${${registry:t}%.plugins}
+        while IFS= read -r line || [[ -n $line ]]; do
+            words "$line" || continue
+            [[ ${reply[1]} == plugin && -n ${reply[2]-} && -n ${reply[4]-} ]] || continue
+            plugins+=( "\`${reply[2]}\` at \`${reply[4][1,12]}\` ($shell)" )
+        done < $registry
+    done
+
+    bins=( $dir/bin/*(N-.on:t) )
+    comps=( $dir/completions/*.comp(N-.on:t:r) )
+    for shell in zsh bash fish; do
+        for file in $dir/functions/$shell/*(N-.on:t); do
+            fn=${file%.(bash|fish)}
+            [[ $fn == _* ]] && continue
+            (( ${+fn_shells[$fn]} )) || fn_names+=( $fn )
+            fn_shells[$fn]="${fn_shells[$fn]:+${fn_shells[$fn]}, }$shell"
+        done
+    done
+
+    native_shells $dir
+    native=$REPLY
+    requires=${req_cmd:+command $req_cmd}
+    [[ -n $req_os ]] && requires="${requires:+$requires; }os $req_os"
+
+    names+=( $name )
+    cell "$describe"
+    summary+=( "| [\`$name\`](#$name) | $order | ${native:-—} | ${requires:-—} | $REPLY |" )
+
+    cell "${describe:-No description.}"
+    body+=( "### \`$name\`" "" "$REPLY" "" )
+    body+=( "- **Order:** $order" )
+    body+=( "- **Native code:** ${native:-none (declarative only)}" )
+    [[ -n $requires ]] && body+=( "- **Requires:** $requires" )
+    if (( $#bins )); then codes $bins; body+=( "- **Executables:** $REPLY" ); fi
+    if (( $#fn_names )); then
+        fns=()
+        for fn in ${(o)fn_names}; do fns+=( "\`$fn\` (${fn_shells[$fn]})" ); done
+        body+=( "- **Shell functions:** ${(j:, :)fns}" )
+    fi
+    if (( $#comps )); then codes $comps; body+=( "- **Declarative completions:** $REPLY" ); fi
+    (( $#plugins )) && body+=( "- **Pinned plugins:** ${(j:, :)plugins}" )
+    (( $#packages )) && body+=( "- **Packages:** ${(j:, :)packages}" )
+    if (( $#installers )); then codes $installers; body+=( "- **Installers:** $REPLY" ); fi
+    (( $#updates )) && body+=( "- **Update steps:** ${(j:, :)updates}" )
+    if (( $#opt_rows )); then
+        body+=( "" "| Option | Default | Meaning |" "| --- | --- | --- |" "${opt_rows[@]}" )
+    fi
+    if (( $#declared )); then
+        body+=( "" "Declared in \`module.conf\`:" "" '```text' "${declared[@]}" '```' )
+    fi
+    body+=( "" )
+done
+
+(( $#names )) || { print -ru2 -- "gen-module-reference: no modules found under $root/modules"; exit 2; }
+
+typeset -a doc=(
+    "# Module reference"
+    ""
+    "<!-- Generated by tests/support/gen-module-reference. Do not edit by hand: change the"
+    "     module's module.conf or files, then run tests/support/gen-module-reference. -->"
+    ""
+    "This page lists the $#names public modules in \`modules/\`. It is generated from each"
+    "module's \`module.conf\` and file layout, and \`tests/check\` fails when it is out of date."
+    ""
+    "- Turn a module off with \`marksharc module disable <name>\`, or see"
+    "  [choosing modules](USERGUIDE.md#choosing-modules)."
+    "- Set an option with a \`set <module>.<key> <value>\` line in your overlay's \`config.conf\`."
+    "  [CONFIGURATION.md](CONFIGURATION.md) describes the file format and the settings that"
+    "  belong to the core, not to a module."
+    ""
+    "How to read an entry:"
+    ""
+    "- **Order** is the load position (0–99). Lower numbers load first; ties load by name."
+    "- **Native code** names the shells the module has its own files for. Lines declared in"
+    "  \`module.conf\` and executables in \`bin/\` work in every shell, so a module with no native"
+    "  code for a shell can still contribute there. [fish.md](fish.md) has the Fish parity table."
+    "- **Requires** lists commands that must be installed, or the operating system the module"
+    "  is limited to. A module whose requirement is not met skips itself silently."
+    "- **Installers** run with \`marksharc install <name>\`; **update steps** run with"
+    "  \`marksharc update\` and can be selected with \`--only <label>\`."
+    ""
+    "## Summary"
+    ""
+    "| Module | Order | Native code | Requires | Description |"
+    "| --- | --- | --- | --- | --- |"
+    "${summary[@]}"
+    ""
+    "## Modules"
+    ""
+    "${body[@]}"
+)
+# Drop the trailing blank line so the file ends with exactly one newline.
+[[ -z ${doc[-1]} ]] && doc[-1]=()
+generated=${(F)doc}
+
+if (( check )); then
+    [[ -r $output ]] || { print -ru2 -- "gen-module-reference: $output is missing; run tests/support/gen-module-reference"; exit 1; }
+    if [[ "$(<$output)" != "$generated" ]]; then
+        print -ru2 -- "gen-module-reference: $output is out of date; run tests/support/gen-module-reference"
+        exit 1
+    fi
+    exit 0
+fi
+if (( to_stdout )); then
+    print -r -- "$generated"
+else
+    print -r -- "$generated" > $output || { print -ru2 -- "gen-module-reference: cannot write $output"; exit 1; }
+fi
